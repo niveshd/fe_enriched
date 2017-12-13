@@ -54,7 +54,7 @@
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
 
-#include <deal.II/grid/filtered_iterator.h>
+#include <set>
 
 //TODO change to 3d after testing
 const unsigned int dim = 2;
@@ -248,6 +248,9 @@ namespace Step36
     typedef std::function<bool (const typename Triangulation<dim>::active_cell_iterator &)> predicate_function;
     std::vector<predicate_function> predicates;
     
+    //Only for elements with at least one enrichment function
+    std::vector<std::vector<size_t> > material_table;
+    
     const FEValuesExtractors::Scalar fe_extractor;
     const unsigned int               fe_fe_index;
     const unsigned int               fe_material_id;
@@ -291,9 +294,9 @@ namespace Step36
     
     //initialize vector of predicates
     predicates.resize(5);
-    predicates[0] = enrichment_predicate<dim>(Point<dim>(0,0), 2);
+    predicates[0] = enrichment_predicate<dim>(Point<dim>(-7.5,7.5), 2);
     predicates[1] = enrichment_predicate<dim>(Point<dim>(-5,5), 2);
-    predicates[2] = enrichment_predicate<dim>(Point<dim>(-10,10), 2);
+    predicates[2] = enrichment_predicate<dim>(Point<dim>(0,0), 2);
     predicates[3] = enrichment_predicate<dim>(Point<dim>(5,-5), 2);
     predicates[4] = enrichment_predicate<dim>(Point<dim>(10,-10), 2);
 
@@ -340,7 +343,7 @@ namespace Step36
     Assert( num_indices == sp_graph.n_rows() , ExcInternalError() );
     std::vector<unsigned int> color_indices;
     color_indices.resize(num_indices);
-    SparsityTools::color_sparsity_pattern (sp_graph, color_indices);
+    size_t num_colors = SparsityTools::color_sparsity_pattern (sp_graph, color_indices);
     
     //print color_indices
     for (size_t i=0; i<num_indices; ++i)
@@ -357,12 +360,72 @@ namespace Step36
     }
     
     output_test("color");    
-      
+    
+    //build material table and also assign materials
+    std::vector<size_t> predicate_list;
+    bool found = false;
+    predicate_list.reserve(num_colors);
+    //loop throught cells
+    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
+         cell != dof_handler.end(); ++cell)
+    {
+        cell->set_material_id (0);  //No enrichment at all
+        predicate_list.clear();
+        
+        //loop through predicate function. connections between same color regions is also done.
+        //doesn't matter though.
+        for (size_t i=0; i<predicates.size(); ++i)
+        {        
+            //add if predicate true to vector of functions
+            if (predicates[i](cell))
+            {
+                predicate_list.push_back(i);       
+                std::cout << " - " << i;
+            }
+            
+        }
+        
+        if (!predicate_list.empty())
+                std::cout << std::endl;
+        
+        found = false;
+        //check if the combination is already added
+        if ( !predicate_list.empty() )
+        {
+            for ( size_t j=0; j<material_table.size(); j++)
+            {
+                if (material_table[j] == predicate_list)
+                {
+                    std::cout << "fe set found at " << j << std::endl;
+                    found=true;
+                    cell->set_material_id(j+1);
+                    break;
+                }
+            }
+            
+            if (!found){
+                material_table.push_back(predicate_list);
+                cell->set_material_id(material_table.size());
+                std::cout << "new fe set pushed at " << material_table.size()-1 << std::endl;
+            }     
+        }
+    }
+    
+    output_test("final");
+    
+    //print material table
+    std::cout << "Material table " << std::endl;
+    for ( size_t j=0; j<material_table.size(); j++)
+    {
+        std::cout << j << " ( ";
+        for ( size_t i = 0; i<material_table[j].size(); i++)
+            std::cout << material_table[j][i] << " ";
+        std::cout << " ) " << std::endl;
+    }
+        
     //TODO Assert q collection and fe collection are of same size
       
-      
-    //assign material index
-  }
+}
 
   template <int dim>
   std::pair<unsigned int, unsigned int>
