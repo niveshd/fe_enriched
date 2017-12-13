@@ -54,19 +54,30 @@
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
 
-#include <vector>
+#include <deal.II/grid/filtered_iterator.h>
 
 //TODO change to 3d after testing
 const unsigned int dim = 2;
 
 using namespace dealii;
 
-  template <int dim, const Point<dim> &p, const int radius>
-  bool
-  predicate(const typename hp::DoFHandler<dim>::cell_iterator &cell)
+  template <int dim>
+  struct enrichment_predicate
   {
-    return (cell->center() - p).norm() < radius*radius;
-  }
+    enrichment_predicate(const Point<dim> p, const int radius)
+    :p(p),radius(radius){}
+    
+    template <class Iterator>
+    bool operator () (const Iterator &i)
+    { 
+        return ( (i->center() - p).norm() < radius);
+    }
+    
+  private:
+    Point<dim> p;
+    int radius;   
+    
+  };
 
 /**
  * Coulomb potential
@@ -149,6 +160,39 @@ private:
   const double radius;
 };
 
+template <class MeshType>
+bool find_connection_between_regions
+(const MeshType                                                              &mesh,
+ const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
+ const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2
+)
+{
+    std::vector<bool> locally_active_vertices_on_subdomain (mesh.get_triangulation().n_vertices(),
+                                                            false);
+
+    //Mark vertices in region defined by predicate 1
+    for (typename MeshType::active_cell_iterator
+        cell = mesh.begin_active();
+        cell != mesh.end(); ++cell)
+    if (predicate_1(cell)) // True predicate --> Part of subdomain
+        for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
+        locally_active_vertices_on_subdomain[cell->vertex_index(v)] = true;
+
+    //Find cells in region 2 defined by predicate 2 which are common with region 1
+    for (typename MeshType::active_cell_iterator
+        cell = mesh.begin_active();
+        cell != mesh.end(); ++cell)
+    if (predicate_2(cell)) // False predicate --> Potential halo cell
+        for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
+        if (locally_active_vertices_on_subdomain[cell->vertex_index(v)] == true)
+            {
+            return true;
+            }
+
+    return false;
+}
+  
+
 namespace Step36
 {
 
@@ -172,6 +216,7 @@ namespace Step36
     void estimate_error ();
     void refine_grid ();
     void output_results (const unsigned int cycle) const;
+    void output_test (std::string file_name) const;
 
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
@@ -202,17 +247,6 @@ namespace Step36
     
     typedef std::function<bool (const typename Triangulation<dim>::active_cell_iterator &)> predicate_function;
     std::vector<predicate_function> predicates;
-//     predicates.resize(3);
-    
-    //vector of predicates
-/*    typedef std::function<bool (const typename Triangulation<dim>::active_cell_iterator &)>  predicate_function;*/    
-//     typedef std::function<bool (int)>  predicate_function;
-//     typedef std::vector< predicate_fuction > pp;
-//     pp predicates;
-//     predicates.resize(3);
-//     
-//     predicates[0] = predicate<dim, Point<dim>(), 1>;
-//     predicates[1] = predicate<dim, Point<dim>(0,1), 1>;
     
     const FEValuesExtractors::Scalar fe_extractor;
     const unsigned int               fe_fe_index;
@@ -222,7 +256,7 @@ namespace Step36
     const unsigned int               pou_material_id;
 
     std::vector<Vector<float> > vec_estimated_error_per_cell;
-    Vector<float> estimated_error_per_cell;
+    Vector<float> estimated_error_per_cell;    
   };
 
   template <int dim>
@@ -245,15 +279,23 @@ namespace Step36
     pou_fe_index(1),
     pou_material_id(1)
   {
-    GridGenerator::hyper_cube (triangulation, -10, 10);
-    triangulation.refine_global (5); //64 cells
-
+    GridGenerator::hyper_cube (triangulation, -20, 20);
+    triangulation.refine_global (4); //64 cells
+    
     //TODO undo? no refinement according to material.
 //     for (auto cell= triangulation.begin_active(); cell != triangulation.end(); ++cell)
 //       if (std::sqrt(cell->center().square()) < 5.0)
 //         cell->set_refine_flag();
 
 //     triangulation.execute_coarsening_and_refinement(); // 120 cells
+    
+    //initialize vector of predicates
+    predicates.resize(5);
+    predicates[0] = enrichment_predicate<dim>(Point<dim>(0,0), 2);
+    predicates[1] = enrichment_predicate<dim>(Point<dim>(-5,5), 2);
+    predicates[2] = enrichment_predicate<dim>(Point<dim>(-10,10), 2);
+    predicates[3] = enrichment_predicate<dim>(Point<dim>(5,-5), 2);
+    predicates[4] = enrichment_predicate<dim>(Point<dim>(10,-10), 2);
 
     //TODO more q_collections?
     q_collection.push_back(QGauss<dim>(4));
@@ -268,22 +310,58 @@ namespace Step36
                                                FE_Q<dim>(1),
                                                &enrichment));
 
-    // assign fe index in the constructor so that FE/FE+POU is determined
-    // on the coarsest mesh to avoid issues like
-    // +---------+----+----+
-    // |         | fe |    |
-    // |    fe   +----+----+
-    // |         | pou|    |
-    // +---------+----+----+
-    // see discussion in Step46.
+    //set material id based on predicate functions. TODO undo
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell)
-      if (enrichment.is_enriched(cell->center()))
-        cell->set_material_id(pou_material_id);
-      else
-        cell->set_material_id(fe_material_id);
+    {
+    cell->set_material_id(0);
+        for (size_t i=0; i<predicates.size(); ++i)
+            if ( predicates[i](cell) )
+                cell->set_material_id(i+1);
+    }
+    
+    output_test("predicate");
+             
+    //make a sparsity pattern based on connections between regions
+    unsigned int num_indices = predicates.size();
+    DynamicSparsityPattern dsp;
+    dsp.reinit ( num_indices, num_indices );
+    for (size_t i = 0; i < num_indices; ++i)
+        for (size_t j = i+1; j < num_indices; ++j)
+            if ( find_connection_between_regions(dof_handler, predicates[i], predicates[j]) )
+                dsp.add(i,j);
+    
+    dsp.symmetrize();
+    
+    //color different regions (defined by predicate)
+    SparsityPattern sp_graph;
+    sp_graph.copy_from(dsp);
+    
+    Assert( num_indices == sp_graph.n_rows() , ExcInternalError() );
+    std::vector<unsigned int> color_indices;
+    color_indices.resize(num_indices);
+    SparsityTools::color_sparsity_pattern (sp_graph, color_indices);
+    
+    //print color_indices
+    for (size_t i=0; i<num_indices; ++i)
+        std::cout << "predicate " << i << " : " << color_indices[i] << std::endl;
+    
+    //set material id based on color. TODO undo
+    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
+         cell != dof_handler.end(); ++cell)
+    {
+    cell->set_material_id(0);
+        for (size_t i=0; i<predicates.size(); ++i)
+            if ( predicates[i](cell) )
+                cell->set_material_id (color_indices[i]);
+    }
+    
+    output_test("color");    
       
     //TODO Assert q collection and fe collection are of same size
+      
+      
+    //assign material index
   }
 
   template <int dim>
@@ -566,21 +644,21 @@ namespace Step36
       }
     }
 
-//     Assert (cycle < 10, ExcNotImplemented());
-//     if (this_mpi_process==0)
-//       {
-//         std::string filename = "solution-";
-//         filename += ('0' + cycle);
-//         filename += ".vtk";
-//         std::ofstream output (filename.c_str());
-// 
-//         DataOut<dim,hp::DoFHandler<dim> > data_out;
-//         data_out.attach_dof_handler (dof_handler);
-//         data_out.add_data_vector (eigenfunctions_locally_relevant[0], "solution");
-//         data_out.build_patches (6);
-//         data_out.write_vtk (output);
-//         output.close();
-//       }
+    Assert (cycle < 10, ExcNotImplemented());
+    if (this_mpi_process==0)
+      {
+        std::string filename = "solution-";
+        filename += ('0' + cycle);
+        filename += ".vtk";
+        std::ofstream output (filename.c_str());
+
+        DataOut<dim,hp::DoFHandler<dim> > data_out;
+        data_out.attach_dof_handler (dof_handler);
+        data_out.add_data_vector (eigenfunctions_locally_relevant[0], "solution");
+        data_out.build_patches (6);
+        data_out.write_vtk (output);
+        output.close();
+      }
 
     // second output without making mesh finer
     if (this_mpi_process==0)
@@ -592,41 +670,72 @@ namespace Step36
 
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
-        data_out.add_data_vector (fe_index, "fe_index");
+//         data_out.add_data_vector (fe_index, "fe_index");
         data_out.add_data_vector (material_id, "material_id");
-        data_out.add_data_vector (estimated_error_per_cell, "estimated_error");
+//         data_out.add_data_vector (estimated_error_per_cell, "estimated_error");
         data_out.build_patches ();
         data_out.write_vtk (output);
         output.close();
       }
 
-    // scalar data for plotting
-    //output scalar data (eigenvalues, energies, ndofs, etc)
-//     if (this_mpi_process == 0)
-//       {
-//         const std::string scalar_fname = "scalar-data.txt";
-// 
-//         std::ofstream output (scalar_fname.c_str(),
-//                               std::ios::out |
-//                               (cycle==0
-//                                ?
-//                                std::ios::trunc : std::ios::app));
-// 
-//         std::streamsize max_precision  = std::numeric_limits<double>::digits10;
-// 
-//         std::string sep("  ");
-//         output << cycle << sep
-//                << std::setprecision(max_precision)
-//                << triangulation.n_active_cells() << sep
-//                << dof_handler.n_dofs () << sep
-//                << std::scientific;
-// 
-//         for (unsigned int i = 0; i < eigenvalues.size(); i++)
-//           output << eigenvalues[i] << sep;
-// 
-//         output<<std::endl;
-//         output.close();
-//       } //end scope
+//     scalar data for plotting
+//     output scalar data (eigenvalues, energies, ndofs, etc)
+    if (this_mpi_process == 0)
+      {
+        const std::string scalar_fname = "scalar-data.txt";
+
+        std::ofstream output (scalar_fname.c_str(),
+                              std::ios::out |
+                              (cycle==0
+                               ?
+                               std::ios::trunc : std::ios::app));
+
+        std::streamsize max_precision  = std::numeric_limits<double>::digits10;
+
+        std::string sep("  ");
+        output << cycle << sep
+               << std::setprecision(max_precision)
+               << triangulation.n_active_cells() << sep
+               << dof_handler.n_dofs () << sep
+               << std::scientific;
+
+        for (unsigned int i = 0; i < eigenvalues.size(); i++)
+          output << eigenvalues[i] << sep;
+
+        output<<std::endl;
+        output.close();
+      } //end scope
+
+  }
+  
+  template <int dim>
+  void EigenvalueProblem<dim>::output_test (std::string file_name) const
+  {
+    Vector<float> material_id(triangulation.n_active_cells());
+    {
+      typename hp::DoFHandler<dim>::active_cell_iterator
+      cell = dof_handler.begin_active(),
+      endc = dof_handler.end();
+      for (unsigned int index=0; cell!=endc; ++cell, ++index)
+      {
+        material_id(index) = cell->material_id();
+      }
+    }
+
+    // second output without making mesh finer
+    if (this_mpi_process==0)
+      {
+        file_name += ".vtk";
+        std::ofstream output (file_name.c_str());
+        
+
+        DataOut<dim,hp::DoFHandler<dim> > data_out;
+        data_out.attach_dof_handler (dof_handler);
+        data_out.add_data_vector (material_id, "material_id");
+        data_out.build_patches ();
+        data_out.write_vtk (output);
+        output.close();
+      }
 
   }
 
@@ -639,17 +748,17 @@ namespace Step36
     for (unsigned int cycle = 0; cycle < 1; cycle++)
       {
         pcout << "Cycle "<<cycle <<std::endl;
-        const std::pair<unsigned int, unsigned int> n_cells = setup_system ();
+//         const std::pair<unsigned int, unsigned int> n_cells = setup_system ();
 
-        pcout << "   Number of active cells:       "
-              << triangulation.n_active_cells ()
-              << std::endl
-              << "     FE / POUFE :                "
-              << n_cells.first << " / " << n_cells.second
-              << std::endl
-              << "   Number of degrees of freedom: "
-              << dof_handler.n_dofs ()
-              << std::endl;
+//         pcout << "   Number of active cells:       "
+//               << triangulation.n_active_cells ()
+//               << std::endl
+//               << "     FE / POUFE :                "
+//               << n_cells.first << " / " << n_cells.second
+//               << std::endl
+//               << "   Number of degrees of freedom: "
+//               << dof_handler.n_dofs ()
+//               << std::endl;
 
 //         assemble_system ();
 
@@ -659,7 +768,7 @@ namespace Step36
 //                     ExcInternalError());
 
 //         estimate_error ();
-        output_results(cycle);
+//         output_results(cycle);
 //         refine_grid ();
 //
 //         pcout << std::endl;
