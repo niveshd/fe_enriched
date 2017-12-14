@@ -61,23 +61,23 @@ const unsigned int dim = 2;
 
 using namespace dealii;
 
-  template <int dim>
-  struct enrichment_predicate
-  {
+template <int dim>
+struct enrichment_predicate
+{
     enrichment_predicate(const Point<dim> p, const int radius)
     :p(p),radius(radius){}
-    
+
     template <class Iterator>
     bool operator () (const Iterator &i)
     { 
         return ( (i->center() - p).norm() < radius);
     }
-    
-  private:
+
+    private:
     Point<dim> p;
     int radius;   
-    
-  };
+
+};
 
 /**
  * Coulomb potential
@@ -160,37 +160,6 @@ private:
   const double radius;
 };
 
-template <class MeshType>
-bool find_connection_between_regions
-(const MeshType                                                              &mesh,
- const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
- const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2
-)
-{
-    std::vector<bool> locally_active_vertices_on_subdomain (mesh.get_triangulation().n_vertices(),
-                                                            false);
-
-    //Mark vertices in region defined by predicate 1
-    for (typename MeshType::active_cell_iterator
-        cell = mesh.begin_active();
-        cell != mesh.end(); ++cell)
-    if (predicate_1(cell)) // True predicate --> Part of subdomain
-        for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
-        locally_active_vertices_on_subdomain[cell->vertex_index(v)] = true;
-
-    //Find cells in region 2 defined by predicate 2 which are common with region 1
-    for (typename MeshType::active_cell_iterator
-        cell = mesh.begin_active();
-        cell != mesh.end(); ++cell)
-    if (predicate_2(cell)) // False predicate --> Potential halo cell
-        for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
-        if (locally_active_vertices_on_subdomain[cell->vertex_index(v)] == true)
-            {
-            return true;
-            }
-
-    return false;
-}
   
 
 namespace Step36
@@ -200,11 +169,11 @@ namespace Step36
    * Main class
    */
   template <int dim>
-  class EigenvalueProblem
+  class LaplaceProblem
   {
   public:
-    EigenvalueProblem ();
-    virtual ~EigenvalueProblem();
+    LaplaceProblem ();
+    virtual ~LaplaceProblem();
     void run ();
 
   private:
@@ -263,7 +232,7 @@ namespace Step36
   };
 
   template <int dim>
-  EigenvalueProblem<dim>::EigenvalueProblem ()
+  LaplaceProblem<dim>::LaplaceProblem ()
     :
     dof_handler (triangulation),
     mpi_communicator(MPI_COMM_WORLD),
@@ -283,7 +252,7 @@ namespace Step36
     pou_material_id(1)
   {
     GridGenerator::hyper_cube (triangulation, -20, 20);
-    triangulation.refine_global (4); //64 cells
+    triangulation.refine_global (4);
     
     //TODO undo? no refinement according to material.
 //     for (auto cell= triangulation.begin_active(); cell != triangulation.end(); ++cell)
@@ -331,7 +300,7 @@ namespace Step36
     dsp.reinit ( num_indices, num_indices );
     for (size_t i = 0; i < num_indices; ++i)
         for (size_t j = i+1; j < num_indices; ++j)
-            if ( find_connection_between_regions(dof_handler, predicates[i], predicates[j]) )
+            if ( GridTools::find_connection_between_subdomains(dof_handler, predicates[i], predicates[j]) )
                 dsp.add(i,j);
     
     dsp.symmetrize();
@@ -429,7 +398,7 @@ namespace Step36
 
   template <int dim>
   std::pair<unsigned int, unsigned int>
-  EigenvalueProblem<dim>::setup_system ()
+  LaplaceProblem<dim>::setup_system ()
   {
     for (typename hp::DoFHandler<dim>::active_cell_iterator
          cell = dof_handler.begin_active();
@@ -522,7 +491,7 @@ namespace Step36
 
   template <int dim>
   bool
-  EigenvalueProblem<dim>::cell_is_pou(const typename hp::DoFHandler<dim>::cell_iterator &cell) const
+  LaplaceProblem<dim>::cell_is_pou(const typename hp::DoFHandler<dim>::cell_iterator &cell) const
   {
     return cell->material_id() == pou_material_id;
   }
@@ -530,7 +499,7 @@ namespace Step36
 
   template <int dim>
   void
-  EigenvalueProblem<dim>::assemble_system()
+  LaplaceProblem<dim>::assemble_system()
   {
     stiffness_matrix = 0;
     mass_matrix = 0;
@@ -614,7 +583,7 @@ namespace Step36
 
   template <int dim>
   std::pair<unsigned int, double>
-  EigenvalueProblem<dim>::solve()
+  LaplaceProblem<dim>::solve()
   {
     SolverControl solver_control (dof_handler.n_dofs(), 1e-9,false,false);
     SLEPcWrappers::SolverKrylovSchur eigensolver (solver_control,
@@ -639,13 +608,13 @@ namespace Step36
   }
 
   template <int dim>
-  EigenvalueProblem<dim>::~EigenvalueProblem()
+  LaplaceProblem<dim>::~LaplaceProblem()
   {
     dof_handler.clear ();
   }
 
   template <int dim>
-  void EigenvalueProblem<dim>::estimate_error ()
+  void LaplaceProblem<dim>::estimate_error ()
   {
     {
       std::vector<const PETScWrappers::MPI::Vector *> sol (number_of_eigenvalues);
@@ -680,7 +649,7 @@ namespace Step36
   }
 
   template <int dim>
-  void EigenvalueProblem<dim>::refine_grid ()
+  void LaplaceProblem<dim>::refine_grid ()
   {
     const double threshold = 0.9 * estimated_error_per_cell.linfty_norm();
     GridRefinement::refine (triangulation,
@@ -692,7 +661,7 @@ namespace Step36
   }
 
   template <int dim>
-  void EigenvalueProblem<dim>::output_results (const unsigned int cycle) const
+  void LaplaceProblem<dim>::output_results (const unsigned int cycle) const
   {
     Vector<float> fe_index(triangulation.n_active_cells());
     Vector<float> material_id(triangulation.n_active_cells());
@@ -772,7 +741,7 @@ namespace Step36
   }
   
   template <int dim>
-  void EigenvalueProblem<dim>::output_test (std::string file_name) const
+  void LaplaceProblem<dim>::output_test (std::string file_name) const
   {
     Vector<float> material_id(triangulation.n_active_cells());
     {
@@ -805,7 +774,7 @@ namespace Step36
 
   template <int dim>
   void
-  EigenvalueProblem<dim>::run()
+  LaplaceProblem<dim>::run()
   {
     //TODO cycle to be set to 4 after testing
     for (unsigned int cycle = 0; cycle < 1; cycle++)
@@ -851,7 +820,7 @@ int main (int argc,char **argv)
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        Step36::EigenvalueProblem<dim> step36;
+        Step36::LaplaceProblem<dim> step36;
 //         PETScWrappers::set_option_value("-eps_target","-1.0");
 //         PETScWrappers::set_option_value("-st_type","sinvert");
 //         PETScWrappers::set_option_value("-st_ksp_type","cg");
