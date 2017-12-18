@@ -182,7 +182,7 @@ namespace Step1
   private:
     bool cell_is_pou(const typename hp::DoFHandler<dim>::cell_iterator &cell) const;
     
-    void build_color_predicate_table ();
+    void build_tables ();
     std::pair<unsigned int, unsigned int> setup_system ();
     void assemble_system ();
     std::pair<unsigned int, double> solve ();
@@ -195,6 +195,9 @@ namespace Step1
     hp::DoFHandler<dim> dof_handler;
     hp::FECollection<dim> fe_collection;
     hp::QCollection<dim> q_collection;
+    
+    FE_Q<dim> fe_base;
+    FE_Q<dim> fe_enriched;
 
     IndexSet locally_owned_dofs;
     IndexSet locally_relevant_dofs;
@@ -248,6 +251,8 @@ namespace Step1
   LaplaceProblem<dim>::LaplaceProblem ()
     :
     dof_handler (triangulation),
+    fe_base(2),
+    fe_enriched(1),
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
@@ -295,10 +300,10 @@ namespace Step1
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell)
     {
-    cell->set_material_id(0);
+    cell->set_active_fe_index(0);
         for (size_t i=0; i<vec_predicates.size(); ++i)
             if ( vec_predicates[i](cell) )
-                cell->set_material_id(i+1);
+                cell->set_active_fe_index(i+1);
     }
     
     output_test("predicate");
@@ -333,37 +338,71 @@ namespace Step1
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell)
     {
-    cell->set_material_id(0);
+    cell->set_active_fe_index(0);
         for (size_t i=0; i<vec_predicates.size(); ++i)
             if ( vec_predicates[i](cell) )
-                cell->set_material_id (predicate_colors[i]);
+                cell->set_active_fe_index (predicate_colors[i]);
     }
     
     output_test("color"); 
     }
     
     //build fe table. should be called everytime number of cells change!
-    build_color_predicate_table();
+    build_tables();
         
+   
+    //q collections the same size as different material identities
+    q_collection.push_back(QGauss<dim>(4));
+    
+    for (size_t i=1; i!=material_table.size(); ++i)
+        q_collection.push_back(QGauss<dim>(10));
+    
+    // usual elements (active_fe_index ==0):
+    fe_collection.push_back (FE_Enriched<dim> (fe_base));
+    
+    for (size_t i=1; i !=material_table.size(); ++i)   
+    {
+        //set vector base elements for fe enrichment
+        //if {1,2} are color of fe element, 2 fe elements need to be enriched.
+        std::vector<const FiniteElement<dim> *> vec_fe_enriched;          
+        vec_fe_enriched.assign (material_table[i].size(), &fe_enriched);
+            
+        //set functions based on cell accessor
+        //cell accessor --> cell id --> color --> appropriate enrichment function
+        std::vector<std::vector<std::function<const Function<dim> *
+            (const typename Triangulation<dim, dim>::cell_iterator &) > > >
+                functions(material_table[i].size());
+        
+        size_t ind = 0;
+        for (auto it=material_table[i].begin();
+             it != material_table[i].end();
+             ++it, ++ind)
+        {
+            auto func = [&] 
+            (const typename Triangulation<dim, dim>::cell_iterator & cell)
+            {
+                size_t id = cell->index();
+                return &vec_enrichments[color_predicate_table[id][i]];
+            };
+            functions[ind].push_back(func);               
+            
+        }
+        
+        Assert (vec_fe_enriched.size() == functions.size(), 
+                ExcDimensionMismatch(vec_fe_enriched.size(), functions.size()));
+                                            
+        fe_collection.push_back (FE_Enriched<dim> (&fe_base,
+                                                   vec_fe_enriched,
+                                                   functions));
+    }
+    
     //TODO Assert q collection and fe collection are of same size
-    
-//     //TODO more q_collections?
-//     q_collection.push_back(QGauss<dim>(4));
-//     q_collection.push_back(QGauss<dim>(10));
-    
-    //     // usual elements (active_fe_index ==0):
-//     fe_collection.push_back (FE_Enriched<dim> (FE_Q<dim>(2)));
-// 
-// 
-//     // enriched elements (active_fe_index==1):
-//     fe_collection.push_back (FE_Enriched<dim> (FE_Q<dim>(2),
-//                                                FE_Q<dim>(1),
-//                                                &enrichment));
+
       
 }
 
   template <int dim>
-  void LaplaceProblem<dim>::build_color_predicate_table ()
+  void LaplaceProblem<dim>::build_tables ()
   {
     bool found = false;
     color_predicate_table.resize( triangulation.n_cells() ); 
@@ -373,12 +412,12 @@ namespace Step1
     
     
     //loop throught cells and build fe table
-    typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-    for (size_t cell_index = 0;
-         cell != dof_handler.end();
-         ++cell, ++cell_index)
+    auto cell= triangulation.begin_active();
+    size_t cell_index = 0;
+    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
+         cell != dof_handler.end(); ++cell, ++cell_index)
     {
-        cell->set_material_id (0);  //No enrichment at all
+        cell->set_active_fe_index (0);  //No enrichment at all
         std::set<size_t> color_list;
         
         //loop through predicate function. connections between same color regions is also done.
@@ -414,14 +453,14 @@ namespace Step1
                 {
                     std::cout << "color combo set found at " << j << std::endl;
                     found=true;
-                    cell->set_material_id(j);
+                    cell->set_active_fe_index(j);                    
                     break;
                 }
             }
             
             if (!found){
                 material_table.push_back(color_list);
-                cell->set_material_id(material_table.size()-1);
+                cell->set_active_fe_index(material_table.size()-1);
                 std::cout << "color combo set pushed at " << material_table.size()-1 << std::endl;
             }     
         }
@@ -787,14 +826,14 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::output_test (std::string file_name) const
   {
-    Vector<float> material_id(triangulation.n_active_cells());
+    Vector<float> active_fe_index(triangulation.n_active_cells());
     {
       typename hp::DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
       for (unsigned int index=0; cell!=endc; ++cell, ++index)
       {
-        material_id(index) = cell->material_id();
+        active_fe_index(index) = cell->active_fe_index();
       }
     }
 
@@ -807,7 +846,7 @@ namespace Step1
 
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
-        data_out.add_data_vector (material_id, "material_id");
+        data_out.add_data_vector (active_fe_index, "fe_index");
         data_out.build_patches ();
         data_out.write_vtk (output);
         output.close();
