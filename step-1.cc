@@ -54,7 +54,7 @@
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
 
-#include <set>
+#include <map>
 
 //TODO need 3d test example?
 const unsigned int dim = 2;
@@ -76,7 +76,7 @@ struct EnrichmentPredicate
     const Point<dim> &get_origin() { return origin; }
     const int &get_radius() { return radius; }
 
-    Private:
+    private:
         const Point<dim> origin;
         const int radius;   
 };
@@ -181,7 +181,8 @@ namespace Step1
 
   private:
     bool cell_is_pou(const typename hp::DoFHandler<dim>::cell_iterator &cell) const;
-
+    
+    void build_color_predicate_table ();
     std::pair<unsigned int, unsigned int> setup_system ();
     void assemble_system ();
     std::pair<unsigned int, double> solve ();
@@ -215,12 +216,22 @@ namespace Step1
 
     PotentialFunction<dim> potential;
 
-    std::vector<EnrichmentFunction<dim>> vec_enrichments; 
-    
+    std::vector<EnrichmentFunction<dim>> vec_enrichments;     
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
     
-    //Only for elements with at least one enrichment function
-    std::vector<std::vector<size_t> > material_table;
+    //each predicate is assigned a color depending on overlap of vertices.
+    std::vector<unsigned int> predicate_colors;
+    size_t num_colors;
+    
+    //cell wise mapping of color with enrichment functions
+    //vector size = number of cells;
+    //map:  < color , corresponding predicate_function >
+    //(only one per color acceptable). An assertion checks this
+    std::vector <std::map<size_t, size_t>> color_predicate_table;
+    
+    //vector of size num_colors + 1
+    //different color combinations that a cell can contain
+    std::vector <std::set<size_t>> material_table;
     
     const FEValuesExtractors::Scalar fe_extractor;
     const unsigned int               fe_fe_index;
@@ -277,10 +288,9 @@ namespace Step1
                                       vec_predicates[i].get_radius() );
         vec_enrichments.push_back( func );
             
-    }
-    
+    }    
 
-
+    {
     //set material id based on predicate functions. TODO undo
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell)
@@ -292,6 +302,7 @@ namespace Step1
     }
     
     output_test("predicate");
+    }
              
     //make a sparsity pattern based on connections between regions
     unsigned int num_indices = vec_predicates.size();
@@ -309,87 +320,30 @@ namespace Step1
     sp_graph.copy_from(dsp);
     
     Assert( num_indices == sp_graph.n_rows() , ExcInternalError() );
-    std::vector<unsigned int> color_indices;
-    color_indices.resize(num_indices);
-    size_t num_colors = SparsityTools::color_sparsity_pattern (sp_graph, color_indices);
+    predicate_colors.resize(num_indices);
+    num_colors = SparsityTools::color_sparsity_pattern (sp_graph, predicate_colors);
     
+    {//TODO remove
     //print color_indices
     for (size_t i=0; i<num_indices; ++i)
-        std::cout << "predicate " << i << " : " << color_indices[i] << std::endl;
+        std::cout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
     
-    //set material id based on color. TODO undo
+
+    //set material id based on color.
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell)
     {
     cell->set_material_id(0);
         for (size_t i=0; i<vec_predicates.size(); ++i)
             if ( vec_predicates[i](cell) )
-                cell->set_material_id (color_indices[i]);
+                cell->set_material_id (predicate_colors[i]);
     }
     
-    output_test("color");    
-    
-    //build material table and also assign materials
-    std::vector<size_t> predicate_list;
-    bool found = false;
-    predicate_list.reserve(num_colors);
-    //loop throught cells
-    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-         cell != dof_handler.end(); ++cell)
-    {
-        cell->set_material_id (0);  //No enrichment at all
-        predicate_list.clear();
-        
-        //loop through predicate function. connections between same color regions is also done.
-        //doesn't matter though.
-        for (size_t i=0; i<vec_predicates.size(); ++i)
-        {        
-            //add if predicate true to vector of functions
-            if (vec_predicates[i](cell))
-            {
-                predicate_list.push_back(i);       
-                std::cout << " - " << i;
-            }
-            
-        }
-        
-        if (!predicate_list.empty())
-                std::cout << std::endl;
-        
-        found = false;
-        //check if the combination is already added
-        if ( !predicate_list.empty() )
-        {
-            for ( size_t j=0; j<material_table.size(); j++)
-            {
-                if (material_table[j] == predicate_list)
-                {
-                    std::cout << "fe set found at " << j << std::endl;
-                    found=true;
-                    cell->set_material_id(j+1);
-                    break;
-                }
-            }
-            
-            if (!found){
-                material_table.push_back(predicate_list);
-                cell->set_material_id(material_table.size());
-                std::cout << "new fe set pushed at " << material_table.size()-1 << std::endl;
-            }     
-        }
+    output_test("color"); 
     }
     
-    output_test("final");
-    
-    //print material table
-    std::cout << "Material table " << std::endl;
-    for ( size_t j=0; j<material_table.size(); j++)
-    {
-        std::cout << j << " ( ";
-        for ( size_t i = 0; i<material_table[j].size(); i++)
-            std::cout << material_table[j][i] << " ";
-        std::cout << " ) " << std::endl;
-    }
+    //build fe table. should be called everytime number of cells change!
+    build_color_predicate_table();
         
     //TODO Assert q collection and fe collection are of same size
     
@@ -407,6 +361,84 @@ namespace Step1
 //                                                &enrichment));
       
 }
+
+  template <int dim>
+  void LaplaceProblem<dim>::build_color_predicate_table ()
+  {
+    bool found = false;
+    color_predicate_table.resize( triangulation.n_cells() ); 
+    
+    //set first element of material_table size to empty
+    material_table.resize(1);
+    
+    
+    //loop throught cells and build fe table
+    typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
+    for (size_t cell_index = 0;
+         cell != dof_handler.end();
+         ++cell, ++cell_index)
+    {
+        cell->set_material_id (0);  //No enrichment at all
+        std::set<size_t> color_list;
+        
+        //loop through predicate function. connections between same color regions is also done.
+        //doesn't matter though.
+        for (size_t i=0; i<vec_predicates.size(); ++i)
+        {        
+            //add if predicate true to vector of functions
+            if (vec_predicates[i](cell))
+            {
+                //add color and predicate pair to each cell if predicate is true.
+                auto ret = color_predicate_table[cell_index].insert
+                    (std::pair <size_t, size_t> (predicate_colors[i], i));  
+                
+                color_list.insert(predicate_colors[i]);
+                
+                //A single predicate for a single color! repeat addition not accepted.
+                Assert( ret.second == true, ExcInternalError () );                           
+                
+                std::cout << " - " << predicate_colors[i] << "(" << i << ")" ;
+            }            
+        }
+        
+        if (!color_list.empty())
+                std::cout << std::endl;
+        
+        found = false;
+        //check if color combination is already added
+        if ( !color_list.empty() )
+        {
+            for ( size_t j=0; j<material_table.size(); j++)
+            {
+                if (material_table[j] ==  color_list)
+                {
+                    std::cout << "color combo set found at " << j << std::endl;
+                    found=true;
+                    cell->set_material_id(j);
+                    break;
+                }
+            }
+            
+            if (!found){
+                material_table.push_back(color_list);
+                cell->set_material_id(material_table.size()-1);
+                std::cout << "color combo set pushed at " << material_table.size()-1 << std::endl;
+            }     
+        }
+    }
+    
+    output_test("final");
+    
+    //print material table
+    std::cout << "Material table " << std::endl;
+    for ( size_t j=0; j<material_table.size(); j++)
+    {
+        std::cout << j << " ( ";
+        for ( auto i = material_table[j].begin(); i != material_table[j].end(); i++)
+            std::cout << *i << " ";
+        std::cout << " ) " << std::endl;
+    }
+  }
 
   template <int dim>
   std::pair<unsigned int, unsigned int>
