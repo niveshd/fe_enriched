@@ -56,27 +56,26 @@
 
 #include <set>
 
-//TODO change to 3d after testing
+//TODO need 3d test example?
 const unsigned int dim = 2;
 
 using namespace dealii;
 
 template <int dim>
-struct enrichment_predicate
+struct EnrichmentPredicate
 {
-    enrichment_predicate(const Point<dim> p, const int radius)
-    :p(p),radius(radius){}
+    EnrichmentPredicate(const Point<dim> origin, const int radius)
+    :origin(origin),radius(radius){}
 
     template <class Iterator>
     bool operator () (const Iterator &i)
     { 
-        return ( (i->center() - p).norm() < radius);
-    }
+        return ( (i->center() - origin).norm() < radius);
+    }    
 
-    private:
-    Point<dim> p;
-    int radius;   
-
+    //can be modified only during construction
+    const Point<dim> origin;
+    const int radius;   
 };
 
 /**
@@ -124,6 +123,7 @@ public:
     return std::exp(-Z*r);
   }
 
+  //TODO remove?
   bool is_enriched(const Point<dim> &point) const
   {
     if (origin.distance(point) < radius)
@@ -162,7 +162,7 @@ private:
 
   
 
-namespace Step36
+namespace Step1
 {
 
   /**
@@ -212,10 +212,9 @@ namespace Step36
 
     PotentialFunction<dim> potential;
 
-    EnrichmentFunction<dim> enrichment; 
+    std::vector<EnrichmentFunction<dim>> vec_enrichments; 
     
-    typedef std::function<bool (const typename Triangulation<dim>::active_cell_iterator &)> predicate_function;
-    std::vector<predicate_function> predicates;
+    std::vector<EnrichmentPredicate<dim>> vec_predicates;
     
     //Only for elements with at least one enrichment function
     std::vector<std::vector<size_t> > material_table;
@@ -241,9 +240,6 @@ namespace Step36
     pcout (std::cout,
            (this_mpi_process == 0)),
     number_of_eigenvalues(1),
-    enrichment(Point<dim>(),
-           /*Z*/1.0,
-           /*radius*/2.5), // radius is set such that 8 cells are marked as enriched
     fe_extractor(/*dofs start at...*/0),
     fe_fe_index(0),
     fe_material_id(0),
@@ -261,46 +257,46 @@ namespace Step36
 
 //     triangulation.execute_coarsening_and_refinement(); // 120 cells
     
-    //initialize vector of predicates
-    predicates.resize(5);
-    predicates[0] = enrichment_predicate<dim>(Point<dim>(-7.5,7.5), 2);
-    predicates[1] = enrichment_predicate<dim>(Point<dim>(-5,5), 2);
-    predicates[2] = enrichment_predicate<dim>(Point<dim>(0,0), 2);
-    predicates[3] = enrichment_predicate<dim>(Point<dim>(5,-5), 2);
-    predicates[4] = enrichment_predicate<dim>(Point<dim>(10,-10), 2);
+    //initialize vector of vec_predicates
+    vec_predicates.reserve(5);
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-5,5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(5,-5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(10,-10), 2) );
+    
+    //vector of enrichment functions
+    vec_enrichments.reserve( vec_predicates.size() );
+    for (size_t i=0; i<vec_predicates.size(); ++i)
+    {
+        EnrichmentFunction<dim> func( vec_predicates[i].origin,
+                                      1,
+                                      vec_predicates[i].radius );
+        vec_enrichments.push_back( func );
+            
+    }
+    
 
-    //TODO more q_collections?
-    q_collection.push_back(QGauss<dim>(4));
-    q_collection.push_back(QGauss<dim>(10));
-
-    // usual elements (active_fe_index ==0):
-    fe_collection.push_back (FE_Enriched<dim> (FE_Q<dim>(2)));
-
-
-    // enriched elements (active_fe_index==1):
-    fe_collection.push_back (FE_Enriched<dim> (FE_Q<dim>(2),
-                                               FE_Q<dim>(1),
-                                               &enrichment));
 
     //set material id based on predicate functions. TODO undo
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell)
     {
     cell->set_material_id(0);
-        for (size_t i=0; i<predicates.size(); ++i)
-            if ( predicates[i](cell) )
+        for (size_t i=0; i<vec_predicates.size(); ++i)
+            if ( vec_predicates[i](cell) )
                 cell->set_material_id(i+1);
     }
     
     output_test("predicate");
              
     //make a sparsity pattern based on connections between regions
-    unsigned int num_indices = predicates.size();
+    unsigned int num_indices = vec_predicates.size();
     DynamicSparsityPattern dsp;
     dsp.reinit ( num_indices, num_indices );
     for (size_t i = 0; i < num_indices; ++i)
         for (size_t j = i+1; j < num_indices; ++j)
-            if ( GridTools::find_connection_between_subdomains(dof_handler, predicates[i], predicates[j]) )
+            if ( GridTools::find_connection_between_subdomains(dof_handler, vec_predicates[i], vec_predicates[j]) )
                 dsp.add(i,j);
     
     dsp.symmetrize();
@@ -323,8 +319,8 @@ namespace Step36
          cell != dof_handler.end(); ++cell)
     {
     cell->set_material_id(0);
-        for (size_t i=0; i<predicates.size(); ++i)
-            if ( predicates[i](cell) )
+        for (size_t i=0; i<vec_predicates.size(); ++i)
+            if ( vec_predicates[i](cell) )
                 cell->set_material_id (color_indices[i]);
     }
     
@@ -343,10 +339,10 @@ namespace Step36
         
         //loop through predicate function. connections between same color regions is also done.
         //doesn't matter though.
-        for (size_t i=0; i<predicates.size(); ++i)
+        for (size_t i=0; i<vec_predicates.size(); ++i)
         {        
             //add if predicate true to vector of functions
-            if (predicates[i](cell))
+            if (vec_predicates[i](cell))
             {
                 predicate_list.push_back(i);       
                 std::cout << " - " << i;
@@ -393,6 +389,19 @@ namespace Step36
     }
         
     //TODO Assert q collection and fe collection are of same size
+    
+//     //TODO more q_collections?
+//     q_collection.push_back(QGauss<dim>(4));
+//     q_collection.push_back(QGauss<dim>(10));
+    
+    //     // usual elements (active_fe_index ==0):
+//     fe_collection.push_back (FE_Enriched<dim> (FE_Q<dim>(2)));
+// 
+// 
+//     // enriched elements (active_fe_index==1):
+//     fe_collection.push_back (FE_Enriched<dim> (FE_Q<dim>(2),
+//                                                FE_Q<dim>(1),
+//                                                &enrichment));
       
 }
 
@@ -820,12 +829,12 @@ int main (int argc,char **argv)
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        Step36::LaplaceProblem<dim> step36;
+        Step1::LaplaceProblem<dim> step1;
 //         PETScWrappers::set_option_value("-eps_target","-1.0");
 //         PETScWrappers::set_option_value("-st_type","sinvert");
 //         PETScWrappers::set_option_value("-st_ksp_type","cg");
 //         PETScWrappers::set_option_value("-st_pc_type", "jacobi");
-        step36.run();
+        step1.run();
       }
 
     }
