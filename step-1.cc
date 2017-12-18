@@ -72,10 +72,13 @@ struct EnrichmentPredicate
     { 
         return ( (i->center() - origin).norm() < radius);
     }    
+    
+    const Point<dim> &get_origin() { return origin; }
+    const int &get_radius() { return radius; }
 
-    //can be modified only during construction
-    const Point<dim> origin;
-    const int radius;   
+    Private:
+        const Point<dim> origin;
+        const int radius;   
 };
 
 /**
@@ -269,9 +272,9 @@ namespace Step1
     vec_enrichments.reserve( vec_predicates.size() );
     for (size_t i=0; i<vec_predicates.size(); ++i)
     {
-        EnrichmentFunction<dim> func( vec_predicates[i].origin,
+        EnrichmentFunction<dim> func( vec_predicates[i].get_origin(),
                                       1,
-                                      vec_predicates[i].radius );
+                                      vec_predicates[i].get_radius() );
         vec_enrichments.push_back( func );
             
     }
