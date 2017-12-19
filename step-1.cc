@@ -14,9 +14,7 @@
 // ---------------------------------------------------------------------
 
 
-// test FE_Enriched in real-life application on eigenvalue problem similar
-// to Step-36. That involves assembly (shape values and gradients) and
-// error estimator (Kelly - > face gradients) and MPI run.
+// 
 
 #include "../tests.h"
 
@@ -256,8 +254,7 @@ namespace Step1
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout,
-           (this_mpi_process == 0)),
+    pcout (std::cout, (this_mpi_process == 0)),
     number_of_eigenvalues(1),
     fe_extractor(/*dofs start at...*/0),
     fe_fe_index(0),
@@ -414,14 +411,15 @@ namespace Step1
     //loop throught cells and build fe table
     auto cell= triangulation.begin_active();
     size_t cell_index = 0;
+    auto cell_test = triangulation.begin_active();
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell, ++cell_index)
     {
         cell->set_active_fe_index (0);  //No enrichment at all
         std::set<size_t> color_list;
         
-        //loop through predicate function. connections between same color regions is also done.
-        //doesn't matter though.
+        //loop through predicate function to find connected subdomains
+        //connections between same color regions is checked again.
         for (size_t i=0; i<vec_predicates.size(); ++i)
         {        
             //add if predicate true to vector of functions
@@ -436,12 +434,12 @@ namespace Step1
                 //A single predicate for a single color! repeat addition not accepted.
                 Assert( ret.second == true, ExcInternalError () );                           
                 
-                std::cout << " - " << predicate_colors[i] << "(" << i << ")" ;
+//                 std::cout << " - " << predicate_colors[i] << "(" << i << ")" ;
             }            
         }
         
         if (!color_list.empty())
-                std::cout << std::endl;
+//                 std::cout << std::endl;
         
         found = false;
         //check if color combination is already added
@@ -451,7 +449,7 @@ namespace Step1
             {
                 if (material_table[j] ==  color_list)
                 {
-                    std::cout << "color combo set found at " << j << std::endl;
+//                     std::cout << "color combo set found at " << j << std::endl;
                     found=true;
                     cell->set_active_fe_index(j);                    
                     break;
@@ -461,7 +459,7 @@ namespace Step1
             if (!found){
                 material_table.push_back(color_list);
                 cell->set_active_fe_index(material_table.size()-1);
-                std::cout << "color combo set pushed at " << material_table.size()-1 << std::endl;
+//                 std::cout << "color combo set pushed at " << material_table.size()-1 << std::endl;
             }     
         }
     }
@@ -483,17 +481,6 @@ namespace Step1
   std::pair<unsigned int, unsigned int>
   LaplaceProblem<dim>::setup_system ()
   {
-    for (typename hp::DoFHandler<dim>::active_cell_iterator
-         cell = dof_handler.begin_active();
-         cell != dof_handler.end(); ++cell)
-      {
-        if (cell->material_id() == fe_material_id)
-          cell->set_active_fe_index (fe_fe_index);
-        else if (cell->material_id() == pou_material_id)
-          cell->set_active_fe_index (pou_fe_index);
-        else
-          Assert (false, ExcNotImplemented());
-      }
 
     GridTools::partition_triangulation (n_mpi_processes, triangulation);
     dof_handler.distribute_dofs (fe_collection);
