@@ -68,7 +68,7 @@ struct EnrichmentPredicate
     template <class Iterator>
     bool operator () (const Iterator &i)
     { 
-        return ( (i->center() - origin).norm() < radius);
+        return ( (i->center() - origin).norm_square() < radius*radius);
     }    
     
     const Point<dim> &get_origin() { return origin; }
@@ -79,29 +79,50 @@ struct EnrichmentPredicate
         const int radius;   
 };
 
-/**
- * Coulomb potential
- */
+
+
 template <int dim>
-class PotentialFunction : public Function<dim>
+class RightHandSide :  public Function<dim>
 {
 public:
-  PotentialFunction()
-    : Function<dim>(1)
-  {}
-
-  virtual double value(const Point<dim> &point,
-                       const unsigned int component = 0 ) const;
+  RightHandSide ();
+  virtual void value (const Point<dim> &p,
+                      double   &values) const;
+  virtual void value_list (const std::vector<Point<dim> > &points,
+                           std::vector<double >           &value_list) const;
 };
 
+
 template <int dim>
-double PotentialFunction<dim>::value(const Point<dim> &p,
-                                     const unsigned int ) const
+RightHandSide<dim>::RightHandSide () :
+  Function<dim> ()
+{}
+
+
+template <int dim>
+inline
+void RightHandSide<dim>::value (const Point<dim> &p,
+                                double           &values) const
 {
-  Assert (p.square() > 0.,
-          ExcDivideByZero());
-  return -1.0 / std::sqrt(p.square());
+  Assert (dim >= 2, ExcInternalError());
+  
+  values = 1;
 }
+
+
+template <int dim>
+void RightHandSide<dim>::value_list (const std::vector<Point<dim> > &points,
+                                     std::vector<double >           &value_list) const
+{
+  const unsigned int n_points = points.size();
+
+  AssertDimension(points.size(), value_list.size());
+  
+  for (unsigned int p=0; p<n_points; ++p)
+    RightHandSide<dim>::value (points[p],
+                                      value_list[p]);
+}
+
 
 template <int dim>
 class EnrichmentFunction : public Function<dim>
@@ -178,12 +199,10 @@ namespace Step1
     void run ();
 
   private:
-    bool cell_is_pou(const typename hp::DoFHandler<dim>::cell_iterator &cell) const;
-    
     void build_tables ();
-    std::pair<unsigned int, unsigned int> setup_system ();
+    void setup_system ();
     void assemble_system ();
-    std::pair<unsigned int, double> solve ();
+    unsigned int solve ();
     void estimate_error ();
     void refine_grid ();
     void output_results (const unsigned int cycle) const;
@@ -200,10 +219,9 @@ namespace Step1
     IndexSet locally_owned_dofs;
     IndexSet locally_relevant_dofs;
 
-    std::vector<PETScWrappers::MPI::Vector> eigenfunctions;
-    std::vector<PETScWrappers::MPI::Vector> eigenfunctions_locally_relevant;
-    std::vector<PetscScalar>                eigenvalues;
-    PETScWrappers::MPI::SparseMatrix        stiffness_matrix, mass_matrix;
+    PETScWrappers::MPI::SparseMatrix        system_matrix;
+    PETScWrappers::MPI::Vector              solution;
+    PETScWrappers::MPI::Vector              system_rhs;
 
     ConstraintMatrix constraints;
 
@@ -213,9 +231,7 @@ namespace Step1
 
     ConditionalOStream pcout;
 
-    const unsigned int number_of_eigenvalues;
-
-    PotentialFunction<dim> potential;
+    RightHandSide<dim> right_hand_side;
 
     std::vector<EnrichmentFunction<dim>> vec_enrichments;     
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
@@ -235,11 +251,7 @@ namespace Step1
     std::vector <std::set<size_t>> material_table;
     
     const FEValuesExtractors::Scalar fe_extractor;
-    const unsigned int               fe_fe_index;
-    const unsigned int               fe_material_id;
     const FEValuesExtractors::Scalar pou_extractor;
-    const unsigned int               pou_fe_index;
-    const unsigned int               pou_material_id;
 
     std::vector<Vector<float> > vec_estimated_error_per_cell;
     Vector<float> estimated_error_per_cell;    
@@ -255,13 +267,9 @@ namespace Step1
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0)),
-    number_of_eigenvalues(1),
     fe_extractor(/*dofs start at...*/0),
-    fe_fe_index(0),
-    fe_material_id(0),
-    pou_extractor(/*dofs start at (scalar fields!)*/1),
-    pou_fe_index(1),
-    pou_material_id(1)
+    //TODO not used anywhere!
+    pou_extractor(/*dofs start at (scalar fields!)*/1)
   {
     GridGenerator::hyper_cube (triangulation, -20, 20);
     triangulation.refine_global (4);
@@ -293,11 +301,11 @@ namespace Step1
     }    
 
     {
-    //set material id based on predicate functions. TODO undo
+    //set material id based on predicate functions. TODO comment
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end(); ++cell)
     {
-    cell->set_active_fe_index(0);
+      cell->set_active_fe_index(0);
         for (size_t i=0; i<vec_predicates.size(); ++i)
             if ( vec_predicates[i](cell) )
                 cell->set_active_fe_index(i+1);
@@ -325,10 +333,10 @@ namespace Step1
     predicate_colors.resize(num_indices);
     num_colors = SparsityTools::color_sparsity_pattern (sp_graph, predicate_colors);
     
-    {//TODO remove
+    {//TODO comment
     //print color_indices
     for (size_t i=0; i<num_indices; ++i)
-        std::cout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
+        pcout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
     
 
     //set material id based on color.
@@ -385,18 +393,24 @@ namespace Step1
             
         }
         
-        Assert (vec_fe_enriched.size() == functions.size(), 
-                ExcDimensionMismatch(vec_fe_enriched.size(), functions.size()));
+        AssertDimension(vec_fe_enriched.size(), functions.size());
+        
+        {
+          pcout << "\nenrichment:"
+                << "fe enriched - " << vec_fe_enriched.size() << std::endl;
+          
+          for (size_t i = 0; i < functions.size(); ++i)
+          {
+            pcout << "size " << functions[i].size() << std::endl;
+          }
+          
+        }
                                             
         fe_collection.push_back (FE_Enriched<dim> (&fe_base,
                                                    vec_fe_enriched,
                                                    functions));
-    }
-    
-    //TODO Assert q collection and fe collection are of same size
-
-      
-}
+    }      
+  }
 
   template <int dim>
   void LaplaceProblem<dim>::build_tables ()
@@ -434,12 +448,12 @@ namespace Step1
                 //A single predicate for a single color! repeat addition not accepted.
                 Assert( ret.second == true, ExcInternalError () );                           
                 
-//                 std::cout << " - " << predicate_colors[i] << "(" << i << ")" ;
+//                 pcout << " - " << predicate_colors[i] << "(" << i << ")" ;
             }            
         }
         
         if (!color_list.empty())
-//                 std::cout << std::endl;
+//                 pcout << std::endl;
         
         found = false;
         //check if color combination is already added
@@ -449,7 +463,7 @@ namespace Step1
             {
                 if (material_table[j] ==  color_list)
                 {
-//                     std::cout << "color combo set found at " << j << std::endl;
+//                     pcout << "color combo set found at " << j << std::endl;
                     found=true;
                     cell->set_active_fe_index(j);                    
                     break;
@@ -459,7 +473,7 @@ namespace Step1
             if (!found){
                 material_table.push_back(color_list);
                 cell->set_active_fe_index(material_table.size()-1);
-//                 std::cout << "color combo set pushed at " << material_table.size()-1 << std::endl;
+//                 pcout << "color combo set pushed at " << material_table.size()-1 << std::endl;
             }     
         }
     }
@@ -467,30 +481,32 @@ namespace Step1
     output_test("final");
     
     //print material table
-    std::cout << "Material table " << std::endl;
+    pcout << "\nMaterial table : " << std::endl;
     for ( size_t j=0; j<material_table.size(); j++)
     {
-        std::cout << j << " ( ";
+        pcout << j << " ( ";
         for ( auto i = material_table[j].begin(); i != material_table[j].end(); i++)
-            std::cout << *i << " ";
-        std::cout << " ) " << std::endl;
+            pcout << *i << " ";
+        pcout << " ) " << std::endl;
     }
   }
 
   template <int dim>
-  std::pair<unsigned int, unsigned int>
-  LaplaceProblem<dim>::setup_system ()
+  void LaplaceProblem<dim>::setup_system ()
   {
 
     GridTools::partition_triangulation (n_mpi_processes, triangulation);
     dof_handler.distribute_dofs (fe_collection);
     DoFRenumbering::subdomain_wise (dof_handler);
-    std::vector<IndexSet> locally_owned_dofs_per_processor
+    
+    //?
+    std::vector<IndexSet> locally_owned_dofs_per_proc
       = DoFTools::locally_owned_dofs_per_subdomain (dof_handler);
-    locally_owned_dofs = locally_owned_dofs_per_processor[this_mpi_process];
+    locally_owned_dofs = locally_owned_dofs_per_proc[this_mpi_process];
     locally_relevant_dofs.clear();
     DoFTools::extract_locally_relevant_dofs (dof_handler,
                                              locally_relevant_dofs);
+    //?
 
     constraints.clear();
     constraints.reinit (locally_relevant_dofs);
@@ -502,68 +518,30 @@ namespace Step1
     constraints.close ();
 
     // Initialise the stiffness and mass matrices
-    DynamicSparsityPattern csp (locally_relevant_dofs);
-    DoFTools::make_sparsity_pattern (dof_handler, csp,
+    DynamicSparsityPattern dsp (locally_relevant_dofs);
+    DoFTools::make_sparsity_pattern (dof_handler, dsp,
                                      constraints,
-                                     /* keep constrained dofs */ false);
+                                     false);
 
     std::vector<types::global_dof_index> n_locally_owned_dofs(n_mpi_processes);
     for (unsigned int i = 0; i < n_mpi_processes; i++)
-      n_locally_owned_dofs[i] = locally_owned_dofs_per_processor[i].n_elements();
+      n_locally_owned_dofs[i] = locally_owned_dofs_per_proc[i].n_elements();
 
     SparsityTools::distribute_sparsity_pattern
-    (csp,
+    (dsp,
      n_locally_owned_dofs,
      mpi_communicator,
      locally_relevant_dofs);
 
-    stiffness_matrix.reinit (locally_owned_dofs,
-                             locally_owned_dofs,
-                             csp,
-                             mpi_communicator);
+    system_matrix.reinit (locally_owned_dofs,
+                          locally_owned_dofs,
+                          dsp,
+                          mpi_communicator);
 
-    mass_matrix.reinit (locally_owned_dofs,
-                        locally_owned_dofs,
-                        csp,
-                        mpi_communicator);
-
-    // reinit vectors
-    eigenfunctions.resize (number_of_eigenvalues);
-    eigenfunctions_locally_relevant.resize(number_of_eigenvalues);
-    vec_estimated_error_per_cell.resize(number_of_eigenvalues);
-    for (unsigned int i=0; i<eigenfunctions.size (); ++i)
-      {
-        eigenfunctions[i].reinit (locally_owned_dofs, mpi_communicator);//without ghost dofs
-        eigenfunctions_locally_relevant[i].reinit (locally_owned_dofs,
-                                                   locally_relevant_dofs,
-                                                   mpi_communicator);
-
-        vec_estimated_error_per_cell[i].reinit(triangulation.n_active_cells());
-      }
-
-    eigenvalues.resize (eigenfunctions.size ());
+    solution.reinit (locally_owned_dofs, mpi_communicator);
+    system_rhs.reinit (locally_owned_dofs, mpi_communicator);
 
     estimated_error_per_cell.reinit (triangulation.n_active_cells());
-
-    unsigned int n_pou_cells = 0,
-                 n_fem_cells = 0;
-
-    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-         cell != dof_handler.end(); ++cell)
-      if (cell_is_pou(cell))
-        n_pou_cells++;
-      else
-        n_fem_cells++;
-
-    return std::make_pair (n_fem_cells,
-                           n_pou_cells);
-  }
-
-  template <int dim>
-  bool
-  LaplaceProblem<dim>::cell_is_pou(const typename hp::DoFHandler<dim>::cell_iterator &cell) const
-  {
-    return cell->material_id() == pou_material_id;
   }
 
 
@@ -571,13 +549,16 @@ namespace Step1
   void
   LaplaceProblem<dim>::assemble_system()
   {
-    stiffness_matrix = 0;
-    mass_matrix = 0;
+    system_matrix = 0;
+    system_rhs = 0;
 
-    FullMatrix<double> cell_stiffness_matrix;
-    FullMatrix<double> cell_mass_matrix;
+    FullMatrix<double> cell_system_matrix;
+    Vector<double>     cell_rhs;
+    
     std::vector<types::global_dof_index> local_dof_indices;
-    std::vector<double> potential_values;
+    
+    std::vector<double> rhs_values;
+    
     hp::FEValues<dim> fe_values_hp(fe_collection, q_collection,
                                    update_values | update_gradients |
                                    update_quadrature_points | update_JxW_values);
@@ -595,86 +576,69 @@ namespace Step1
           const unsigned int &dofs_per_cell = cell->get_fe().dofs_per_cell;
           const unsigned int &n_q_points    = fe_values.n_quadrature_points;
 
-          potential_values.resize(n_q_points);
+          rhs_values.resize(n_q_points);
 
           local_dof_indices.resize     (dofs_per_cell);
-          cell_stiffness_matrix.reinit (dofs_per_cell,dofs_per_cell);
-          cell_mass_matrix.reinit      (dofs_per_cell,dofs_per_cell);
+          cell_system_matrix.reinit (dofs_per_cell,dofs_per_cell);
+          cell_rhs.reinit (dofs_per_cell);
 
-          cell_stiffness_matrix = 0;
-          cell_mass_matrix      = 0;
+          cell_system_matrix = 0;
+          cell_rhs = 0;
 
-          potential.value_list (fe_values.get_quadrature_points(),
-                                potential_values);
+          right_hand_side.value_list (fe_values.get_quadrature_points(),
+                                rhs_values);
 
           for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
             for (unsigned int i=0; i<dofs_per_cell; ++i)
               for (unsigned int j=i; j<dofs_per_cell; ++j)
-                {
-                  cell_stiffness_matrix (i, j)
-                  += (fe_values[fe_extractor].gradient (i, q_point) *
-                      fe_values[fe_extractor].gradient (j, q_point) *
-                      0.5
-                      +
-                      potential_values[q_point] *
-                      fe_values[fe_extractor].value (i, q_point) *
-                      fe_values[fe_extractor].value (j, q_point)
-                     ) * fe_values.JxW (q_point);
-
-                  cell_mass_matrix (i, j)
-                  += (fe_values[fe_extractor].value (i, q_point) *
-                      fe_values[fe_extractor].value (j, q_point)
-                     ) * fe_values.JxW (q_point);
+                {                     
+                  cell_system_matrix(i,j) += (fe_values.shape_grad(i,q_point) *
+                                      fe_values.shape_grad(j,q_point) *
+                                      fe_values.JxW(q_point));
+                  cell_rhs(i) += (rhs_values[q_point] *
+                                  fe_values.shape_value(i,q_point) *
+                                  fe_values.JxW(q_point));
                 }
 
           // exploit symmetry
           for (unsigned int i=0; i<dofs_per_cell; ++i)
             for (unsigned int j=i; j<dofs_per_cell; ++j)
               {
-                cell_stiffness_matrix (j, i) = cell_stiffness_matrix (i, j);
-                cell_mass_matrix (j, i)      = cell_mass_matrix (i, j);
+                cell_system_matrix (j, i) = cell_system_matrix (i, j);
               }
 
           cell->get_dof_indices (local_dof_indices);
 
           constraints
-          .distribute_local_to_global (cell_stiffness_matrix,
+          .distribute_local_to_global (cell_system_matrix,
+                                       cell_rhs,
                                        local_dof_indices,
-                                       stiffness_matrix);
-          constraints
-          .distribute_local_to_global (cell_mass_matrix,
-                                       local_dof_indices,
-                                       mass_matrix);
+                                       system_matrix,
+                                       system_rhs);
         }
 
-    stiffness_matrix.compress (VectorOperation::add);
-    mass_matrix.compress (VectorOperation::add);
+    system_matrix.compress (VectorOperation::add);
+    system_rhs.compress (VectorOperation::add);
   }
 
   template <int dim>
-  std::pair<unsigned int, double>
-  LaplaceProblem<dim>::solve()
+  unsigned int LaplaceProblem<dim>::solve()
   {
-    SolverControl solver_control (dof_handler.n_dofs(), 1e-9,false,false);
-    SLEPcWrappers::SolverKrylovSchur eigensolver (solver_control,
-                                                  mpi_communicator);
-
-    eigensolver.set_which_eigenpairs (EPS_SMALLEST_REAL);
-    eigensolver.set_problem_type (EPS_GHEP);
-
-    eigensolver.solve (stiffness_matrix, mass_matrix,
-                       eigenvalues, eigenfunctions,
-                       eigenfunctions.size());
-
-    for (unsigned int i = 0; i < eigenfunctions.size(); i++)
-      {
-        constraints.distribute(eigenfunctions[i]);
-        eigenfunctions_locally_relevant[i] = eigenfunctions[i];
-      }
-
-    return std::make_pair (solver_control.last_step (),
-                           solver_control.last_value ());
-
+    SolverControl           solver_control (solution.size(),
+                                          1e-8*system_rhs.l2_norm());
+    PETScWrappers::SolverCG cg (solver_control,
+                                mpi_communicator);
+    PETScWrappers::PreconditionBlockJacobi preconditioner(system_matrix);
+    cg.solve (system_matrix, solution, system_rhs,
+              preconditioner);
+    
+    Vector<double> localized_solution (solution);
+    pcout << "local solution" << localized_solution.size() << ":" << solution << std::endl;
+    
+    constraints.distribute (localized_solution);
+    solution = localized_solution;    
+    
+    return solver_control.last_step();
   }
 
   template <int dim>
@@ -687,35 +651,19 @@ namespace Step1
   void LaplaceProblem<dim>::estimate_error ()
   {
     {
-      std::vector<const PETScWrappers::MPI::Vector *> sol (number_of_eigenvalues);
-      std::vector<Vector<float> *>   error (number_of_eigenvalues);
-
-      for (unsigned int i = 0; i < number_of_eigenvalues; i++)
-        {
-          sol[i] = &eigenfunctions_locally_relevant[i];
-          error[i] = &vec_estimated_error_per_cell[i];
-        }
+      const PETScWrappers::MPI::Vector * sol;
+      Vector<float> *  error;
 
       hp::QCollection<dim-1> face_quadrature_formula;
       face_quadrature_formula.push_back (QGauss<dim-1>(3));
       face_quadrature_formula.push_back (QGauss<dim-1>(3));
 
-      KellyErrorEstimator<dim>::estimate (dof_handler,
-                                          face_quadrature_formula,
-                                          typename FunctionMap<dim>::type(),
-                                          sol,
-                                          error);
+//       KellyErrorEstimator<dim>::estimate (dof_handler,
+//                                           face_quadrature_formula,
+//                                           typename FunctionMap<dim>::type(),
+//                                           sol,
+//                                           error);
     }
-
-    // sum up for a global:
-    for (unsigned int c=0; c < estimated_error_per_cell.size(); c++)
-      {
-        double er = 0.0;
-        for (unsigned int i = 0; i < number_of_eigenvalues; i++)
-          er += vec_estimated_error_per_cell[i][c] * vec_estimated_error_per_cell[i][c];
-
-        estimated_error_per_cell[c] = sqrt(er);
-      }
   }
 
   template <int dim>
@@ -734,14 +682,12 @@ namespace Step1
   void LaplaceProblem<dim>::output_results (const unsigned int cycle) const
   {
     Vector<float> fe_index(triangulation.n_active_cells());
-    Vector<float> material_id(triangulation.n_active_cells());
     {
       typename hp::DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
       for (unsigned int index=0; cell!=endc; ++cell, ++index)
       {
-        material_id(index) = cell->material_id();
         fe_index(index) = cell->active_fe_index();
       }
     }
@@ -756,58 +702,11 @@ namespace Step1
 
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
-        data_out.add_data_vector (eigenfunctions_locally_relevant[0], "solution");
+        data_out.add_data_vector (solution, "solution");
         data_out.build_patches (6);
         data_out.write_vtk (output);
         output.close();
       }
-
-    // second output without making mesh finer
-    if (this_mpi_process==0)
-      {
-        std::string filename = "mesh-";
-        filename += ('0' + cycle);
-        filename += ".vtk";
-        std::ofstream output (filename.c_str());
-
-        DataOut<dim,hp::DoFHandler<dim> > data_out;
-        data_out.attach_dof_handler (dof_handler);
-//         data_out.add_data_vector (fe_index, "fe_index");
-        data_out.add_data_vector (material_id, "material_id");
-//         data_out.add_data_vector (estimated_error_per_cell, "estimated_error");
-        data_out.build_patches ();
-        data_out.write_vtk (output);
-        output.close();
-      }
-
-//     scalar data for plotting
-//     output scalar data (eigenvalues, energies, ndofs, etc)
-    if (this_mpi_process == 0)
-      {
-        const std::string scalar_fname = "scalar-data.txt";
-
-        std::ofstream output (scalar_fname.c_str(),
-                              std::ios::out |
-                              (cycle==0
-                               ?
-                               std::ios::trunc : std::ios::app));
-
-        std::streamsize max_precision  = std::numeric_limits<double>::digits10;
-
-        std::string sep("  ");
-        output << cycle << sep
-               << std::setprecision(max_precision)
-               << triangulation.n_active_cells() << sep
-               << dof_handler.n_dofs () << sep
-               << std::scientific;
-
-        for (unsigned int i = 0; i < eigenvalues.size(); i++)
-          output << eigenvalues[i] << sep;
-
-        output<<std::endl;
-        output.close();
-      } //end scope
-
   }
   
   template <int dim>
@@ -850,42 +749,32 @@ namespace Step1
     for (unsigned int cycle = 0; cycle < 1; cycle++)
       {
         pcout << "Cycle "<<cycle <<std::endl;
-//         const std::pair<unsigned int, unsigned int> n_cells = setup_system ();
+//         setup_system ();
 
-//         pcout << "   Number of active cells:       "
-//               << triangulation.n_active_cells ()
-//               << std::endl
-//               << "     FE / POUFE :                "
-//               << n_cells.first << " / " << n_cells.second
-//               << std::endl
-//               << "   Number of degrees of freedom: "
-//               << dof_handler.n_dofs ()
-//               << std::endl;
+        pcout << "   Number of active cells:       "
+              << triangulation.n_active_cells ()
+              << std::endl
+              << "   Number of degrees of freedom: "
+              << dof_handler.n_dofs ()
+              << std::endl;
 
 //         assemble_system ();
 
     //TODO uncomment - do not solve for 2d
-//         const std::pair<unsigned int, double> res = solve ();
-//         AssertThrow(res.second < 5e-8,
-//                     ExcInternalError());
+//         auto n_iterations = solve ();
 
 //         estimate_error ();
 //         output_results(cycle);
-//         refine_grid ();
-//
-//         pcout << std::endl;
-//         for (unsigned int i=0; i<eigenvalues.size(); ++i)
-//           pcout << "      Eigenvalue " << i
-//                 << " : " << eigenvalues[i]
-//                 << std::endl;
-      }
+        //refine_grid ();
 
+//         pcout << "number of iterations" << n_iterations << std::endl;
+      }
   }
 }
 
+
 int main (int argc,char **argv)
 {
-
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
@@ -897,11 +786,11 @@ int main (int argc,char **argv)
 //         PETScWrappers::set_option_value("-st_pc_type", "jacobi");
         step1.run();
       }
-
+      
     }
   catch (std::exception &exc)
     {
-      std::cerr << std::endl << std::endl
+      std::cerr << std::endl   << std::endl
                 << "----------------------------------------------------"
                 << std::endl;
       std::cerr << "Exception on processing: " << std::endl
@@ -922,5 +811,6 @@ int main (int argc,char **argv)
                 << "----------------------------------------------------"
                 << std::endl;
       return 1;
-    };
+    };   
 }
+
