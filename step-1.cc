@@ -182,7 +182,8 @@ private:
   const double radius;
 };
 
-  
+
+
 
 namespace Step1
 {
@@ -294,9 +295,9 @@ namespace Step1
     vec_predicates.reserve(5);
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-15,15), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
-//     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
-//     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
-//     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(15,-15), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(15,-15), 2) );
     
     //vector of enrichment functions
     vec_enrichments.reserve( vec_predicates.size() );
