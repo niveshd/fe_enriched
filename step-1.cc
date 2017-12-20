@@ -212,7 +212,7 @@ namespace Step1
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
     hp::FECollection<dim> fe_collection;
-    hp::FECollection<dim> fe_collection_test; //TODO remove after testing
+//     hp::FECollection<dim> fe_collection_test; //TODO remove after testing
     hp::QCollection<dim> q_collection;
     
     FE_Q<dim> fe_base;
@@ -297,7 +297,7 @@ namespace Step1
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(15,-15), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(12.5,-12.5), 2) );
     
     //vector of enrichment functions
     vec_enrichments.reserve( vec_predicates.size() );
@@ -384,15 +384,10 @@ namespace Step1
     for (unsigned int i = 0; i < num_colors; ++i)
     {
       color_enrichments[i] =  
-        [&] (const typename Triangulation<dim, dim>::cell_iterator & cell)
+        [&,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
             {
                 unsigned int id = cell->index();
-                pcout << " fe collection "
-                      << id << " : " 
-                      << i << " : "
-                      << color_predicate_table[id][i+1]
-                      << std::endl;
-                return &vec_enrichments[color_predicate_table[id][1]];
+                return &vec_enrichments[color_predicate_table[id][i+1]];
             };
     }
     
@@ -477,30 +472,30 @@ namespace Step1
 //                               {{func1}, {func2}}));        
 //                                 
 //     }
-
-    //simple fe collection
-    {
-
-//       fe_collection_test.push_back (FE_Enriched<dim> (fe_base));
-         static auto func = [&] 
-              (const typename Triangulation<dim, dim>::cell_iterator & cell)
-              {
-                  unsigned int id = cell->index();
-                  pcout << " fe collection test "
-                            << id << " : " << color_predicate_table[id][1]
-                            << std::endl;
-                  return &vec_enrichments[color_predicate_table[id][1]];
-              };
-      
-      fe_collection_test.push_back 
-        (FE_Enriched<dim> (&fe_base,
-                           {&fe_nothing},
-                           {{nullptr}}));
-      fe_collection_test.push_back 
-        (FE_Enriched<dim> (&fe_base,
-                           {&fe_enriched},
-                           {{func}}));
-     }
+// 
+//     //simple fe collection
+//     {
+// 
+// //       fe_collection_test.push_back (FE_Enriched<dim> (fe_base));
+//          static auto func = [&] 
+//               (const typename Triangulation<dim, dim>::cell_iterator & cell)
+//               {
+//                   unsigned int id = cell->index();
+//                   pcout << " fe collection test "
+//                             << id << " : " << color_predicate_table[id][1]
+//                             << std::endl;
+//                   return &vec_enrichments[color_predicate_table[id][1]];
+//               };
+//       
+//       fe_collection_test.push_back 
+//         (FE_Enriched<dim> (&fe_base,
+//                            {&fe_nothing},
+//                            {{nullptr}}));
+//       fe_collection_test.push_back 
+//         (FE_Enriched<dim> (&fe_base,
+//                            {&fe_enriched},
+//                            {{func}}));
+//      }
     pcout << "-----constructor complete" << std::endl;
 
   }
