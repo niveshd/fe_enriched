@@ -392,7 +392,7 @@ namespace Step1
                       << i << " : "
                       << color_predicate_table[id][i+1]
                       << std::endl;
-                return &vec_enrichments[color_predicate_table[id][i+1]];
+                return &vec_enrichments[color_predicate_table[id][1]];
             };
     }
     
