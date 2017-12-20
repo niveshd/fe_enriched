@@ -293,7 +293,7 @@ namespace Step1
     
     //initialize vector of vec_predicates
     vec_predicates.reserve(5);
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-15,15), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-12.5,12.5), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
