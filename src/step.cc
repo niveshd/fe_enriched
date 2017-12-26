@@ -14,10 +14,6 @@
 // ---------------------------------------------------------------------
 
 
-// 
-
-#include "../tests.h"
-
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -52,138 +48,13 @@
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
 
+#include "support.h"
+
 #include <map>
+#include <fstream>
 
 //TODO need 3d test example?
 const unsigned int dim = 2;
-
-using namespace dealii;
-
-template <int dim>
-struct EnrichmentPredicate
-{
-    EnrichmentPredicate(const Point<dim> origin, const int radius)
-    :origin(origin),radius(radius){}
-
-    template <class Iterator>
-    bool operator () (const Iterator &i)
-    { 
-        return ( (i->center() - origin).norm_square() < radius*radius);
-    }    
-    
-    const Point<dim> &get_origin() { return origin; }
-    const int &get_radius() { return radius; }
-
-    private:
-        const Point<dim> origin;
-        const int radius;   
-};
-
-
-
-template <int dim>
-class RightHandSide :  public Function<dim>
-{
-public:
-  RightHandSide ();
-  virtual void value (const Point<dim> &p,
-                      double   &values) const;
-  virtual void value_list (const std::vector<Point<dim> > &points,
-                           std::vector<double >           &value_list) const;
-};
-
-
-template <int dim>
-RightHandSide<dim>::RightHandSide () :
-  Function<dim> ()
-{}
-
-
-template <int dim>
-inline
-void RightHandSide<dim>::value (const Point<dim> &p,
-                                double           &values) const
-{
-  Assert (dim >= 2, ExcInternalError());
-  
-  values = 1;
-}
-
-
-template <int dim>
-void RightHandSide<dim>::value_list (const std::vector<Point<dim> > &points,
-                                     std::vector<double >           &value_list) const
-{
-  const unsigned int n_points = points.size();
-
-  AssertDimension(points.size(), value_list.size());
-  
-  for (unsigned int p=0; p<n_points; ++p)
-    RightHandSide<dim>::value (points[p],
-                                      value_list[p]);
-}
-
-
-template <int dim>
-class EnrichmentFunction : public Function<dim>
-{
-public:
-  EnrichmentFunction(const Point<dim> &origin,
-                     const double     &Z,
-                     const double     &radius)
-    : Function<dim>(1),
-      origin(origin),
-      Z(Z),
-      radius(radius)
-  {}
-
-  virtual double value(const Point<dim> &point,
-                       const unsigned int component = 0) const
-  {
-    Tensor<1,dim> dist = point-origin;
-    const double r = dist.norm();
-    return std::exp(-Z*r);
-  }
-
-  //TODO remove?
-  bool is_enriched(const Point<dim> &point) const
-  {
-    if (origin.distance(point) < radius)
-      return true;
-    else
-      return false;
-  }
-
-  virtual Tensor< 1, dim> gradient (const Point<dim > &p,
-                                    const unsigned int component=0) const
-  {
-    Tensor<1,dim> dist = p-origin;
-    const double r = dist.norm();
-    Assert (r > 0.,
-            ExcDivideByZero());
-    dist/=r;
-    return -Z*std::exp(-Z*r)*dist;
-  }
-
-private:
-  /**
-   * origin
-   */
-  const Point<dim> origin;
-
-  /**
-   * charge
-   */
-  const double Z;
-
-  /**
-   * enrichment radius
-   */
-  const double radius;
-};
-
-
-
 
 namespace Step1
 {
@@ -207,7 +78,7 @@ namespace Step1
     void estimate_error ();
     void refine_grid ();
     void output_results (const unsigned int cycle) const;
-    void output_test (std::string file_name) const;
+    void output_test ();  //change to const later
 
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
@@ -255,14 +126,17 @@ namespace Step1
     
     //vector of size num_colors + 1
     //different color combinations that a cell can contain
-    unsigned int max_size_table_entry;
     std::vector <std::set<unsigned int>> material_table;
     
     const FEValuesExtractors::Scalar fe_extractor;
     const FEValuesExtractors::Scalar pou_extractor;
-
-    std::vector<Vector<float> > vec_estimated_error_per_cell;
-    Vector<float> estimated_error_per_cell;    
+    
+    //output vectors. size triangulation.n_active_cells()
+    //change to Vector
+    std::vector<Vector<float>> predicate_output;
+    Vector<float> color_output;
+    Vector<float> active_fe_index;
+    
   };
 
   template <int dim>
@@ -276,20 +150,12 @@ namespace Step1
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0)),
-    max_size_table_entry(0),
     fe_extractor(/*dofs start at...*/0),
     //TODO not used anywhere!
     pou_extractor(/*dofs start at (scalar fields!)*/1)
   {
     GridGenerator::hyper_cube (triangulation, -20, 20);
     triangulation.refine_global (4);
-    
-    //TODO undo? no refinement according to material.
-//     for (auto cell= triangulation.begin_active(); cell != triangulation.end(); ++cell)
-//       if (std::sqrt(cell->center().square()) < 5.0)
-//         cell->set_refine_flag();
-
-//     triangulation.execute_coarsening_and_refinement(); // 120 cells
     
     //initialize vector of vec_predicates
     vec_predicates.reserve(5);
@@ -306,22 +172,25 @@ namespace Step1
         EnrichmentFunction<dim> func( vec_predicates[i].get_origin(),
                                       1,
                                       vec_predicates[i].get_radius() );
-        vec_enrichments.push_back( func );
-            
+        vec_enrichments.push_back( func );            
     }    
 
     {
-    //set material id based on predicate functions. TODO comment
-    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-         cell != dof_handler.end(); ++cell)
+    //set vector based on predicate functions. TODO comment    
+    predicate_output.resize(vec_predicates.size());    
+    for (unsigned int i = 0; i < vec_predicates.size(); ++i)
     {
-      cell->set_active_fe_index(0);
-        for (unsigned int i=0; i<vec_predicates.size(); ++i)
-            if ( vec_predicates[i](cell) )
-                cell->set_active_fe_index(i+1);
+      predicate_output[i].reinit(triangulation.n_active_cells());
     }
     
-    output_test("predicate");
+    unsigned int index = 0;
+    for (typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active();
+         cell != dof_handler.end(); ++cell, ++index)
+    {
+        for (unsigned int i=0; i<vec_predicates.size(); ++i)
+          if ( vec_predicates[i](cell) )
+            predicate_output[i][index] = i+1;
+    }
     }
              
     //make a sparsity pattern based on connections between regions
@@ -350,16 +219,17 @@ namespace Step1
     
 
     //set material id based on color.
+    color_output.reinit(triangulation.n_active_cells());
+    unsigned int index = 0;
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-         cell != dof_handler.end(); ++cell)
+         cell != dof_handler.end();
+         ++cell, ++index)
     {
     cell->set_active_fe_index(0);
         for (unsigned int i=0; i<vec_predicates.size(); ++i)
             if ( vec_predicates[i](cell) )
-                cell->set_active_fe_index (predicate_colors[i]);
+                color_output[index] = predicate_colors[i];
     }
-    
-    output_test("color"); 
     }
     
     //build fe table. should be called everytime number of cells change!
@@ -390,51 +260,48 @@ namespace Step1
                 return &vec_enrichments[color_predicate_table[id][i+1]];
             };
     }
-    
+  
     
     for (unsigned int i=0; i !=material_table.size(); ++i)   
     {
-        vec_fe_enriched.assign(max_size_table_entry, &fe_nothing);
-        functions.assign(max_size_table_entry, {nullptr});
-        
-        pcout << std::endl;
-            
+        vec_fe_enriched.assign(num_colors, &fe_nothing);
+        functions.assign(num_colors, {nullptr});
+                    
         //set functions based on cell accessor        
         unsigned int ind = 0;
         for (auto it=material_table[i].begin();
              it != material_table[i].end();
-             ++it, ++ind)
+             ++it)
         {
+            ind = *it-1;
             AssertIndexRange(ind, vec_fe_enriched.size());
             
             vec_fe_enriched[ind] = &fe_enriched;
-            
+
             AssertIndexRange(ind, functions.size());
-            AssertIndexRange(*it-1, color_enrichments.size());
+            AssertIndexRange(ind, color_enrichments.size());
             
             //i'th color function is (i-1) element of color wise enrichments
-            functions[ind].assign(1,color_enrichments[*it-1]);
-            
-            
-            pcout << "color function added: " << *it << std::endl;
+            functions[ind].assign(1,color_enrichments[ind]); 
         }
         
         AssertDimension(vec_fe_enriched.size(), functions.size());
         
-        //printing contents of function
-        {
-          pcout << "enriched fe elements " << vec_fe_enriched.size() << std::endl;
-          
-          for (unsigned int i = 0; i < functions.size(); ++i)
-          {
-            pcout << "size of " <<i<< "- function: " << functions[i].size() << std::endl;
-          }
-          
-        }
+        FE_Enriched<dim> fe_component(&fe_base,
+                                     vec_fe_enriched,
+                                     functions);
                                             
-        fe_collection.push_back (FE_Enriched<dim> (&fe_base,
-                                                   vec_fe_enriched,
-                                                   functions));
+        fe_collection.push_back (fe_component);
+        
+        pcout << "fe set - " << fe_component.get_name() << std::endl;
+        pcout << "function set - ";
+        for (auto enrichment_function_array : functions)
+          for (auto func_component : enrichment_function_array)
+            if (func_component)
+              pcout << " X ";
+            else
+              pcout << " O ";
+        pcout << std::endl;
     }
     
 //     //fe_collection should look like this in the end
@@ -503,7 +370,6 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::build_tables ()
   {
-    bool found = false;
     color_predicate_table.resize( triangulation.n_cells() ); 
     
     //set first element of material_table size to empty
@@ -540,10 +406,10 @@ namespace Step1
             }            
         }
         
-        if (!color_list.empty())
+//         if (!color_list.empty())
 //                 pcout << std::endl;
         
-        found = false;
+        bool found = false;
         //check if color combination is already added
         if ( !color_list.empty() )
         {
@@ -557,23 +423,24 @@ namespace Step1
                     break;
                 }
             }
-            
+
+
             if (!found){
                 material_table.push_back(color_list);
                 cell->set_active_fe_index(material_table.size()-1);
-                
-                max_size_table_entry = (max_size_table_entry > color_list.size())?
-                                       max_size_table_entry:
+                /*
+                num_colors+1 = (num_colors+1 > color_list.size())?
+                                       num_colors+1:
                                        color_list.size();
 //                 pcout << "color combo set pushed at " << material_table.size()-1 << std::endl;
-            }     
+                */
+            } 
+            
         }
     }
     
-    output_test("final");
-    
-    pcout << "\nMax entry size of material_table : " << max_size_table_entry << std::endl;
-    
+    output_test();
+        
     //print material table
     pcout << "\nMaterial table : " << std::endl;
     for ( unsigned int j=0; j<material_table.size(); j++)
@@ -636,8 +503,6 @@ namespace Step1
 
     solution.reinit (locally_owned_dofs, mpi_communicator);
     system_rhs.reinit (locally_owned_dofs, mpi_communicator);
-
-    estimated_error_per_cell.reinit (triangulation.n_active_cells());
     
     pcout << "-----system set up complete" << std::endl;
   }
@@ -772,13 +637,13 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::refine_grid ()
   {
-    const double threshold = 0.9 * estimated_error_per_cell.linfty_norm();
-    GridRefinement::refine (triangulation,
-                            estimated_error_per_cell,
-                            threshold);
-
-    triangulation.prepare_coarsening_and_refinement ();
-    triangulation.execute_coarsening_and_refinement ();
+//     const double threshold = 0.9 * estimated_error_per_cell.linfty_norm();
+//     GridRefinement::refine (triangulation,
+//                             estimated_error_per_cell,
+//                             threshold);
+// 
+//     triangulation.prepare_coarsening_and_refinement ();
+//     triangulation.execute_coarsening_and_refinement ();
   }
 
   template <int dim>
@@ -813,18 +678,29 @@ namespace Step1
   }
   
   template <int dim>
-  void LaplaceProblem<dim>::output_test (std::string file_name) const
+  void LaplaceProblem<dim>::output_test ()
   {
-    Vector<float> active_fe_index(triangulation.n_active_cells());
+    std::string file_name = "output";
+    
+//     std::vector<Vector<float>> shape_funct(dof_handler.n_dofs(), 
+//                                            Vector<float>(dof_handler.n_dofs()));
+//     
+//     for (unsigned int i = 0; i < dof_handler.n_dofs(); ++i)
+//     {
+//       shape_funct[i] = i;
+//       constraints.distribute(shape_funct[i]);
+//     }
+    
+    active_fe_index.reinit(triangulation.n_active_cells());
+    typename hp::DoFHandler<dim>::active_cell_iterator
+    cell = dof_handler.begin_active(),
+    endc = dof_handler.end();
+    for (unsigned int index=0; cell!=endc; ++cell, ++index)
     {
-      typename hp::DoFHandler<dim>::active_cell_iterator
-      cell = dof_handler.begin_active(),
-      endc = dof_handler.end();
-      for (unsigned int index=0; cell!=endc; ++cell, ++index)
-      {
-        active_fe_index(index) = cell->active_fe_index();
-      }
+      active_fe_index[index] = cell->active_fe_index();
     }
+    
+    // set the others correctly
 
     // second output without making mesh finer
     if (this_mpi_process==0)
@@ -836,9 +712,18 @@ namespace Step1
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
         data_out.add_data_vector (active_fe_index, "fe_index");
-        data_out.build_patches ();
+        data_out.add_data_vector (color_output, "colors");
+        for (unsigned int i = 0; i < predicate_output.size(); ++i)
+          data_out.add_data_vector (predicate_output[i], "predicate_" + std::to_string(i));
+
+        /*
+        for (unsigned int i = 0; i < shape_funct.size(); ++i)
+          if (shape_funct[i].l_infty() > 0)
+            data_out.add_data_vector (shape_funct[i], "shape_funct_" + std::to_string(i));
+        */
+        
+        data_out.build_patches (); // <--- this is the one to additionally refine cells for output only
         data_out.write_vtk (output);
-        output.close();
       }
 
   }
@@ -861,12 +746,12 @@ namespace Step1
               << dof_handler.n_dofs ()
               << std::endl;
 
-        assemble_system ();
-        auto n_iterations = solve ();
+//         assemble_system ();
+//         auto n_iterations = solve ();
         //estimate_error ();
-        output_results(cycle);
+//         output_results(cycle);
         //refine_grid ();
-        pcout << "Number of iterations " << n_iterations << std::endl;
+//         pcout << "Number of iterations " << n_iterations << std::endl;
       }
   }
 }
