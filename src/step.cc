@@ -122,11 +122,12 @@ namespace Step1
     //vector size = number of cells;
     //map:  < color , corresponding predicate_function >
     //(only one per color acceptable). An assertion checks this
-    std::vector <std::map<unsigned int, unsigned int>> color_predicate_table;
+    std::map<unsigned int,
+      std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
     
     //vector of size num_colors + 1
     //different color combinations that a cell can contain
-    std::vector <std::set<unsigned int>> material_table;
+    std::vector <std::set<unsigned int>> color_sets;
     
     const FEValuesExtractors::Scalar fe_extractor;
     const FEValuesExtractors::Scalar pou_extractor;
@@ -156,7 +157,7 @@ namespace Step1
     
     //initialize vector of vec_predicates
     vec_predicates.reserve(5);
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-12.5,12.5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
@@ -218,7 +219,7 @@ namespace Step1
     //q collections the same size as different material identities
     q_collection.push_back(QGauss<dim>(4));
     
-    for (unsigned int i=1; i!=material_table.size(); ++i)
+    for (unsigned int i=1; i!=color_sets.size(); ++i)
         q_collection.push_back(QGauss<dim>(10));
     
     // usual elements (active_fe_index ==0):
@@ -236,20 +237,20 @@ namespace Step1
         [&,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
             {
                 unsigned int id = cell->index();
-                return &vec_enrichments[color_predicate_table[id][i+1]];
+                return &vec_enrichments[cellwise_color_predicate_map[id][i+1]];
             };
     }
   
     
-    for (unsigned int i=0; i !=material_table.size(); ++i)   
+    for (unsigned int i=0; i !=color_sets.size(); ++i)   
     {
         vec_fe_enriched.assign(num_colors, &fe_nothing);
         functions.assign(num_colors, {nullptr});
                     
         //set functions based on cell accessor        
         unsigned int ind = 0;
-        for (auto it=material_table[i].begin();
-             it != material_table[i].end();
+        for (auto it=color_sets[i].begin();
+             it != color_sets[i].end();
              ++it)
         {
             ind = *it-1;
@@ -290,14 +291,14 @@ namespace Step1
 //               (const typename Triangulation<dim, dim>::cell_iterator & cell)
 //               {
 //                   unsigned int id = cell->index();
-//                   return &vec_enrichments[color_predicate_table[id][1]];
+//                   return &vec_enrichments[cellwise_color_predicate_map[id][1]];
 //               };
 //               
 //             auto func2 = [&] 
 //               (const typename Triangulation<dim, dim>::cell_iterator & cell)
 //               {
 //                   unsigned int id = cell->index();
-//                   return &vec_enrichments[color_predicate_table[id][2]];
+//                   return &vec_enrichments[cellwise_color_predicate_map[id][2]];
 //               };
 // 
 //           fe_collection_test.push_back 
@@ -328,9 +329,9 @@ namespace Step1
 //               {
 //                   unsigned int id = cell->index();
 //                   pcout << " fe collection test "
-//                             << id << " : " << color_predicate_table[id][1]
+//                             << id << " : " << cellwise_color_predicate_map[id][1]
 //                             << std::endl;
-//                   return &vec_enrichments[color_predicate_table[id][1]];
+//                   return &vec_enrichments[cellwise_color_predicate_map[id][1]];
 //               };
 //       
 //       fe_collection_test.push_back 
@@ -349,83 +350,21 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::build_tables ()
   {
-    color_predicate_table.resize( triangulation.n_cells() ); 
-    
-    //set first element of material_table size to empty
-    material_table.resize(1);    
-    
-    //loop throught cells and build fe table
-    auto cell= triangulation.begin_active();
-    unsigned int cell_index = 0;
-    auto cell_test = triangulation.begin_active();
-    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-         cell != dof_handler.end(); ++cell, ++cell_index)
-    {
-        cell->set_active_fe_index (0);  //No enrichment at all
-        std::set<unsigned int> color_list;
-        
-        //loop through predicate function to find connected subdomains
-        //connections between same color regions is checked again.
-        for (unsigned int i=0; i<vec_predicates.size(); ++i)
-        {        
-            //add if predicate true to vector of functions
-            if (vec_predicates[i](cell))
-            {
-                //add color and predicate pair to each cell if predicate is true.
-                auto ret = color_predicate_table[cell_index].insert
-                    (std::pair <unsigned int, unsigned int> (predicate_colors[i], i));  
-                
-                color_list.insert(predicate_colors[i]);
-                
-                //A single predicate for a single color! repeat addition not accepted.
-                Assert( ret.second == true, ExcInternalError () );                           
-                
-//                 pcout << " - " << predicate_colors[i] << "(" << i << ")" ;
-            }            
-        }
-        
-//         if (!color_list.empty())
-//                 pcout << std::endl;
-        
-        bool found = false;
-        //check if color combination is already added
-        if ( !color_list.empty() )
-        {
-            for ( unsigned int j=0; j<material_table.size(); j++)
-            {
-                if (material_table[j] ==  color_list)
-                {
-//                     pcout << "color combo set found at " << j << std::endl;
-                    found=true;
-                    cell->set_active_fe_index(j);                    
-                    break;
-                }
-            }
-
-
-            if (!found){
-                material_table.push_back(color_list);
-                cell->set_active_fe_index(material_table.size()-1);
-                /*
-                num_colors+1 = (num_colors+1 > color_list.size())?
-                                       num_colors+1:
-                                       color_list.size();
-//                 pcout << "color combo set pushed at " << material_table.size()-1 << std::endl;
-                */
-            } 
-            
-        }
-    }
+    set_cellwise_color_set_and_fe_index (dof_handler, 
+                                         vec_predicates,
+                                         predicate_colors,
+                                         cellwise_color_predicate_map,
+                                         color_sets);
     
     output_test();
         
     {
     //print material table
     pcout << "\nMaterial table : " << std::endl;
-    for ( unsigned int j=0; j<material_table.size(); j++)
+    for ( unsigned int j=0; j<color_sets.size(); j++)
     {
         pcout << j << " ( ";
-        for ( auto i = material_table[j].begin(); i != material_table[j].end(); i++)
+        for ( auto i = color_sets[j].begin(); i != color_sets[j].end(); i++)
             pcout << *i << " ";
         pcout << " ) " << std::endl;
     }

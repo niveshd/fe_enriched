@@ -43,6 +43,7 @@ unsigned int color_predicates
   DynamicSparsityPattern dsp;
   dsp.reinit ( num_indices, num_indices );
   
+  //find connections between subdomains defined by predicates
   for (unsigned int i = 0; i < num_indices; ++i)
       for (unsigned int j = i+1; j < num_indices; ++j)
           if ( GridTools::find_connection_between_subdomains
@@ -58,9 +59,95 @@ unsigned int color_predicates
   Assert( num_indices == sp_graph.n_rows() , ExcInternalError() );
   predicate_colors.resize(num_indices);
   
+  //return num of colors and assign each predicate with a color
   return SparsityTools::color_sparsity_pattern (sp_graph, predicate_colors); 
 }
-  
+
+
+
+template <int dim, class MeshType>
+void 
+set_cellwise_color_set_and_fe_index
+  (MeshType &mesh,
+   const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+   const std::vector<unsigned int> &predicate_colors,
+   std::map<unsigned int,
+      std::map<unsigned int, unsigned int> > 
+        &cellwise_color_predicate_map,
+   std::vector <std::set<unsigned int>> &color_sets)
+{
+    //set first element of color_sets size to empty
+    color_sets.resize(1);    
+    
+    //loop throught cells and build fe table
+    auto cell= mesh.begin_active();
+    unsigned int cell_index = 0;
+    auto cell_test = mesh.begin_active();
+    for (typename hp::DoFHandler<dim>::cell_iterator cell= mesh.begin_active();
+         cell != mesh.end(); ++cell, ++cell_index)
+    {
+        cell->set_active_fe_index (0);  //No enrichment at all
+        std::set<unsigned int> color_list;
+        
+        //loop through predicate function to find connected subdomains
+        //connections between same color regions is checked again.
+        for (unsigned int i=0; i<vec_predicates.size(); ++i)
+        {        
+            //add if predicate true to vector of functions
+            if (vec_predicates[i](cell))
+            {
+                //add color and predicate pair to each cell if predicate is true.
+                auto ret = cellwise_color_predicate_map[cell_index].insert
+                    (std::pair <unsigned int, unsigned int> (predicate_colors[i], i));  
+                
+                color_list.insert(predicate_colors[i]);
+                
+                //A single predicate for a single color! repeat addition not accepted.
+                Assert( ret.second == true, ExcInternalError () );                           
+                
+//                 pcout << " - " << predicate_colors[i] << "(" << i << ")" ;
+            }            
+        }
+        
+//         if (!color_list.empty())
+//                 pcout << std::endl;
+        
+        bool found = false;
+        //check if color combination is already added
+        if ( !color_list.empty() )
+        {
+            for ( unsigned int j=0; j<color_sets.size(); j++)
+            {
+                if (color_sets[j] ==  color_list)
+                {
+//                     pcout << "color combo set found at " << j << std::endl;
+                    found=true;
+                    cell->set_active_fe_index(j);                    
+                    break;
+                }
+            }
+
+
+            if (!found){
+                color_sets.push_back(color_list);
+                cell->set_active_fe_index(color_sets.size()-1);
+                /*
+                num_colors+1 = (num_colors+1 > color_list.size())?
+                                       num_colors+1:
+                                       color_list.size();
+//                 pcout << "color combo set pushed at " << color_sets.size()-1 << std::endl;
+                */
+            } 
+            
+        }
+    }
+}
+
+
+
+
+
+//template instantiations  
 template unsigned int color_predicates
   (const hp::DoFHandler<2,2> &mesh,
    const std::vector<EnrichmentPredicate<2>> &,
@@ -70,3 +157,25 @@ template unsigned int color_predicates
   (const hp::DoFHandler<3,3> &mesh,
    const std::vector<EnrichmentPredicate<3>> &,
    std::vector<unsigned int> &);
+  
+template
+void
+set_cellwise_color_set_and_fe_index
+  (hp::DoFHandler<2,2> &mesh,
+   const std::vector<EnrichmentPredicate<2>> &vec_predicates,
+   const std::vector<unsigned int> &predicate_colors,
+   std::map<unsigned int,
+      std::map<unsigned int, unsigned int> > 
+        &cellwise_color_predicate_map,
+   std::vector <std::set<unsigned int>> &color_sets);  
+  
+template
+void
+set_cellwise_color_set_and_fe_index
+  (hp::DoFHandler<3,3> &mesh,
+   const std::vector<EnrichmentPredicate<3>> &vec_predicates,
+   const std::vector<unsigned int> &predicate_colors,
+   std::map<unsigned int,
+      std::map<unsigned int, unsigned int> > 
+        &cellwise_color_predicate_map,
+   std::vector <std::set<unsigned int>> &color_sets); 

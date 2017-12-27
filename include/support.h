@@ -1,4 +1,5 @@
 #include <vector>
+#include <map>
 
 using namespace dealii;
 
@@ -9,7 +10,7 @@ struct EnrichmentPredicate
     :origin(origin),radius(radius){}
 
     template <class Iterator>
-    bool operator () (const Iterator &i)
+    bool operator () (const Iterator &i) const
     { 
         return ( (i->center() - origin).norm_square() < radius*radius);
     }    
@@ -135,4 +136,13 @@ unsigned int color_predicates
    const std::vector<EnrichmentPredicate<dim>> &,
    std::vector<unsigned int> &);
 
-  
+template <int dim, class MeshType>
+void 
+set_cellwise_color_set_and_fe_index
+  (MeshType &mesh,
+   const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+   const std::vector<unsigned int> &predicate_colors,
+   std::map<unsigned int,
+      std::map<unsigned int, unsigned int> > 
+        &cellwise_color_predicate_map,
+   std::vector <std::set<unsigned int>> &color_sets);
