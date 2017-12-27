@@ -366,10 +366,10 @@ namespace Step1
     {
     //print material table
     pcout << "\nMaterial table : " << std::endl;
-    for ( unsigned int j=0; j<color_sets.size(); j++)
+    for ( unsigned int j=0; j<color_sets.size(); ++j)
     {
         pcout << j << " ( ";
-        for ( auto i = color_sets[j].begin(); i != color_sets[j].end(); i++)
+        for ( auto i = color_sets[j].begin(); i != color_sets[j].end(); ++i)
             pcout << *i << " ";
         pcout << " ) " << std::endl;
     }
@@ -411,7 +411,7 @@ namespace Step1
                                      false);
 
     std::vector<types::global_dof_index> n_locally_owned_dofs(n_mpi_processes);
-    for (unsigned int i = 0; i < n_mpi_processes; i++)
+    for (unsigned int i = 0; i < n_mpi_processes; ++i)
       n_locally_owned_dofs[i] = locally_owned_dofs_per_proc[i].n_elements();
 
     SparsityTools::distribute_sparsity_pattern
@@ -658,7 +658,7 @@ namespace Step1
   LaplaceProblem<dim>::run()
   {
     //TODO cycle to be set to 4 after testing
-    for (unsigned int cycle = 0; cycle < 1; cycle++)
+    for (unsigned int cycle = 0; cycle < 1; ++cycle)
       {
         pcout << "Cycle "<<cycle <<std::endl;
         setup_system ();

@@ -81,11 +81,12 @@ set_cellwise_color_set_and_fe_index
     color_sets.resize(1);    
     
     //loop throught cells and build fe table
-    auto cell= mesh.begin_active();
     unsigned int cell_index = 0;
-    auto cell_test = mesh.begin_active();
-    for (typename hp::DoFHandler<dim>::cell_iterator cell= mesh.begin_active();
-         cell != mesh.end(); ++cell, ++cell_index)
+    
+    auto cell = mesh.begin_active();
+    auto endc = mesh.end();
+    for (unsigned int cell_index=0;
+         cell != endc; ++cell, ++cell_index)
     {
         cell->set_active_fe_index (0);  //No enrichment at all
         std::set<unsigned int> color_list;
@@ -117,7 +118,7 @@ set_cellwise_color_set_and_fe_index
         //check if color combination is already added
         if ( !color_list.empty() )
         {
-            for ( unsigned int j=0; j<color_sets.size(); j++)
+            for ( unsigned int j=0; j<color_sets.size(); ++j)
             {
                 if (color_sets[j] ==  color_list)
                 {
@@ -201,7 +202,7 @@ void make_fe_collection_from_colored_enrichments
           (const typename Triangulation<dim, dim>::cell_iterator &) >>>
           functions;
           
-  for (unsigned int color_set_id=0; color_set_id !=color_sets.size(); ++color_set_id)   
+  for (unsigned int color_set_id=0; color_set_id!=color_sets.size(); ++color_set_id)   
     {
         vec_fe_enriched.assign(num_colors, &fe_nothing);
         functions.assign(num_colors, {nullptr});
