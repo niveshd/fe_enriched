@@ -178,6 +178,63 @@ void make_colorwise_enrichment_functions
   }
 
 
+template <int dim>  
+void make_fe_collection_from_colored_enrichments
+  (
+    const unsigned int &num_colors,
+    const std::vector <std::set<unsigned int>> 
+      &color_sets,         //total list of color sets possible
+   
+    const std::vector<
+      std::function<const Function<dim>*
+        (const typename Triangulation<dim>::cell_iterator&)> >
+          &color_enrichments,  //color wise enrichment functions
+   
+    const FE_Q<dim> &fe_base,            //basic fe element
+    const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
+    const FE_Nothing<dim> &fe_nothing,
+    hp::FECollection<dim> &fe_collection
+  )
+{
+  std::vector<const FiniteElement<dim> *> vec_fe_enriched;
+  std::vector<std::vector<std::function<const Function<dim> *
+          (const typename Triangulation<dim, dim>::cell_iterator &) >>>
+          functions;
+          
+  for (unsigned int color_set_id=0; color_set_id !=color_sets.size(); ++color_set_id)   
+    {
+        vec_fe_enriched.assign(num_colors, &fe_nothing);
+        functions.assign(num_colors, {nullptr});
+        
+        std::cout << " functions size while adding " << functions.size() << std::endl;
+                    
+        //ind = 0 means color id         
+        unsigned int ind = 0;
+        for (auto it=color_sets[color_set_id].begin();
+             it != color_sets[color_set_id].end();
+             ++it)
+        {
+            ind = *it-1;
+            AssertIndexRange(ind, vec_fe_enriched.size());
+            
+            vec_fe_enriched[ind] = &fe_enriched;
+
+            AssertIndexRange(ind, functions.size());
+            AssertIndexRange(ind, color_enrichments.size());
+            
+            //color_set_id'th color function is (color_set_id-1) element of color wise enrichments
+            functions[ind].assign(1,color_enrichments[ind]); 
+        }
+        
+        AssertDimension(vec_fe_enriched.size(), functions.size());
+        
+        FE_Enriched<dim> fe_component(&fe_base,
+                                     vec_fe_enriched,
+                                     functions);
+                                            
+        fe_collection.push_back (fe_component);
+    }  
+}
 
 
 //template instantiations  
@@ -249,3 +306,41 @@ void make_colorwise_enrichment_functions
     std::function<const Function<3>*
       (const typename Triangulation<3>::cell_iterator&)> >
         &color_enrichments);
+  
+  
+template  
+void make_fe_collection_from_colored_enrichments
+  (
+    const unsigned int &num_colors,
+    const std::vector <std::set<unsigned int>> 
+      &color_sets,         //total list of color sets possible
+   
+    const std::vector<
+      std::function<const Function<2>*
+        (const typename Triangulation<2>::cell_iterator&)> >
+          &color_enrichments,  //color wise enrichment functions
+   
+    const FE_Q<2> &fe_base,            //basic fe element
+    const FE_Q<2> &fe_enriched,        //fe element multiplied by enrichment function
+    const FE_Nothing<2> &fe_nothing,
+    hp::FECollection<2> &fe_collection
+  );
+  
+  
+template  
+void make_fe_collection_from_colored_enrichments
+  (
+    const unsigned int &num_colors,
+    const std::vector <std::set<unsigned int>> 
+      &color_sets,         //total list of color sets possible
+   
+    const std::vector<
+      std::function<const Function<3>*
+        (const typename Triangulation<3>::cell_iterator&)> >
+          &color_enrichments,  //color wise enrichment functions
+   
+    const FE_Q<3> &fe_base,            //basic fe element
+    const FE_Q<3> &fe_enriched,        //fe element multiplied by enrichment function
+    const FE_Nothing<3> &fe_nothing,
+    hp::FECollection<3> &fe_collection
+  );

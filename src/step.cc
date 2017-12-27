@@ -83,7 +83,7 @@ namespace Step1
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
     hp::FECollection<dim> fe_collection;
-//     hp::FECollection<dim> fe_collection_test; //TODO remove after testing
+    hp::FECollection<dim> fe_collection_test; //TODO remove after testing
     hp::QCollection<dim> q_collection;
     
     FE_Q<dim> fe_base;
@@ -222,12 +222,7 @@ namespace Step1
     for (unsigned int i=1; i!=color_sets.size(); ++i)
         q_collection.push_back(QGauss<dim>(10));
     
-    // usual elements (active_fe_index ==0):
-    std::vector<const FiniteElement<dim> *> vec_fe_enriched;
-    std::vector<std::vector<std::function<const Function<dim> *
-            (const typename Triangulation<dim, dim>::cell_iterator &) >>>
-            functions;
-            
+           
     //setup color wise enrichment functions
     //i'th function corresponds to (i+1) color!
     make_colorwise_enrichment_functions (num_colors,
@@ -235,85 +230,95 @@ namespace Step1
                                         cellwise_color_predicate_map,
                                         color_enrichments);
   
+    make_fe_collection_from_colored_enrichments (num_colors,
+                                                 color_sets,
+                                                 color_enrichments,
+                                                 fe_base,
+                                                 fe_enriched,
+                                                 fe_nothing,
+                                                 fe_collection);
     
-    for (unsigned int i=0; i !=color_sets.size(); ++i)   
+    {//print content of fe_collection
+    pcout << "\n Printing fe collection" << std::endl;
+      
+    for (unsigned int id = 0; id < fe_collection.size(); ++id)
     {
-        vec_fe_enriched.assign(num_colors, &fe_nothing);
-        functions.assign(num_colors, {nullptr});
-                    
-        //set functions based on cell accessor        
-        unsigned int ind = 0;
-        for (auto it=color_sets[i].begin();
-             it != color_sets[i].end();
-             ++it)
-        {
-            ind = *it-1;
-            AssertIndexRange(ind, vec_fe_enriched.size());
-            
-            vec_fe_enriched[ind] = &fe_enriched;
-
-            AssertIndexRange(ind, functions.size());
-            AssertIndexRange(ind, color_enrichments.size());
-            
-            //i'th color function is (i-1) element of color wise enrichments
-            functions[ind].assign(1,color_enrichments[ind]); 
-        }
-        
-        AssertDimension(vec_fe_enriched.size(), functions.size());
-        
-        FE_Enriched<dim> fe_component(&fe_base,
-                                     vec_fe_enriched,
-                                     functions);
-                                            
-        fe_collection.push_back (fe_component);
-        
-        pcout << "fe set - " << fe_component.get_name() << std::endl;
-        pcout << "function set - ";
-        for (auto enrichment_function_array : functions)
-          for (auto func_component : enrichment_function_array)
-            if (func_component)
-              pcout << " X ";
-            else
-              pcout << " O ";
-        pcout << std::endl;
+      pcout << "Fe Set : " << fe_collection[id].get_name() << std::endl;
+      
+      FE_Enriched<dim> fe_component(fe_collection[id]);
+      auto functions = fe_component.get_enrichments();
+      
+      pcout << " functions size after addition " << functions.size() << std::endl;
+      
+      pcout << "Function set : \t ";
+      for (auto enrichment_function_array : functions)
+        for (auto func_component : enrichment_function_array)
+          if (func_component)
+            pcout << " X ";
+          else
+            pcout << " O ";
+          
+      pcout << std::endl;
+    }
     }
     
     {//test fe_collection
-//     //fe_collection should look like this in the end
-//     {
-//       
-//             auto func1 = [&] 
-//               (const typename Triangulation<dim, dim>::cell_iterator & cell)
-//               {
-//                   unsigned int id = cell->index();
-//                   return &vec_enrichments[cellwise_color_predicate_map[id][1]];
-//               };
-//               
-//             auto func2 = [&] 
-//               (const typename Triangulation<dim, dim>::cell_iterator & cell)
-//               {
-//                   unsigned int id = cell->index();
-//                   return &vec_enrichments[cellwise_color_predicate_map[id][2]];
-//               };
-// 
-//           fe_collection_test.push_back 
-//             (FE_Enriched<dim> (&fe_base,
-//                               {&fe_nothing, &fe_nothing},
-//                               {{nullptr}, {nullptr}}));
-//            fe_collection_test.push_back 
-//             (FE_Enriched<dim> (&fe_base,
-//                               {&fe_enriched, &fe_nothing},
-//                               {{func1}, {nullptr}}));
-//            fe_collection_test.push_back 
-//             (FE_Enriched<dim> (&fe_base,
-//                               {&fe_enriched, &fe_nothing},
-//                               {{func2}, {nullptr}}));
-//            fe_collection_test.push_back 
-//             (FE_Enriched<dim> (&fe_base,
-//                               {&fe_enriched, &fe_enriched},
-//                               {{func1}, {func2}}));        
-//                                 
-//     }
+    //fe_collection should look like this in the end
+    {
+      
+            auto func1 = [&] 
+              (const typename Triangulation<dim, dim>::cell_iterator & cell)
+              {
+                  unsigned int id = cell->index();
+                  return &vec_enrichments[cellwise_color_predicate_map[id][1]];
+              };
+              
+            auto func2 = [&] 
+              (const typename Triangulation<dim, dim>::cell_iterator & cell)
+              {
+                  unsigned int id = cell->index();
+                  return &vec_enrichments[cellwise_color_predicate_map[id][2]];
+              };
+
+          fe_collection_test.push_back 
+            (FE_Enriched<dim> (&fe_base,
+                              {&fe_nothing, &fe_nothing},
+                              {{nullptr}, {nullptr}}));
+           fe_collection_test.push_back 
+            (FE_Enriched<dim> (&fe_base,
+                              {&fe_enriched, &fe_nothing},
+                              {{func1}, {nullptr}}));
+           fe_collection_test.push_back 
+            (FE_Enriched<dim> (&fe_base,
+                              {&fe_enriched, &fe_nothing},
+                              {{func2}, {nullptr}}));
+           fe_collection_test.push_back 
+            (FE_Enriched<dim> (&fe_base,
+                              {&fe_enriched, &fe_enriched},
+                              {{func1}, {func2}}));        
+                                
+    pcout << "\n Printing fe collection test" << std::endl;
+      
+    for (unsigned int id = 0; id < fe_collection_test.size(); ++id)
+    {
+      pcout << "Fe Set : " << fe_collection_test[id].get_name() << std::endl;
+      
+      FE_Enriched<dim> fe_component(fe_collection_test[id]);
+      auto functions = fe_component.get_enrichments();
+      
+      pcout << " functions size after addition " << functions.size() << std::endl;
+      
+      pcout << "Function set : \t ";
+      for (auto enrichment_function_array : functions)
+        for (auto func_component : enrichment_function_array)
+          if (func_component)
+            pcout << " X ";
+          else
+            pcout << " O ";
+          
+      pcout << std::endl;
+    }
+    }
 // 
 //     //simple fe collection
 //     {
