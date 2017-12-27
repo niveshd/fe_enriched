@@ -247,18 +247,22 @@ namespace Step1
       
       FE_Enriched<dim> fe_component(fe_collection[id]);
       auto functions = fe_component.get_enrichments();
+            
+      //TODO how to retrieve function from fe_collection
+      //...individual element of fe_collection is fe_element
+      //fe element has no get_enrichments function
+      //fe enriched copied from this fe element has enrichment function
+      //but doesn't have the correct function
       
-      pcout << " functions size after addition " << functions.size() << std::endl;
-      
-      pcout << "Function set : \t ";
-      for (auto enrichment_function_array : functions)
-        for (auto func_component : enrichment_function_array)
-          if (func_component)
-            pcout << " X ";
-          else
-            pcout << " O ";
-          
-      pcout << std::endl;
+//       pcout << "Function set : \t ";
+//       for (auto enrichment_function_array : functions)
+//         for (auto func_component : enrichment_function_array)
+//           if (func_component)
+//             pcout << " X ";
+//           else
+//             pcout << " O ";
+//           
+//       pcout << std::endl;
     }
     }
     
@@ -291,11 +295,13 @@ namespace Step1
            fe_collection_test.push_back 
             (FE_Enriched<dim> (&fe_base,
                               {&fe_enriched, &fe_nothing},
-                              {{func2}, {nullptr}}));
+                              {{func2}, {nullptr}}));           
            fe_collection_test.push_back 
             (FE_Enriched<dim> (&fe_base,
                               {&fe_enriched, &fe_enriched},
                               {{func1}, {func2}}));        
+
+          
                                 
     pcout << "\n Printing fe collection test" << std::endl;
       
@@ -305,8 +311,6 @@ namespace Step1
       
       FE_Enriched<dim> fe_component(fe_collection_test[id]);
       auto functions = fe_component.get_enrichments();
-      
-      pcout << " functions size after addition " << functions.size() << std::endl;
       
       pcout << "Function set : \t ";
       for (auto enrichment_function_array : functions)

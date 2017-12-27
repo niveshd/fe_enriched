@@ -205,9 +205,7 @@ void make_fe_collection_from_colored_enrichments
     {
         vec_fe_enriched.assign(num_colors, &fe_nothing);
         functions.assign(num_colors, {nullptr});
-        
-        std::cout << " functions size while adding " << functions.size() << std::endl;
-                    
+                            
         //ind = 0 means color id         
         unsigned int ind = 0;
         for (auto it=color_sets[color_set_id].begin();
@@ -231,6 +229,21 @@ void make_fe_collection_from_colored_enrichments
         FE_Enriched<dim> fe_component(&fe_base,
                                      vec_fe_enriched,
                                      functions);
+      
+      {//TODO delete after testing
+      ConditionalOStream pcout
+        (std::cout, (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0));
+        
+      pcout << "Function set : \t ";
+      for (auto enrichment_function_array : functions )
+        for (auto func_component : enrichment_function_array)
+          if (func_component)
+            pcout << " X ";
+          else
+            pcout << " O ";
+          
+      pcout << std::endl;
+      }
                                             
         fe_collection.push_back (fe_component);
     }  
