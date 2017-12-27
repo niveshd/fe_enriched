@@ -230,16 +230,10 @@ namespace Step1
             
     //setup color wise enrichment functions
     //i'th function corresponds to (i+1) color!
-    color_enrichments.resize (num_colors);
-    for (unsigned int i = 0; i < num_colors; ++i)
-    {
-      color_enrichments[i] =  
-        [&,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
-            {
-                unsigned int id = cell->index();
-                return &vec_enrichments[cellwise_color_predicate_map[id][i+1]];
-            };
-    }
+    make_colorwise_enrichment_functions (num_colors,
+                                        vec_enrichments,
+                                        cellwise_color_predicate_map,
+                                        color_enrichments);
   
     
     for (unsigned int i=0; i !=color_sets.size(); ++i)   
@@ -284,6 +278,7 @@ namespace Step1
         pcout << std::endl;
     }
     
+    {//test fe_collection
 //     //fe_collection should look like this in the end
 //     {
 //       
@@ -343,6 +338,7 @@ namespace Step1
 //                            {&fe_enriched},
 //                            {{func}}));
 //      }
+    }
     pcout << "-----constructor complete" << std::endl;
 
   }

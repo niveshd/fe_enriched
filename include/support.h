@@ -135,6 +135,7 @@ unsigned int color_predicates
   (const MeshType &mesh,
    const std::vector<EnrichmentPredicate<dim>> &,
    std::vector<unsigned int> &);
+  
 
 template <int dim, class MeshType>
 void 
@@ -146,3 +147,20 @@ set_cellwise_color_set_and_fe_index
       std::map<unsigned int, unsigned int> > 
         &cellwise_color_predicate_map,
    std::vector <std::set<unsigned int>> &color_sets);
+  
+  
+template <int dim>
+void make_colorwise_enrichment_functions
+  (const unsigned int &num_colors,          //needs number of colors
+   
+   const std::vector<EnrichmentFunction<dim>> 
+    &vec_enrichments,     //enrichment functions based on predicate id
+   
+   std::map<unsigned int,
+    std::map<unsigned int, unsigned int> >
+      &cellwise_color_predicate_map,
+   
+   std::vector<
+    std::function<const Function<dim>*
+      (const typename Triangulation<dim>::cell_iterator&)> >
+        &color_enrichments);

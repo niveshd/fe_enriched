@@ -30,6 +30,7 @@
 #include <deal.II/lac/petsc_parallel_sparse_matrix.h>
 
 #include <vector>
+#include <map>
 #include "support.h"
 
 template <int dim, class MeshType>
@@ -144,6 +145,38 @@ set_cellwise_color_set_and_fe_index
 }
 
 
+template <int dim>
+void make_colorwise_enrichment_functions
+  (const unsigned int &num_colors,          //needs number of colors
+   
+   const std::vector<EnrichmentFunction<dim>> 
+    &vec_enrichments,     //enrichment functions based on predicate id
+   
+   std::map<unsigned int,
+    std::map<unsigned int, unsigned int> >
+      &cellwise_color_predicate_map,
+   
+   std::vector<
+    std::function<const Function<dim>*
+      (const typename Triangulation<dim>::cell_iterator&)> >
+        &color_enrichments)   //colorwise enrichment functions indexed from 0!
+    //color_enrichments[0] is color 1 enrichment function
+  {
+    color_enrichments.resize (num_colors);
+    
+    for (unsigned int i = 0; i < num_colors; ++i)
+    {
+      color_enrichments[i] =  
+        [&,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
+            {
+                unsigned int id = cell->index();
+                
+                //i'th color corresponds to i+1 function
+                return &vec_enrichments[cellwise_color_predicate_map[id][i+1]];
+            };
+    }    
+  }
+
 
 
 
@@ -153,10 +186,12 @@ template unsigned int color_predicates
    const std::vector<EnrichmentPredicate<2>> &,
    std::vector<unsigned int> &);
   
+  
 template unsigned int color_predicates
   (const hp::DoFHandler<3,3> &mesh,
    const std::vector<EnrichmentPredicate<3>> &,
    std::vector<unsigned int> &);
+  
   
 template
 void
@@ -167,7 +202,8 @@ set_cellwise_color_set_and_fe_index
    std::map<unsigned int,
       std::map<unsigned int, unsigned int> > 
         &cellwise_color_predicate_map,
-   std::vector <std::set<unsigned int>> &color_sets);  
+   std::vector <std::set<unsigned int>> &color_sets); 
+  
   
 template
 void
@@ -179,3 +215,37 @@ set_cellwise_color_set_and_fe_index
       std::map<unsigned int, unsigned int> > 
         &cellwise_color_predicate_map,
    std::vector <std::set<unsigned int>> &color_sets); 
+  
+  
+  
+template
+void make_colorwise_enrichment_functions
+  (const unsigned int &num_colors,          //needs number of colors
+   
+   const std::vector<EnrichmentFunction<2>> 
+    &vec_enrichments,     //enrichment functions based on predicate id
+   
+   std::map<unsigned int,
+    std::map<unsigned int, unsigned int> >
+      &cellwise_color_predicate_map,
+   
+   std::vector<
+    std::function<const Function<2>*
+      (const typename Triangulation<2>::cell_iterator&)> >
+        &color_enrichments);
+  
+template
+void make_colorwise_enrichment_functions
+  (const unsigned int &num_colors,          //needs number of colors
+   
+   const std::vector<EnrichmentFunction<3>> 
+    &vec_enrichments,     //enrichment functions based on predicate id
+   
+   std::map<unsigned int,
+    std::map<unsigned int, unsigned int> >
+      &cellwise_color_predicate_map,
+   
+   std::vector<
+    std::function<const Function<3>*
+      (const typename Triangulation<3>::cell_iterator&)> >
+        &color_enrichments);
