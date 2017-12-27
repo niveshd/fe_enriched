@@ -149,10 +149,7 @@ namespace Step1
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0)),
-    fe_extractor(/*dofs start at...*/0),
-    //TODO not used anywhere!
-    pou_extractor(/*dofs start at (scalar fields!)*/1)
+    pcout (std::cout, (this_mpi_process == 0))
   {
     GridGenerator::hyper_cube (triangulation, -20, 20);
     triangulation.refine_global (4);
@@ -175,8 +172,7 @@ namespace Step1
         vec_enrichments.push_back( func );            
     }    
 
-    {
-    //set vector based on predicate functions. TODO comment    
+    {//print predicates
     predicate_output.resize(vec_predicates.size());    
     for (unsigned int i = 0; i < vec_predicates.size(); ++i)
     {
@@ -194,43 +190,26 @@ namespace Step1
     }
              
     //make a sparsity pattern based on connections between regions
-    unsigned int num_indices = vec_predicates.size();
-    DynamicSparsityPattern dsp;
-    dsp.reinit ( num_indices, num_indices );
-    for (unsigned int i = 0; i < num_indices; ++i)
-        for (unsigned int j = i+1; j < num_indices; ++j)
-            if ( GridTools::find_connection_between_subdomains(dof_handler, vec_predicates[i], vec_predicates[j]) )
-                dsp.add(i,j);
-    
-    dsp.symmetrize();
-    
-    //color different regions (defined by predicate)
-    SparsityPattern sp_graph;
-    sp_graph.copy_from(dsp);
-    
-    Assert( num_indices == sp_graph.n_rows() , ExcInternalError() );
-    predicate_colors.resize(num_indices);
-    num_colors = SparsityTools::color_sparsity_pattern (sp_graph, predicate_colors);
+    num_colors = color_predicates (dof_handler, vec_predicates, predicate_colors);
     
     {//TODO comment
     //print color_indices
-    for (unsigned int i=0; i<num_indices; ++i)
+    for (unsigned int i=0; i<predicate_colors.size(); ++i)
         pcout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
-    
+    }
 
-    //set material id based on color.
+    //make color index
+    {
     color_output.reinit(triangulation.n_active_cells());
     unsigned int index = 0;
     for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
          cell != dof_handler.end();
          ++cell, ++index)
-    {
-    cell->set_active_fe_index(0);
         for (unsigned int i=0; i<vec_predicates.size(); ++i)
             if ( vec_predicates[i](cell) )
                 color_output[index] = predicate_colors[i];
     }
-    }
+
     
     //build fe table. should be called everytime number of cells change!
     build_tables();
@@ -373,8 +352,7 @@ namespace Step1
     color_predicate_table.resize( triangulation.n_cells() ); 
     
     //set first element of material_table size to empty
-    material_table.resize(1);
-    
+    material_table.resize(1);    
     
     //loop throught cells and build fe table
     auto cell= triangulation.begin_active();
@@ -441,6 +419,7 @@ namespace Step1
     
     output_test();
         
+    {
     //print material table
     pcout << "\nMaterial table : " << std::endl;
     for ( unsigned int j=0; j<material_table.size(); j++)
@@ -449,6 +428,7 @@ namespace Step1
         for ( auto i = material_table[j].begin(); i != material_table[j].end(); i++)
             pcout << *i << " ";
         pcout << " ) " << std::endl;
+    }
     }
     
     pcout << "-----build tables complete" << std::endl;

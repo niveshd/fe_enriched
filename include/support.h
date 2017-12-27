@@ -1,3 +1,4 @@
+#include <vector>
 
 using namespace dealii;
 
@@ -125,3 +126,13 @@ private:
    */
   const double radius;
 };
+
+
+
+template <int dim, class MeshType>
+unsigned int color_predicates
+  (const MeshType &mesh,
+   const std::vector<EnrichmentPredicate<dim>> &,
+   std::vector<unsigned int> &);
+
+  
