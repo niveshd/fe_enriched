@@ -85,11 +85,11 @@ namespace Step1
     hp::FECollection<dim> fe_collection;
     hp::FECollection<dim> fe_collection_test; //TODO remove after testing
     hp::QCollection<dim> q_collection;
-    
+
     FE_Q<dim> fe_base;
     FE_Q<dim> fe_enriched;
     FE_Nothing<dim> fe_nothing;
-    
+
     IndexSet locally_owned_dofs;
     IndexSet locally_relevant_dofs;
 
@@ -107,37 +107,37 @@ namespace Step1
 
     RightHandSide<dim> right_hand_side;
 
-    std::vector<EnrichmentFunction<dim>> vec_enrichments;     
+    std::vector<EnrichmentFunction<dim>> vec_enrichments;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
     std::vector<
       std::function<const Function<dim>*
-        (const typename Triangulation<dim>::cell_iterator&)> >      
+        (const typename Triangulation<dim>::cell_iterator&)> >
           color_enrichments;
-    
+
     //each predicate is assigned a color depending on overlap of vertices.
     std::vector<unsigned int> predicate_colors;
     unsigned int num_colors;
-    
+
     //cell wise mapping of color with enrichment functions
     //vector size = number of cells;
     //map:  < color , corresponding predicate_function >
     //(only one per color acceptable). An assertion checks this
     std::map<unsigned int,
       std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
-    
+
     //vector of size num_colors + 1
     //different color combinations that a cell can contain
-    std::vector <std::set<unsigned int>> color_sets;
-    
+    std::vector <std::set<unsigned int>> fe_sets;
+
     const FEValuesExtractors::Scalar fe_extractor;
     const FEValuesExtractors::Scalar pou_extractor;
-    
+
     //output vectors. size triangulation.n_active_cells()
     //change to Vector
     std::vector<Vector<float>> predicate_output;
     Vector<float> color_output;
     Vector<float> active_fe_index;
-    
+
   };
 
   template <int dim>
@@ -152,17 +152,15 @@ namespace Step1
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0))
   {
-    GridGenerator::hyper_cube (triangulation, -20, 20);
-    triangulation.refine_global (4);
-    
+    GridGenerator::hyper_cube (triangulation, -2, 2);
+    triangulation.refine_global (2);
+
     //initialize vector of vec_predicates
-    vec_predicates.reserve(5);
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(12.5,-12.5), 2) );
-    
+    vec_predicates.reserve(3);
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
+
     //vector of enrichment functions
     vec_enrichments.reserve( vec_predicates.size() );
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
@@ -170,16 +168,16 @@ namespace Step1
         EnrichmentFunction<dim> func( vec_predicates[i].get_origin(),
                                       1,
                                       vec_predicates[i].get_radius() );
-        vec_enrichments.push_back( func );            
-    }    
+        vec_enrichments.push_back( func );
+    }
 
     {//print predicates
-    predicate_output.resize(vec_predicates.size());    
+    predicate_output.resize(vec_predicates.size());
     for (unsigned int i = 0; i < vec_predicates.size(); ++i)
     {
       predicate_output[i].reinit(triangulation.n_active_cells());
     }
-    
+
     unsigned int index = 0;
     for (typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active();
          cell != dof_handler.end(); ++cell, ++index)
@@ -189,10 +187,10 @@ namespace Step1
             predicate_output[i][index] = i+1;
     }
     }
-             
+
     //make a sparsity pattern based on connections between regions
     num_colors = color_predicates (dof_handler, vec_predicates, predicate_colors);
-    
+
     {//TODO comment
     //print color_indices
     for (unsigned int i=0; i<predicate_colors.size(); ++i)
@@ -211,49 +209,49 @@ namespace Step1
                 color_output[index] = predicate_colors[i];
     }
 
-    
+
     //build fe table. should be called everytime number of cells change!
     build_tables();
-        
-   
+
+
     //q collections the same size as different material identities
     q_collection.push_back(QGauss<dim>(4));
-    
-    for (unsigned int i=1; i!=color_sets.size(); ++i)
+
+    for (unsigned int i=1; i!=fe_sets.size(); ++i)
         q_collection.push_back(QGauss<dim>(10));
-    
-           
+
+
     //setup color wise enrichment functions
     //i'th function corresponds to (i+1) color!
     make_colorwise_enrichment_functions (num_colors,
                                         vec_enrichments,
                                         cellwise_color_predicate_map,
                                         color_enrichments);
-  
+
     make_fe_collection_from_colored_enrichments (num_colors,
-                                                 color_sets,
+                                                 fe_sets,
                                                  color_enrichments,
                                                  fe_base,
                                                  fe_enriched,
                                                  fe_nothing,
                                                  fe_collection);
-    
+
     {//print content of fe_collection
     pcout << "\n Printing fe collection" << std::endl;
-      
+
     for (unsigned int id = 0; id < fe_collection.size(); ++id)
     {
       pcout << "Fe Set : " << fe_collection[id].get_name() << std::endl;
-      
+
       FE_Enriched<dim> fe_component(fe_collection[id]);
       auto functions = fe_component.get_enrichments();
-            
+
       //TODO how to retrieve function from fe_collection
       //...individual element of fe_collection is fe_element
       //fe element has no get_enrichments function
       //fe enriched copied from this fe element has enrichment function
       //but doesn't have the correct function
-      
+
 //       pcout << "Function set : \t ";
 //       for (auto enrichment_function_array : functions)
 //         for (auto func_component : enrichment_function_array)
@@ -261,74 +259,74 @@ namespace Step1
 //             pcout << " X ";
 //           else
 //             pcout << " O ";
-//           
+//
 //       pcout << std::endl;
     }
     }
-    
+
     {//test fe_collection
     //fe_collection should look like this in the end
-    {
-      
-            auto func1 = [&] 
-              (const typename Triangulation<dim, dim>::cell_iterator & cell)
-              {
-                  unsigned int id = cell->index();
-                  return &vec_enrichments[cellwise_color_predicate_map[id][1]];
-              };
-              
-            auto func2 = [&] 
-              (const typename Triangulation<dim, dim>::cell_iterator & cell)
-              {
-                  unsigned int id = cell->index();
-                  return &vec_enrichments[cellwise_color_predicate_map[id][2]];
-              };
-
-          fe_collection_test.push_back 
-            (FE_Enriched<dim> (&fe_base,
-                              {&fe_nothing, &fe_nothing},
-                              {{nullptr}, {nullptr}}));
-           fe_collection_test.push_back 
-            (FE_Enriched<dim> (&fe_base,
-                              {&fe_enriched, &fe_nothing},
-                              {{func1}, {nullptr}}));
-           fe_collection_test.push_back 
-            (FE_Enriched<dim> (&fe_base,
-                              {&fe_enriched, &fe_nothing},
-                              {{func2}, {nullptr}}));           
-           fe_collection_test.push_back 
-            (FE_Enriched<dim> (&fe_base,
-                              {&fe_enriched, &fe_enriched},
-                              {{func1}, {func2}}));        
-
-          
-                                
-    pcout << "\n Printing fe collection test" << std::endl;
-      
-    for (unsigned int id = 0; id < fe_collection_test.size(); ++id)
-    {
-      pcout << "Fe Set : " << fe_collection_test[id].get_name() << std::endl;
-      
-      FE_Enriched<dim> fe_component(fe_collection_test[id]);
-      auto functions = fe_component.get_enrichments();
-      
-      pcout << "Function set : \t ";
-      for (auto enrichment_function_array : functions)
-        for (auto func_component : enrichment_function_array)
-          if (func_component)
-            pcout << " X ";
-          else
-            pcout << " O ";
-          
-      pcout << std::endl;
-    }
-    }
-// 
+    // {
+    //
+    //         auto func1 = [&]
+    //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
+    //           {
+    //               unsigned int id = cell->index();
+    //               return &vec_enrichments[cellwise_color_predicate_map[id][1]];
+    //           };
+    //
+    //         auto func2 = [&]
+    //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
+    //           {
+    //               unsigned int id = cell->index();
+    //               return &vec_enrichments[cellwise_color_predicate_map[id][2]];
+    //           };
+    //
+    //       fe_collection_test.push_back
+    //         (FE_Enriched<dim> (&fe_base,
+    //                           {&fe_nothing, &fe_nothing},
+    //                           {{nullptr}, {nullptr}}));
+    //        fe_collection_test.push_back
+    //         (FE_Enriched<dim> (&fe_base,
+    //                           {&fe_enriched, &fe_nothing},
+    //                           {{func1}, {nullptr}}));
+    //        fe_collection_test.push_back
+    //         (FE_Enriched<dim> (&fe_base,
+    //                           {&fe_enriched, &fe_nothing},
+    //                           {{func2}, {nullptr}}));
+    //        fe_collection_test.push_back
+    //         (FE_Enriched<dim> (&fe_base,
+    //                           {&fe_enriched, &fe_enriched},
+    //                           {{func1}, {func2}}));
+    //
+    //
+    //
+    // pcout << "\n Printing fe collection test" << std::endl;
+    //
+    // for (unsigned int id = 0; id < fe_collection_test.size(); ++id)
+    // {
+    //   pcout << "Fe Set : " << fe_collection_test[id].get_name() << std::endl;
+    //
+    //   FE_Enriched<dim> fe_component(fe_collection_test[id]);
+    //   auto functions = fe_component.get_enrichments();
+    //
+    //   pcout << "Function set : \t ";
+    //   for (auto enrichment_function_array : functions)
+    //     for (auto func_component : enrichment_function_array)
+    //       if (func_component)
+    //         pcout << " X ";
+    //       else
+    //         pcout << " O ";
+    //
+    //   pcout << std::endl;
+    // }
+    // }
+//
 //     //simple fe collection
 //     {
-// 
+//
 // //       fe_collection_test.push_back (FE_Enriched<dim> (fe_base));
-//          static auto func = [&] 
+//          static auto func = [&]
 //               (const typename Triangulation<dim, dim>::cell_iterator & cell)
 //               {
 //                   unsigned int id = cell->index();
@@ -337,12 +335,12 @@ namespace Step1
 //                             << std::endl;
 //                   return &vec_enrichments[cellwise_color_predicate_map[id][1]];
 //               };
-//       
-//       fe_collection_test.push_back 
+//
+//       fe_collection_test.push_back
 //         (FE_Enriched<dim> (&fe_base,
 //                            {&fe_nothing},
 //                            {{nullptr}}));
-//       fe_collection_test.push_back 
+//       fe_collection_test.push_back
 //         (FE_Enriched<dim> (&fe_base,
 //                            {&fe_enriched},
 //                            {{func}}));
@@ -355,26 +353,26 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::build_tables ()
   {
-    set_cellwise_color_set_and_fe_index (dof_handler, 
+    set_cellwise_color_set_and_fe_index (dof_handler,
                                          vec_predicates,
                                          predicate_colors,
                                          cellwise_color_predicate_map,
-                                         color_sets);
-    
+                                         fe_sets);
+
     output_test();
-        
+
     {
     //print material table
     pcout << "\nMaterial table : " << std::endl;
-    for ( unsigned int j=0; j<color_sets.size(); ++j)
+    for ( unsigned int j=0; j<fe_sets.size(); ++j)
     {
         pcout << j << " ( ";
-        for ( auto i = color_sets[j].begin(); i != color_sets[j].end(); ++i)
+        for ( auto i = fe_sets[j].begin(); i != fe_sets[j].end(); ++i)
             pcout << *i << " ";
         pcout << " ) " << std::endl;
     }
     }
-    
+
     pcout << "-----build tables complete" << std::endl;
   }
 
@@ -384,51 +382,54 @@ namespace Step1
 
     GridTools::partition_triangulation (n_mpi_processes, triangulation);
     dof_handler.distribute_dofs (fe_collection);
-    DoFRenumbering::subdomain_wise (dof_handler);
-    
-    //?
-    std::vector<IndexSet> locally_owned_dofs_per_proc
-      = DoFTools::locally_owned_dofs_per_subdomain (dof_handler);
-    locally_owned_dofs = locally_owned_dofs_per_proc[this_mpi_process];
-    locally_relevant_dofs.clear();
-    DoFTools::extract_locally_relevant_dofs (dof_handler,
-                                             locally_relevant_dofs);
-    //?
 
-    constraints.clear();
-    constraints.reinit (locally_relevant_dofs);
-    DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
-    VectorTools::interpolate_boundary_values (dof_handler,
-                                              0,
-                                              Functions::ZeroFunction<dim> (1),
-                                              constraints);
-    constraints.close ();
+    // //TODO renumbering screws up numbering of cell ids?
+    // DoFRenumbering::subdomain_wise (dof_handler);
+    // //...
+    // //?
+    // std::vector<IndexSet> locally_owned_dofs_per_proc
+    //   = DoFTools::locally_owned_dofs_per_subdomain (dof_handler);
+    // locally_owned_dofs = locally_owned_dofs_per_proc[this_mpi_process];
+    // locally_relevant_dofs.clear();
+    // DoFTools::extract_locally_relevant_dofs (dof_handler,
+    //                                          locally_relevant_dofs);
+    // //?
+    //
+    // constraints.clear();
+    // constraints.reinit (locally_relevant_dofs);
+    // DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
+    // //TODO  crashing here!
+    // VectorTools::interpolate_boundary_values (dof_handler,
+    //                                           0,
+    //                                           Functions::ZeroFunction<dim> (1),
+    //                                           constraints);
+    // constraints.close ();
+    //
+    // // Initialise the stiffness and mass matrices
+    // DynamicSparsityPattern dsp (locally_relevant_dofs);
+    // DoFTools::make_sparsity_pattern (dof_handler, dsp,
+    //                                  constraints,
+    //                                  false);
+    // ...
+    // std::vector<types::global_dof_index> n_locally_owned_dofs(n_mpi_processes);
+    // for (unsigned int i = 0; i < n_mpi_processes; ++i)
+    //   n_locally_owned_dofs[i] = locally_owned_dofs_per_proc[i].n_elements();
+    //
+    // SparsityTools::distribute_sparsity_pattern
+    // (dsp,
+    //  n_locally_owned_dofs,
+    //  mpi_communicator,
+    //  locally_relevant_dofs);
+    //
+    // system_matrix.reinit (locally_owned_dofs,
+    //                       locally_owned_dofs,
+    //                       dsp,
+    //                       mpi_communicator);
+    //
+    // solution.reinit (locally_owned_dofs, mpi_communicator);
+    // system_rhs.reinit (locally_owned_dofs, mpi_communicator);
 
-    // Initialise the stiffness and mass matrices
-    DynamicSparsityPattern dsp (locally_relevant_dofs);
-    DoFTools::make_sparsity_pattern (dof_handler, dsp,
-                                     constraints,
-                                     false);
-
-    std::vector<types::global_dof_index> n_locally_owned_dofs(n_mpi_processes);
-    for (unsigned int i = 0; i < n_mpi_processes; ++i)
-      n_locally_owned_dofs[i] = locally_owned_dofs_per_proc[i].n_elements();
-
-    SparsityTools::distribute_sparsity_pattern
-    (dsp,
-     n_locally_owned_dofs,
-     mpi_communicator,
-     locally_relevant_dofs);
-
-    system_matrix.reinit (locally_owned_dofs,
-                          locally_owned_dofs,
-                          dsp,
-                          mpi_communicator);
-
-    solution.reinit (locally_owned_dofs, mpi_communicator);
-    system_rhs.reinit (locally_owned_dofs, mpi_communicator);
-    
-    pcout << "-----system set up complete" << std::endl;
+    // pcout << "-----system set up complete" << std::endl;
   }
 
 
@@ -441,11 +442,11 @@ namespace Step1
 
     FullMatrix<double> cell_system_matrix;
     Vector<double>     cell_rhs;
-    
+
     std::vector<types::global_dof_index> local_dof_indices;
-    
+
     std::vector<double> rhs_values;
-    
+
     hp::FEValues<dim> fe_values_hp(fe_collection, q_collection,
                                    update_values | update_gradients |
                                    update_quadrature_points | update_JxW_values);
@@ -478,7 +479,7 @@ namespace Step1
           for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
             for (unsigned int i=0; i<dofs_per_cell; ++i)
               for (unsigned int j=i; j<dofs_per_cell; ++j)
-                {                     
+                {
                   cell_system_matrix(i,j) += (fe_values.shape_grad(i,q_point) *
                                       fe_values.shape_grad(j,q_point) *
                                       fe_values.JxW(q_point));
@@ -506,7 +507,7 @@ namespace Step1
 
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
-    
+
     pcout << "-----assemble_system complete" << std::endl;
 
   }
@@ -521,15 +522,15 @@ namespace Step1
     PETScWrappers::PreconditionBlockJacobi preconditioner(system_matrix);
     cg.solve (system_matrix, solution, system_rhs,
               preconditioner);
-    
+
     Vector<double> localized_solution (solution);
     pcout << "local solution " << localized_solution.size() << ":" << solution.size() << std::endl;
-    
+
     constraints.distribute (localized_solution);
-    solution = localized_solution;    
-    
+    solution = localized_solution;
+
     return solver_control.last_step();
-    
+
     pcout << "-----solve step complete" << std::endl;
   }
 
@@ -565,7 +566,7 @@ namespace Step1
 //     GridRefinement::refine (triangulation,
 //                             estimated_error_per_cell,
 //                             threshold);
-// 
+//
 //     triangulation.prepare_coarsening_and_refinement ();
 //     triangulation.execute_coarsening_and_refinement ();
   }
@@ -600,21 +601,21 @@ namespace Step1
         output.close();
       }
   }
-  
+
   template <int dim>
   void LaplaceProblem<dim>::output_test ()
   {
     std::string file_name = "output";
-    
-//     std::vector<Vector<float>> shape_funct(dof_handler.n_dofs(), 
+
+//     std::vector<Vector<float>> shape_funct(dof_handler.n_dofs(),
 //                                            Vector<float>(dof_handler.n_dofs()));
-//     
+//
 //     for (unsigned int i = 0; i < dof_handler.n_dofs(); ++i)
 //     {
 //       shape_funct[i] = i;
 //       constraints.distribute(shape_funct[i]);
 //     }
-    
+
     active_fe_index.reinit(triangulation.n_active_cells());
     typename hp::DoFHandler<dim>::active_cell_iterator
     cell = dof_handler.begin_active(),
@@ -623,7 +624,7 @@ namespace Step1
     {
       active_fe_index[index] = cell->active_fe_index();
     }
-    
+
     // set the others correctly
 
     // second output without making mesh finer
@@ -631,7 +632,7 @@ namespace Step1
       {
         file_name += ".vtk";
         std::ofstream output (file_name.c_str());
-        
+
 
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
@@ -645,7 +646,7 @@ namespace Step1
           if (shape_funct[i].l_infty() > 0)
             data_out.add_data_vector (shape_funct[i], "shape_funct_" + std::to_string(i));
         */
-        
+
         data_out.build_patches (); // <--- this is the one to additionally refine cells for output only
         data_out.write_vtk (output);
       }
@@ -694,7 +695,7 @@ int main (int argc,char **argv)
 //         PETScWrappers::set_option_value("-st_pc_type", "jacobi");
         step1.run();
       }
-      
+
     }
   catch (std::exception &exc)
     {
@@ -719,6 +720,5 @@ int main (int argc,char **argv)
                 << "----------------------------------------------------"
                 << std::endl;
       return 1;
-    };   
+    };
 }
-

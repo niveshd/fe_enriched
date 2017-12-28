@@ -75,10 +75,10 @@ set_cellwise_color_set_and_fe_index
    std::map<unsigned int,
       std::map<unsigned int, unsigned int> >
         &cellwise_color_predicate_map,
-   std::vector <std::set<unsigned int>> &color_sets)
+   std::vector <std::set<unsigned int>> &fe_sets)
 {
-    //set first element of color_sets size to empty
-    color_sets.resize(1);
+    //set first element of fe_sets size to empty
+    fe_sets.resize(1);
 
     //loop throught cells and build fe table
     unsigned int cell_index = 0;
@@ -118,9 +118,9 @@ set_cellwise_color_set_and_fe_index
         //check if color combination is already added
         if ( !color_list.empty() )
         {
-            for ( unsigned int j=0; j<color_sets.size(); ++j)
+            for ( unsigned int j=0; j<fe_sets.size(); ++j)
             {
-                if (color_sets[j] ==  color_list)
+                if (fe_sets[j] ==  color_list)
                 {
 //                     pcout << "color combo set found at " << j << std::endl;
                     found=true;
@@ -131,13 +131,13 @@ set_cellwise_color_set_and_fe_index
 
 
             if (!found){
-                color_sets.push_back(color_list);
-                cell->set_active_fe_index(color_sets.size()-1);
+                fe_sets.push_back(color_list);
+                cell->set_active_fe_index(fe_sets.size()-1);
                 /*
                 num_colors+1 = (num_colors+1 > color_list.size())?
                                        num_colors+1:
                                        color_list.size();
-//                 pcout << "color combo set pushed at " << color_sets.size()-1 << std::endl;
+//                 pcout << "color combo set pushed at " << fe_sets.size()-1 << std::endl;
                 */
             }
 
@@ -184,7 +184,7 @@ void make_fe_collection_from_colored_enrichments
   (
     const unsigned int &num_colors,
     const std::vector <std::set<unsigned int>>
-      &color_sets,         //total list of color sets possible
+      &fe_sets,         //total list of color sets possible
 
     const std::vector<
       std::function<const Function<dim>*
@@ -202,15 +202,15 @@ void make_fe_collection_from_colored_enrichments
           (const typename Triangulation<dim, dim>::cell_iterator &) >>>
           functions;
 
-  for (unsigned int color_set_id=0; color_set_id!=color_sets.size(); ++color_set_id)
+  for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
     {
         vec_fe_enriched.assign(num_colors, &fe_nothing);
         functions.assign(num_colors, {nullptr});
 
         //ind = 0 means color id
         unsigned int ind = 0;
-        for (auto it=color_sets[color_set_id].begin();
-             it != color_sets[color_set_id].end();
+        for (auto it=fe_sets[color_set_id].begin();
+             it != fe_sets[color_set_id].end();
              ++it)
         {
             ind = *it-1;
@@ -278,7 +278,7 @@ set_cellwise_color_set_and_fe_index
    std::map<unsigned int,
       std::map<unsigned int, unsigned int> >
         &cellwise_color_predicate_map,
-   std::vector <std::set<unsigned int>> &color_sets);
+   std::vector <std::set<unsigned int>> &fe_sets);
 
 
 template
@@ -290,7 +290,7 @@ set_cellwise_color_set_and_fe_index
    std::map<unsigned int,
       std::map<unsigned int, unsigned int> >
         &cellwise_color_predicate_map,
-   std::vector <std::set<unsigned int>> &color_sets);
+   std::vector <std::set<unsigned int>> &fe_sets);
 
 
 
@@ -332,7 +332,7 @@ void make_fe_collection_from_colored_enrichments
   (
     const unsigned int &num_colors,
     const std::vector <std::set<unsigned int>>
-      &color_sets,         //total list of color sets possible
+      &fe_sets,         //total list of color sets possible
 
     const std::vector<
       std::function<const Function<2>*
@@ -351,7 +351,7 @@ void make_fe_collection_from_colored_enrichments
   (
     const unsigned int &num_colors,
     const std::vector <std::set<unsigned int>>
-      &color_sets,         //total list of color sets possible
+      &fe_sets,         //total list of color sets possible
 
     const std::vector<
       std::function<const Function<3>*
