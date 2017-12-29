@@ -153,7 +153,7 @@ void make_colorwise_enrichment_functions
    const std::vector<EnrichmentFunction<dim>>
     &vec_enrichments,     //enrichment functions based on predicate id
 
-   std::map<unsigned int,
+   const std::map<unsigned int,
     std::map<unsigned int, unsigned int> >
       &cellwise_color_predicate_map,
 
@@ -172,8 +172,8 @@ void make_colorwise_enrichment_functions
             {
                 unsigned int id = cell->index();
 
-                //i'th color corresponds to i+1 function
-                return &vec_enrichments[cellwise_color_predicate_map[id][i+1]];
+                //i'th function corresponds to i+1 color
+                  return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
             };
     }
   }
@@ -301,7 +301,7 @@ void make_colorwise_enrichment_functions
    const std::vector<EnrichmentFunction<2>>
     &vec_enrichments,     //enrichment functions based on predicate id
 
-   std::map<unsigned int,
+   const std::map<unsigned int,
     std::map<unsigned int, unsigned int> >
       &cellwise_color_predicate_map,
 
@@ -317,7 +317,7 @@ void make_colorwise_enrichment_functions
    const std::vector<EnrichmentFunction<3>>
     &vec_enrichments,     //enrichment functions based on predicate id
 
-   std::map<unsigned int,
+   const std::map<unsigned int,
     std::map<unsigned int, unsigned int> >
       &cellwise_color_predicate_map,
 

@@ -78,9 +78,19 @@ public:
                      const double     &Z,
                      const double     &radius)
     : Function<dim>(1),
+      coefficient(1),
       origin(origin),
       Z(Z),
       radius(radius)
+  {}
+
+  //constant function
+  EnrichmentFunction(const double coefficient)
+    : Function<dim>(1),
+      coefficient(coefficient),
+      origin(Point<dim>()),
+      Z(0), //exponent factor = 1
+      radius(1)
   {}
 
   virtual double value(const Point<dim> &point,
@@ -88,7 +98,7 @@ public:
   {
     Tensor<1,dim> dist = point-origin;
     const double r = dist.norm();
-    return std::exp(-Z*r);
+    return coefficient*std::exp(-Z*r);
   }
 
   //TODO remove?
@@ -108,10 +118,11 @@ public:
     Assert (r > 0.,
             ExcDivideByZero());
     dist/=r;
-    return -Z*std::exp(-Z*r)*dist;
+    return -coefficient*Z*std::exp(-Z*r)*dist;
   }
 
 private:
+  const double coefficient;
   /**
    * origin
    */
@@ -158,7 +169,7 @@ void make_colorwise_enrichment_functions
    const std::vector<EnrichmentFunction<dim>>
     &vec_enrichments,     //enrichment functions based on predicate id
 
-   std::map<unsigned int,
+   const std::map<unsigned int,
     std::map<unsigned int, unsigned int> >
       &cellwise_color_predicate_map,
 
