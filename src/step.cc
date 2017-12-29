@@ -55,6 +55,73 @@
 
 //TODO need 3d test example?
 const unsigned int dim = 2;
+unsigned int patches = 10;
+
+template <int dim>
+void plot_shape_function
+  (hp::DoFHandler<dim> &dof_handler,
+   hp::FECollection<dim> &fe_collection)
+{
+  dof_handler.distribute_dofs(fe_collection);
+
+  deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
+
+  ConstraintMatrix constraints;
+  constraints.clear();
+  dealii::DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
+  constraints.close ();
+
+  // output to check if all is good:
+  std::vector<Vector<double>> shape_functions;
+  std::vector<std::string> names;
+  for (unsigned int s=0; s < dof_handler.n_dofs(); s++)
+    {
+      Vector<double> shape_function;
+      shape_function.reinit(dof_handler.n_dofs());
+      shape_function[s] = 1.0;
+
+      // if the dof is constrained, first output unconstrained vector
+      if (constraints.is_constrained(s))
+        {
+          names.push_back(std::string("UN_") +
+                          dealii::Utilities::int_to_string(s,2));
+          shape_functions.push_back(shape_function);
+        }
+
+      names.push_back(std::string("N_") +
+                      dealii::Utilities::int_to_string(s,2));
+
+      // make continuous/constrain:
+      constraints.distribute(shape_function);
+      shape_functions.push_back(shape_function);
+    }
+
+  DataOut<dim,hp::DoFHandler<dim>> data_out;
+  data_out.attach_dof_handler (dof_handler);
+
+  // get material ids:
+  Vector<float> fe_index(dof_handler.get_triangulation().n_active_cells());
+  typename hp::DoFHandler<dim>::active_cell_iterator
+  cell = dof_handler.begin_active (),
+  endc = dof_handler.end ();
+  for (unsigned int index=0; cell!=endc; ++cell,++index)
+    {
+      fe_index[index] = cell->active_fe_index();
+    }
+  data_out.add_data_vector(fe_index, "fe_index");
+
+  for (unsigned int i = 0; i < shape_functions.size(); i++)
+    data_out.add_data_vector (shape_functions[i], names[i]);
+
+  data_out.build_patches(patches);
+
+  std::string filename = "hp-shape_functions_"
+                         +dealii::Utilities::int_to_string(dim)+"D.vtu";
+  std::ofstream output (filename.c_str ());
+  data_out.write_vtu (output);
+
+}
+
 
 namespace Step1
 {
@@ -158,7 +225,7 @@ namespace Step1
     //initialize vector of vec_predicates
     vec_predicates.reserve(3);
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
+    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
 
     //vector of enrichment functions
@@ -670,6 +737,8 @@ namespace Step1
               << "   Number of degrees of freedom: "
               << dof_handler.n_dofs ()
               << std::endl;
+
+        plot_shape_function<dim>(dof_handler, fe_collection);
 
 //         assemble_system ();
 //         auto n_iterations = solve ();
