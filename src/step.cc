@@ -59,11 +59,8 @@ unsigned int patches = 10;
 
 template <int dim>
 void plot_shape_function
-  (hp::DoFHandler<dim> &dof_handler,
-   hp::FECollection<dim> &fe_collection)
+  (hp::DoFHandler<dim> &dof_handler)
 {
-  dof_handler.distribute_dofs(fe_collection);
-
   deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
   ConstraintMatrix constraints;
@@ -115,11 +112,9 @@ void plot_shape_function
 
   data_out.build_patches(patches);
 
-  std::string filename = "hp-shape_functions_"
-                         +dealii::Utilities::int_to_string(dim)+"D.vtu";
+  std::string filename = "shape_functions.vtu";
   std::ofstream output (filename.c_str ());
   data_out.write_vtu (output);
-
 }
 
 
@@ -223,18 +218,14 @@ namespace Step1
     triangulation.refine_global (2);
 
     //initialize vector of vec_predicates
-    vec_predicates.reserve(3);
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
-    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
+    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
 
     //vector of enrichment functions
-    vec_enrichments.reserve( vec_predicates.size() );
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
     {
-        EnrichmentFunction<dim> func( vec_predicates[i].get_origin(),
-                                      1,
-                                      vec_predicates[i].get_radius() );
+        EnrichmentFunction<dim> func(10+i);  //constant function
         vec_enrichments.push_back( func );
     }
 
@@ -738,7 +729,7 @@ namespace Step1
               << dof_handler.n_dofs ()
               << std::endl;
 
-        plot_shape_function<dim>(dof_handler, fe_collection);
+        plot_shape_function<dim>(dof_handler);
 
 //         assemble_system ();
 //         auto n_iterations = solve ();
