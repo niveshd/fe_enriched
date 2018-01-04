@@ -181,25 +181,24 @@ void make_colorwise_enrichment_functions
 
 template <int dim>
 void make_fe_collection_from_colored_enrichments
-(
-  const unsigned int &num_colors,
-  const std::vector <std::set<unsigned int>>
-  &fe_sets,         //total list of color sets possible
+(const unsigned int &num_colors,
+ const std::vector <std::set<unsigned int>>
+ &fe_sets,         //total list of color sets possible
 
-  const std::vector<
-  std::function<const Function<dim>*
-  (const typename Triangulation<dim>::cell_iterator &)> >
-  &color_enrichments,  //color wise enrichment functions
+ const std::vector<
+ std::function<const Function<dim>*
+ (const typename Triangulation<dim>::cell_iterator &)> >
+ &color_enrichments,  //color wise enrichment functions
 
-  const FE_Q<dim> &fe_base,            //basic fe element
-  const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
-  const FE_Nothing<dim> &fe_nothing,
-  hp::FECollection<dim> &fe_collection
-)
+ const FE_Q<dim> &fe_base,            //basic fe element
+ const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
+ const FE_Nothing<dim> &fe_nothing,
+ hp::FECollection<dim> &fe_collection,
+ std::vector<EnrichmentFunctionArray<dim>> &function_array)
 {
   std::vector<const FiniteElement<dim> *> vec_fe_enriched;
   EnrichmentFunctionArray<dim> functions; // <<-- a vector of this object to the class (use typedef to make life easier)
-  std::vector<EnrichmentFunctionArray<dim>> function_array;
+  function_array.clear();
 
   for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
     {
@@ -207,10 +206,13 @@ void make_fe_collection_from_colored_enrichments
       functions.assign(num_colors, {nullptr});
 
       //ind = 0 means color id
+      //make fe collection by constructing fe_enriched and corresponding
+      //array of functions
       unsigned int ind = 0;
+      unsigned int func_ind = 0;
       for (auto it=fe_sets[color_set_id].begin();
            it != fe_sets[color_set_id].end();
-           ++it)
+           ++it, ++func_ind)
         {
           ind = *it-1;
           AssertIndexRange(ind, vec_fe_enriched.size());
@@ -226,11 +228,13 @@ void make_fe_collection_from_colored_enrichments
 
       AssertDimension(vec_fe_enriched.size(), functions.size());
 
+      function_array.push_back(functions);
+
       FE_Enriched<dim> fe_component(&fe_base,
                                     vec_fe_enriched,
-                                    functions);
+                                    function_array[func_ind]);
 
-      function_array.pushback(functions);
+
 
       {
         //TODO delete after testing
@@ -344,8 +348,8 @@ void make_fe_collection_from_colored_enrichments
   const FE_Q<2> &fe_base,            //basic fe element
   const FE_Q<2> &fe_enriched,        //fe element multiplied by enrichment function
   const FE_Nothing<2> &fe_nothing,
-  hp::FECollection<2> &fe_collection
-                             );
+  hp::FECollection<2> &fe_collection,
+  std::vector<EnrichmentFunctionArray<2>> &function_array);
 
 
 template
@@ -363,5 +367,5 @@ void make_fe_collection_from_colored_enrichments
   const FE_Q<3> &fe_base,            //basic fe element
   const FE_Q<3> &fe_enriched,        //fe element multiplied by enrichment function
   const FE_Nothing<3> &fe_nothing,
-  hp::FECollection<3> &fe_collection
-                             );
+  hp::FECollection<3> &fe_collection,
+  std::vector<EnrichmentFunctionArray<3>> &function_array);

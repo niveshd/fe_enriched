@@ -194,18 +194,17 @@ void make_colorwise_enrichment_functions
 
 template <int dim>
 void make_fe_collection_from_colored_enrichments
-(
-  const unsigned int &num_colors,
-  const std::vector <std::set<unsigned int>>
-  &fe_sets,         //total list of color sets possible
+(const unsigned int &num_colors,
+ const std::vector <std::set<unsigned int>>
+ &fe_sets,         //total list of color sets possible
 
-  const std::vector<
-  std::function<const Function<dim>*
-  (const typename Triangulation<dim>::cell_iterator &)> >
-  &color_enrichments,  //color wise enrichment functions
+ const std::vector<
+ std::function<const Function<dim>*
+ (const typename Triangulation<dim>::cell_iterator &)> >
+ &color_enrichments,  //color wise enrichment functions
 
-  const FE_Q<dim> &fe_base,            //basic fe element
-  const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
-  const FE_Nothing<dim> &fe_nothing,
-  hp::FECollection<dim> &fe_collection
-);
+ const FE_Q<dim> &fe_base,            //basic fe element
+ const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
+ const FE_Nothing<dim> &fe_nothing,
+ hp::FECollection<dim> &fe_collection,
+ std::vector<EnrichmentFunctionArray<dim>> &function_array);

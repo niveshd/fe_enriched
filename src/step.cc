@@ -94,7 +94,7 @@ void plot_shape_function
       constraints.distribute(shape_function);
       shape_functions.push_back(shape_function);
 
-      //separate later
+      //TODO separate later
       {
         std::map<types::global_dof_index, Point<dim> > support_points;
         MappingQ1<dim> mapping;
@@ -181,6 +181,8 @@ namespace Step1
 
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
+
+    std::vector<EnrichmentFunctionArray<dim>> function_array;
     hp::FECollection<dim> fe_collection;
     hp::FECollection<dim> fe_collection_test; //TODO remove after testing
     hp::FECollection<dim> dummy_fe;
@@ -257,8 +259,8 @@ namespace Step1
 
     //initialize vector of vec_predicates
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
-    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
+    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
     // FIXME: switch to using ParameterHandler (require .prm file as an argument
     // in main.cc)
     // Then read positions from that file.
@@ -330,8 +332,7 @@ namespace Step1
     //build fe table. should be called everytime number of cells change!
     build_tables();
 
-    {
-      //print fe index
+    {//print fe index
       const std::string base_filename =
         "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
       const std::string filename =  base_filename + ".gp";
@@ -349,6 +350,28 @@ namespace Step1
 
       for (auto it : dof_handler.active_cell_iterators())
         f << it->center() << " \"" << it->active_fe_index() << "\"\n";
+
+      f << std::flush << "e" << std::endl;
+    }
+
+    {//print cell ids
+      const std::string base_filename =
+        "cell_id" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+      const std::string filename =  base_filename + ".gp";
+      std::ofstream f(filename.c_str());
+
+      f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+        << "set output \"" << base_filename << ".png\"" << std::endl
+        << "set size square" << std::endl
+        << "set view equal xy" << std::endl
+        << "unset xtics" << std::endl
+        << "unset ytics" << std::endl
+        << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+      GridOut().write_gnuplot (triangulation, f);
+      f << "e" << std::endl;
+
+      for (auto it : dof_handler.active_cell_iterators())
+        f << it->center() << " \"" << it->index() << "\"\n";
 
       f << std::flush << "e" << std::endl;
     }
@@ -378,12 +401,16 @@ namespace Step1
           {
             unsigned int id = cell->index();
 
+            pcout << "test " << cell-> index()
+                  << " " << i
+                  << " " << cellwise_color_predicate_map.at(id).at(i+1)
+                  << std::endl;
+
             //i'th function corresponds to i+1 color
             return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
           };
         }
     }
-
 
     make_fe_collection_from_colored_enrichments (num_colors,
                                                  fe_sets,
@@ -391,10 +418,8 @@ namespace Step1
                                                  fe_base,
                                                  fe_enriched,
                                                  fe_nothing,
-                                                 fe_collection);
-
-
-
+                                                 fe_collection,
+                                                 function_array);
 
     {
       //print content of fe_collection
