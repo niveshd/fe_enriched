@@ -25,6 +25,8 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_refinement.h>
 
+#include <deal.II/grid/grid_out.h>
+
 #include <deal.II/numerics/data_postprocessor.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -91,6 +93,41 @@ void plot_shape_function
       // make continuous/constrain:
       constraints.distribute(shape_function);
       shape_functions.push_back(shape_function);
+
+      //separate later
+      {
+        std::map<types::global_dof_index, Point<dim> > support_points;
+        MappingQ1<dim> mapping;
+        hp::MappingCollection<dim> hp_mapping;
+        for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
+          hp_mapping.push_back(mapping);
+        DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
+
+        const std::string base_filename =
+          "grid" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+
+        const std::string filename = base_filename + ".gp";
+        std::ofstream f(filename.c_str());
+
+        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+          << "set output \"" << base_filename << ".png\"" << std::endl
+          << "set size square" << std::endl
+          << "set view equal xy" << std::endl
+          << "unset xtics                                                                                   " << std::endl
+          << "unset ytics" << std::endl
+          << "unset grid" << std::endl
+          << "unset border" << std::endl
+          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+        GridOut grid_out;
+        grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
+        f << "e" << std::endl;
+
+        DoFTools::write_gnuplot_dof_support_point_info(f,
+                                                       support_points);
+
+        f << "e" << std::endl;
+      }
+
     }
 
   DataOut<dim,hp::DoFHandler<dim>> data_out;
@@ -214,13 +251,32 @@ namespace Step1
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0))
   {
-    GridGenerator::hyper_cube (triangulation, -2, 2);
+    GridGenerator::hyper_cube (triangulation, -2, 2); // <-- same here, read geometry from .prm file
     triangulation.refine_global (2);
 
     //initialize vector of vec_predicates
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
     // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
+    // FIXME: switch to using ParameterHandler (require .prm file as an argument
+    // in main.cc)
+    // Then read positions from that file.
+    // Roughly, the content:
+    //
+    // section geometry
+    //   set Size = 4
+    //   set Global refinement = 2;
+    // end
+    // section Solver
+    //   ..
+    // end
+    //
+    // #end-of-dealii parser <-- use this line to Parameter handler
+    // here do some simple parsing of points in any format, maybe
+    // <N_points>
+    // X1 Y1 Z1
+    // X2 Y2 Z2
+
 
     //vector of enrichment functions
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
@@ -271,6 +327,27 @@ namespace Step1
     //build fe table. should be called everytime number of cells change!
     build_tables();
 
+    {//print fe index
+      const std::string base_filename =
+      "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+      const std::string filename =  base_filename + ".gp";
+      std::ofstream f(filename.c_str());
+
+      f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+      << "set output \"" << base_filename << ".png\"" << std::endl
+      << "set size square" << std::endl
+      << "set view equal xy" << std::endl
+      << "unset xtics" << std::endl
+      << "unset ytics" << std::endl
+      << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+      GridOut().write_gnuplot (triangulation, f);
+      f << "e" << std::endl;
+
+      for (auto it : dof_handler.active_cell_iterators())
+      f << it->center() << " \"" << it->active_fe_index() << "\"\n";
+
+      f << std::flush << "e" << std::endl;
+    }
 
     //q collections the same size as different material identities
     q_collection.push_back(QGauss<dim>(4));
@@ -293,6 +370,9 @@ namespace Step1
                                                  fe_enriched,
                                                  fe_nothing,
                                                  fe_collection);
+
+
+
 
     {//print content of fe_collection
     pcout << "\n Printing fe collection" << std::endl;
@@ -406,6 +486,8 @@ namespace Step1
     }
     pcout << "-----constructor complete" << std::endl;
 
+    {}
+
   }
 
   template <int dim>
@@ -432,6 +514,8 @@ namespace Step1
     }
 
     pcout << "-----build tables complete" << std::endl;
+
+
   }
 
   template <int dim>
