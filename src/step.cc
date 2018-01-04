@@ -61,7 +61,7 @@ unsigned int patches = 10;
 
 template <int dim>
 void plot_shape_function
-  (hp::DoFHandler<dim> &dof_handler)
+(hp::DoFHandler<dim> &dof_handler)
 {
   deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
@@ -183,6 +183,7 @@ namespace Step1
     hp::DoFHandler<dim> dof_handler;
     hp::FECollection<dim> fe_collection;
     hp::FECollection<dim> fe_collection_test; //TODO remove after testing
+    hp::FECollection<dim> dummy_fe;
     hp::QCollection<dim> q_collection;
 
     FE_Q<dim> fe_base;
@@ -209,9 +210,9 @@ namespace Step1
     std::vector<EnrichmentFunction<dim>> vec_enrichments;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
     std::vector<
-      std::function<const Function<dim>*
-        (const typename Triangulation<dim>::cell_iterator&)> >
-          color_enrichments;
+    std::function<const Function<dim>*
+    (const typename Triangulation<dim>::cell_iterator &)> >
+    color_enrichments;
 
     //each predicate is assigned a color depending on overlap of vertices.
     std::vector<unsigned int> predicate_colors;
@@ -222,7 +223,7 @@ namespace Step1
     //map:  < color , corresponding predicate_function >
     //(only one per color acceptable). An assertion checks this
     std::map<unsigned int,
-      std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
+        std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
 
     //vector of size num_colors + 1
     //different color combinations that a cell can contain
@@ -256,8 +257,8 @@ namespace Step1
 
     //initialize vector of vec_predicates
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
-    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
+    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
     // FIXME: switch to using ParameterHandler (require .prm file as an argument
     // in main.cc)
     // Then read positions from that file.
@@ -280,71 +281,74 @@ namespace Step1
 
     //vector of enrichment functions
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
-    {
+      {
         EnrichmentFunction<dim> func(10+i);  //constant function
         vec_enrichments.push_back( func );
-    }
+      }
 
-    {//print predicates
-    predicate_output.resize(vec_predicates.size());
-    for (unsigned int i = 0; i < vec_predicates.size(); ++i)
     {
-      predicate_output[i].reinit(triangulation.n_active_cells());
-    }
+      //print predicates
+      predicate_output.resize(vec_predicates.size());
+      for (unsigned int i = 0; i < vec_predicates.size(); ++i)
+        {
+          predicate_output[i].reinit(triangulation.n_active_cells());
+        }
 
-    unsigned int index = 0;
-    for (typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active();
-         cell != dof_handler.end(); ++cell, ++index)
-    {
-        for (unsigned int i=0; i<vec_predicates.size(); ++i)
-          if ( vec_predicates[i](cell) )
-            predicate_output[i][index] = i+1;
-    }
+      unsigned int index = 0;
+      for (typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active();
+           cell != dof_handler.end(); ++cell, ++index)
+        {
+          for (unsigned int i=0; i<vec_predicates.size(); ++i)
+            if ( vec_predicates[i](cell) )
+              predicate_output[i][index] = i+1;
+        }
     }
 
     //make a sparsity pattern based on connections between regions
     num_colors = color_predicates (dof_handler, vec_predicates, predicate_colors);
 
-    {//TODO comment
-    //print color_indices
-    for (unsigned int i=0; i<predicate_colors.size(); ++i)
+    {
+      //TODO comment
+      //print color_indices
+      for (unsigned int i=0; i<predicate_colors.size(); ++i)
         pcout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
     }
 
     //make color index
     {
-    color_output.reinit(triangulation.n_active_cells());
-    unsigned int index = 0;
-    for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-         cell != dof_handler.end();
-         ++cell, ++index)
+      color_output.reinit(triangulation.n_active_cells());
+      unsigned int index = 0;
+      for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
+           cell != dof_handler.end();
+           ++cell, ++index)
         for (unsigned int i=0; i<vec_predicates.size(); ++i)
-            if ( vec_predicates[i](cell) )
-                color_output[index] = predicate_colors[i];
+          if ( vec_predicates[i](cell) )
+            color_output[index] = predicate_colors[i];
     }
 
 
     //build fe table. should be called everytime number of cells change!
     build_tables();
 
-    {//print fe index
+    {
+      //print fe index
       const std::string base_filename =
-      "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+        "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
       const std::string filename =  base_filename + ".gp";
       std::ofstream f(filename.c_str());
 
       f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-      << "set output \"" << base_filename << ".png\"" << std::endl
-      << "set size square" << std::endl
-      << "set view equal xy" << std::endl
-      << "unset xtics" << std::endl
-      << "unset ytics" << std::endl
-      << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+        << "set output \"" << base_filename << ".png\"" << std::endl
+        << "set size square" << std::endl
+        << "set view equal xy" << std::endl
+        << "unset xtics" << std::endl
+        << "unset ytics" << std::endl
+        << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
       GridOut().write_gnuplot (triangulation, f);
       f << "e" << std::endl;
 
       for (auto it : dof_handler.active_cell_iterators())
-      f << it->center() << " \"" << it->active_fe_index() << "\"\n";
+        f << it->center() << " \"" << it->active_fe_index() << "\"\n";
 
       f << std::flush << "e" << std::endl;
     }
@@ -353,15 +357,33 @@ namespace Step1
     q_collection.push_back(QGauss<dim>(4));
 
     for (unsigned int i=1; i!=fe_sets.size(); ++i)
-        q_collection.push_back(QGauss<dim>(10));
+      q_collection.push_back(QGauss<dim>(10));
 
 
     //setup color wise enrichment functions
     //i'th function corresponds to (i+1) color!
-    make_colorwise_enrichment_functions (num_colors,
-                                        vec_enrichments,
-                                        cellwise_color_predicate_map,
-                                        color_enrichments);
+    //TODO uncomment and remove comment 1
+    // make_colorwise_enrichment_functions (num_colors,
+    // vec_enrichments,
+    // cellwise_color_predicate_map,
+    // color_enrichments);
+    //TODO Remove after uncommenting above.
+    {
+      color_enrichments.resize (num_colors); // <<-- return by value and keep as a class member
+
+      for (unsigned int i = 0; i < num_colors; ++i)
+        {
+          color_enrichments[i] =
+            [ &,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
+          {
+            unsigned int id = cell->index();
+
+            //i'th function corresponds to i+1 color
+            return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
+          };
+        }
+    }
+
 
     make_fe_collection_from_colored_enrichments (num_colors,
                                                  fe_sets,
@@ -374,21 +396,22 @@ namespace Step1
 
 
 
-    {//print content of fe_collection
-    pcout << "\n Printing fe collection" << std::endl;
-
-    for (unsigned int id = 0; id < fe_collection.size(); ++id)
     {
-      pcout << "Fe Set : " << fe_collection[id].get_name() << std::endl;
+      //print content of fe_collection
+      pcout << "\n Printing fe collection" << std::endl;
 
-      FE_Enriched<dim> fe_component(fe_collection[id]);
-      auto functions = fe_component.get_enrichments();
+      for (unsigned int id = 0; id < fe_collection.size(); ++id)
+        {
+          pcout << "Fe Set : " << fe_collection[id].get_name() << std::endl;
 
-      //TODO how to retrieve function from fe_collection
-      //...individual element of fe_collection is fe_element
-      //fe element has no get_enrichments function
-      //fe enriched copied from this fe element has enrichment function
-      //but doesn't have the correct function
+          FE_Enriched<dim> fe_component(fe_collection[id]);
+          auto functions = fe_component.get_enrichments();
+
+          //TODO how to retrieve function from fe_collection
+          //...individual element of fe_collection is fe_element
+          //fe element has no get_enrichments function
+          //fe enriched copied from this fe element has enrichment function
+          //but doesn't have the correct function
 
 //       pcout << "Function set : \t ";
 //       for (auto enrichment_function_array : functions)
@@ -399,66 +422,67 @@ namespace Step1
 //             pcout << " O ";
 //
 //       pcout << std::endl;
-    }
+        }
     }
 
-    {//test fe_collection
-    //fe_collection should look like this in the end
-    // {
-    //
-    //         auto func1 = [&]
-    //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
-    //           {
-    //               unsigned int id = cell->index();
-    //               return &vec_enrichments[cellwise_color_predicate_map[id][1]];
-    //           };
-    //
-    //         auto func2 = [&]
-    //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
-    //           {
-    //               unsigned int id = cell->index();
-    //               return &vec_enrichments[cellwise_color_predicate_map[id][2]];
-    //           };
-    //
-    //       fe_collection_test.push_back
-    //         (FE_Enriched<dim> (&fe_base,
-    //                           {&fe_nothing, &fe_nothing},
-    //                           {{nullptr}, {nullptr}}));
-    //        fe_collection_test.push_back
-    //         (FE_Enriched<dim> (&fe_base,
-    //                           {&fe_enriched, &fe_nothing},
-    //                           {{func1}, {nullptr}}));
-    //        fe_collection_test.push_back
-    //         (FE_Enriched<dim> (&fe_base,
-    //                           {&fe_enriched, &fe_nothing},
-    //                           {{func2}, {nullptr}}));
-    //        fe_collection_test.push_back
-    //         (FE_Enriched<dim> (&fe_base,
-    //                           {&fe_enriched, &fe_enriched},
-    //                           {{func1}, {func2}}));
-    //
-    //
-    //
-    // pcout << "\n Printing fe collection test" << std::endl;
-    //
-    // for (unsigned int id = 0; id < fe_collection_test.size(); ++id)
-    // {
-    //   pcout << "Fe Set : " << fe_collection_test[id].get_name() << std::endl;
-    //
-    //   FE_Enriched<dim> fe_component(fe_collection_test[id]);
-    //   auto functions = fe_component.get_enrichments();
-    //
-    //   pcout << "Function set : \t ";
-    //   for (auto enrichment_function_array : functions)
-    //     for (auto func_component : enrichment_function_array)
-    //       if (func_component)
-    //         pcout << " X ";
-    //       else
-    //         pcout << " O ";
-    //
-    //   pcout << std::endl;
-    // }
-    // }
+    {
+      //test fe_collection
+      //fe_collection should look like this in the end
+      // {
+      //
+      //         auto func1 = [&]
+      //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
+      //           {
+      //               unsigned int id = cell->index();
+      //               return &vec_enrichments[cellwise_color_predicate_map[id][1]];
+      //           };
+      //
+      //         auto func2 = [&]
+      //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
+      //           {
+      //               unsigned int id = cell->index();
+      //               return &vec_enrichments[cellwise_color_predicate_map[id][2]];
+      //           };
+      //
+      //       fe_collection_test.push_back
+      //         (FE_Enriched<dim> (&fe_base,
+      //                           {&fe_nothing, &fe_nothing},
+      //                           {{nullptr}, {nullptr}}));
+      //        fe_collection_test.push_back
+      //         (FE_Enriched<dim> (&fe_base,
+      //                           {&fe_enriched, &fe_nothing},
+      //                           {{func1}, {nullptr}}));
+      //        fe_collection_test.push_back
+      //         (FE_Enriched<dim> (&fe_base,
+      //                           {&fe_enriched, &fe_nothing},
+      //                           {{func2}, {nullptr}}));
+      //        fe_collection_test.push_back
+      //         (FE_Enriched<dim> (&fe_base,
+      //                           {&fe_enriched, &fe_enriched},
+      //                           {{func1}, {func2}}));
+      //
+      //
+      //
+      // pcout << "\n Printing fe collection test" << std::endl;
+      //
+      // for (unsigned int id = 0; id < fe_collection_test.size(); ++id)
+      // {
+      //   pcout << "Fe Set : " << fe_collection_test[id].get_name() << std::endl;
+      //
+      //   FE_Enriched<dim> fe_component(fe_collection_test[id]);
+      //   auto functions = fe_component.get_enrichments();
+      //
+      //   pcout << "Function set : \t ";
+      //   for (auto enrichment_function_array : functions)
+      //     for (auto func_component : enrichment_function_array)
+      //       if (func_component)
+      //         pcout << " X ";
+      //       else
+      //         pcout << " O ";
+      //
+      //   pcout << std::endl;
+      // }
+      // }
 //
 //     //simple fe collection
 //     {
@@ -502,15 +526,15 @@ namespace Step1
     output_test();
 
     {
-    //print material table
-    pcout << "\nMaterial table : " << std::endl;
-    for ( unsigned int j=0; j<fe_sets.size(); ++j)
-    {
-        pcout << j << " ( ";
-        for ( auto i = fe_sets[j].begin(); i != fe_sets[j].end(); ++i)
+      //print material table
+      pcout << "\nMaterial table : " << std::endl;
+      for ( unsigned int j=0; j<fe_sets.size(); ++j)
+        {
+          pcout << j << " ( ";
+          for ( auto i = fe_sets[j].begin(); i != fe_sets[j].end(); ++i)
             pcout << *i << " ";
-        pcout << " ) " << std::endl;
-    }
+          pcout << " ) " << std::endl;
+        }
     }
 
     pcout << "-----build tables complete" << std::endl;
@@ -523,7 +547,18 @@ namespace Step1
   {
 
     GridTools::partition_triangulation (n_mpi_processes, triangulation);
+
+    // for (unsigned int i = 0; i < fe_collection.size(); ++i)
+    //   dummy_fe.push_back(FE_System<dim>(fe_base,fe_nothing,fe_nothing...); // <-- change this to FE_System(...) with same input as in FE_Enriched
+
+    // <-- change this to FE_System(...) with same input as in FE_Enriched
+    dummy_fe.push_back(FESystem<dim>(fe_base,fe_nothing,fe_nothing));
+    dummy_fe.push_back(FESystem<dim>(fe_base,fe_enriched,fe_nothing));
+    dummy_fe.push_back(FESystem<dim>(fe_base,fe_enriched,fe_enriched));
+    dummy_fe.push_back(FESystem<dim>(fe_base,fe_nothing,fe_enriched));
+
     dof_handler.distribute_dofs (fe_collection);
+    // dof_handler.distribute_dofs (dummy_fe);
 
     // //TODO renumbering screws up numbering of cell ids?
     // DoFRenumbering::subdomain_wise (dof_handler);
@@ -616,15 +651,15 @@ namespace Step1
           cell_rhs = 0;
 
           right_hand_side.value_list (fe_values.get_quadrature_points(),
-                                rhs_values);
+                                      rhs_values);
 
           for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
             for (unsigned int i=0; i<dofs_per_cell; ++i)
               for (unsigned int j=i; j<dofs_per_cell; ++j)
                 {
                   cell_system_matrix(i,j) += (fe_values.shape_grad(i,q_point) *
-                                      fe_values.shape_grad(j,q_point) *
-                                      fe_values.JxW(q_point));
+                                              fe_values.shape_grad(j,q_point) *
+                                              fe_values.JxW(q_point));
                   cell_rhs(i) += (rhs_values[q_point] *
                                   fe_values.shape_value(i,q_point) *
                                   fe_values.JxW(q_point));
@@ -658,7 +693,7 @@ namespace Step1
   unsigned int LaplaceProblem<dim>::solve()
   {
     SolverControl           solver_control (solution.size(),
-                                          1e-8*system_rhs.l2_norm());
+                                            1e-8*system_rhs.l2_norm());
     PETScWrappers::SolverCG cg (solver_control,
                                 mpi_communicator);
     PETScWrappers::PreconditionBlockJacobi preconditioner(system_matrix);
@@ -686,8 +721,8 @@ namespace Step1
   void LaplaceProblem<dim>::estimate_error ()
   {
     {
-      const PETScWrappers::MPI::Vector * sol;
-      Vector<float> *  error;
+      const PETScWrappers::MPI::Vector *sol;
+      Vector<float>   *error;
 
       hp::QCollection<dim-1> face_quadrature_formula;
       face_quadrature_formula.push_back (QGauss<dim-1>(3));
@@ -722,9 +757,9 @@ namespace Step1
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
       for (unsigned int index=0; cell!=endc; ++cell, ++index)
-      {
-        fe_index(index) = cell->active_fe_index();
-      }
+        {
+          fe_index(index) = cell->active_fe_index();
+        }
     }
 
     Assert (cycle < 10, ExcNotImplemented());
@@ -763,9 +798,9 @@ namespace Step1
     cell = dof_handler.begin_active(),
     endc = dof_handler.end();
     for (unsigned int index=0; cell!=endc; ++cell, ++index)
-    {
-      active_fe_index[index] = cell->active_fe_index();
-    }
+      {
+        active_fe_index[index] = cell->active_fe_index();
+      }
 
     // set the others correctly
 

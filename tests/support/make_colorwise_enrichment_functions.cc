@@ -55,7 +55,8 @@
 
 const unsigned int dim = 2;
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
@@ -82,54 +83,54 @@ int main(int argc, char** argv) {
   std::vector<EnrichmentFunction<dim>> vec_enrichments;
   vec_enrichments.reserve( vec_predicates.size() );
   for (unsigned int i=0; i<vec_predicates.size(); ++i)
-  {
+    {
       EnrichmentFunction<dim> func(i);  //constant function
       vec_enrichments.push_back( func );
-  }
+    }
 
   std::map<unsigned int,
-    std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
+      std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
   std::vector <std::set<unsigned int>> fe_sets;
 
   set_cellwise_color_set_and_fe_index
-    (dof_handler,
-     vec_predicates,
-     predicate_colors,
-     cellwise_color_predicate_map,
-     fe_sets);
+  (dof_handler,
+   vec_predicates,
+   predicate_colors,
+   cellwise_color_predicate_map,
+   fe_sets);
 
- std::vector<
+  std::vector<
   std::function<const Function<dim>*
-    (const typename Triangulation<dim>::cell_iterator&)> >
-      color_enrichments;
+  (const typename Triangulation<dim>::cell_iterator &)> >
+  color_enrichments;
 
   unsigned int num_colors = 2;
   make_colorwise_enrichment_functions
-    (num_colors,          //needs number of colors
-     vec_enrichments,     //enrichment functions based on predicate id
-     cellwise_color_predicate_map,
-     color_enrichments);
+  (num_colors,          //needs number of colors
+   vec_enrichments,     //enrichment functions based on predicate id
+   cellwise_color_predicate_map,
+   color_enrichments);
 
 
-   deallog << "color wise enrichment functions:" << std::endl;
+  deallog << "color wise enrichment functions:" << std::endl;
   auto cell = dof_handler.begin_active();
   auto endc = dof_handler.end();
   for (unsigned int cell_index=0; cell != endc; ++cell, ++cell_index)
-  {
-    unsigned int cell_id = cell -> index();
-    deallog << cell_id << ":predicates=";
-    for (auto predicate : vec_predicates)
-      deallog << predicate(cell) << ":";
+    {
+      unsigned int cell_id = cell -> index();
+      deallog << cell_id << ":predicates=";
+      for (auto predicate : vec_predicates)
+        deallog << predicate(cell) << ":";
 
 
-    if (cellwise_color_predicate_map.count(cell_id) == 1)
-      for (unsigned int color = 0; color != num_colors; ++color)
-        if (cellwise_color_predicate_map.at(cell_id).count(color+1) == 1)
-          deallog << ":color:" << color+1
-                  << ":func_value:" << color_enrichments[color](cell)
-                                            ->value(cell->center());
+      if (cellwise_color_predicate_map.count(cell_id) == 1)
+        for (unsigned int color = 0; color != num_colors; ++color)
+          if (cellwise_color_predicate_map.at(cell_id).count(color+1) == 1)
+            deallog << ":color:" << color+1
+                    << ":func_value:" << color_enrichments[color](cell)
+                    ->value(cell->center());
 
-    deallog << std::endl;
-  }
+      deallog << std::endl;
+    }
   return 0;
 }

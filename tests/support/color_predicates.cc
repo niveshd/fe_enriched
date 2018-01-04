@@ -55,7 +55,8 @@
 
 const unsigned int dim = 2;
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
@@ -66,59 +67,62 @@ int main(int argc, char** argv) {
   std::vector<EnrichmentPredicate<dim>> vec_predicates;
   std::vector<unsigned int> predicate_colors;
 
-  {//case 1
-  vec_predicates.clear();
-  //connections between vec predicates : No connections
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
-
-  predicate_colors.resize(vec_predicates.size());
-
-  color_predicates (triangulation, vec_predicates, predicate_colors);
-
-  deallog << "Case 1" << std::endl;
-  for (auto i:predicate_colors)
   {
-    deallog << i << std::endl;
+    //case 1
+    vec_predicates.clear();
+    //connections between vec predicates : No connections
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
+
+    predicate_colors.resize(vec_predicates.size());
+
+    color_predicates (triangulation, vec_predicates, predicate_colors);
+
+    deallog << "Case 1" << std::endl;
+    for (auto i:predicate_colors)
+      {
+        deallog << i << std::endl;
+      }
   }
-  }
 
-  {//case 2
-  vec_predicates.clear();
-  //connections between vec predicates : 0-1 (overlap connection),
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
-
-  predicate_colors.resize(vec_predicates.size());
-
-  color_predicates (triangulation, vec_predicates, predicate_colors);
-
-  deallog << "Case 2" << std::endl;
-  for (auto i:predicate_colors)
   {
-    deallog << i << std::endl;
+    //case 2
+    vec_predicates.clear();
+    //connections between vec predicates : 0-1 (overlap connection),
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
+
+    predicate_colors.resize(vec_predicates.size());
+
+    color_predicates (triangulation, vec_predicates, predicate_colors);
+
+    deallog << "Case 2" << std::endl;
+    for (auto i:predicate_colors)
+      {
+        deallog << i << std::endl;
+      }
   }
-  }
 
-  {//case 3
-  vec_predicates.clear();
-  //connections between vec predicates : 0-1 (overlap connection),
-  //3-4 (edge connection)
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(12.5,-12.5), 2) );
-
-  predicate_colors.resize(vec_predicates.size());
-
-  color_predicates (triangulation, vec_predicates, predicate_colors);
-
-  deallog << "Case 3" << std::endl;
-  for (auto i:predicate_colors)
   {
-    deallog << i << std::endl;
-  }
+    //case 3
+    vec_predicates.clear();
+    //connections between vec predicates : 0-1 (overlap connection),
+    //3-4 (edge connection)
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(12.5,-12.5), 2) );
+
+    predicate_colors.resize(vec_predicates.size());
+
+    color_predicates (triangulation, vec_predicates, predicate_colors);
+
+    deallog << "Case 3" << std::endl;
+    for (auto i:predicate_colors)
+      {
+        deallog << i << std::endl;
+      }
   }
 
   return 0;

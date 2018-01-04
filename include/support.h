@@ -6,21 +6,27 @@ using namespace dealii;
 template <int dim>
 struct EnrichmentPredicate
 {
-    EnrichmentPredicate(const Point<dim> origin, const int radius)
-    :origin(origin),radius(radius){}
+  EnrichmentPredicate(const Point<dim> origin, const int radius)
+    :origin(origin),radius(radius) {}
 
-    template <class Iterator>
-    bool operator () (const Iterator &i) const
-    {
-        return ( (i->center() - origin).norm_square() < radius*radius);
-    }
+  template <class Iterator>
+  bool operator () (const Iterator &i) const
+  {
+    return ( (i->center() - origin).norm_square() < radius*radius);
+  }
 
-    const Point<dim> &get_origin() { return origin; }
-    const int &get_radius() { return radius; }
+  const Point<dim> &get_origin()
+  {
+    return origin;
+  }
+  const int &get_radius()
+  {
+    return radius;
+  }
 
-    private:
-        const Point<dim> origin;
-        const int radius;
+private:
+  const Point<dim> origin;
+  const int radius;
 };
 
 
@@ -66,7 +72,7 @@ void RightHandSide<dim>::value_list (const std::vector<Point<dim> > &points,
 
   for (unsigned int p=0; p<n_points; ++p)
     RightHandSide<dim>::value (points[p],
-                                      value_list[p]);
+                               value_list[p]);
 }
 
 
@@ -141,59 +147,65 @@ private:
 
 
 
+template <int dim>
+using EnrichmentFunctionArray = std::vector<std::vector<std::function<const Function<dim> *
+                                (const typename Triangulation<dim, dim>::cell_iterator &) >>>;
+
+
+
 template <int dim, class MeshType>
 unsigned int color_predicates
-  (const MeshType &mesh,
-   const std::vector<EnrichmentPredicate<dim>> &,
-   std::vector<unsigned int> &);
+(const MeshType &mesh,
+ const std::vector<EnrichmentPredicate<dim>> &,
+ std::vector<unsigned int> &);
 
 
 template <int dim, class MeshType>
 void
 set_cellwise_color_set_and_fe_index
-  (MeshType &mesh,
-   const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
-   const std::vector<unsigned int> &predicate_colors,
+(MeshType &mesh,
+ const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+ const std::vector<unsigned int> &predicate_colors,
 
-   std::map<unsigned int,
-      std::map<unsigned int, unsigned int> >
-        &cellwise_color_predicate_map,
+ std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
 
-   std::vector <std::set<unsigned int>> &fe_sets);
+ std::vector <std::set<unsigned int>> &fe_sets);
 
 
 template <int dim>
 void make_colorwise_enrichment_functions
-  (const unsigned int &num_colors,          //needs number of colors
+(const unsigned int &num_colors,          //needs number of colors
 
-   const std::vector<EnrichmentFunction<dim>>
-    &vec_enrichments,     //enrichment functions based on predicate id
+ const std::vector<EnrichmentFunction<dim>>
+ &vec_enrichments,     //enrichment functions based on predicate id
 
-   const std::map<unsigned int,
-    std::map<unsigned int, unsigned int> >
-      &cellwise_color_predicate_map,
+ const std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
 
-   std::vector<
-    std::function<const Function<dim>*
-      (const typename Triangulation<dim>::cell_iterator&)> >
-        &color_enrichments);
+ std::vector<
+ std::function<const Function<dim>*
+ (const typename Triangulation<dim>::cell_iterator &)> >
+ &color_enrichments);
 
 
 
 template <int dim>
 void make_fe_collection_from_colored_enrichments
-  (
-    const unsigned int &num_colors,
-    const std::vector <std::set<unsigned int>>
-      &fe_sets,         //total list of color sets possible
+(
+  const unsigned int &num_colors,
+  const std::vector <std::set<unsigned int>>
+  &fe_sets,         //total list of color sets possible
 
-    const std::vector<
-      std::function<const Function<dim>*
-        (const typename Triangulation<dim>::cell_iterator&)> >
-          &color_enrichments,  //color wise enrichment functions
+  const std::vector<
+  std::function<const Function<dim>*
+  (const typename Triangulation<dim>::cell_iterator &)> >
+  &color_enrichments,  //color wise enrichment functions
 
-    const FE_Q<dim> &fe_base,            //basic fe element
-    const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
-    const FE_Nothing<dim> &fe_nothing,
-    hp::FECollection<dim> &fe_collection
-  );
+  const FE_Q<dim> &fe_base,            //basic fe element
+  const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
+  const FE_Nothing<dim> &fe_nothing,
+  hp::FECollection<dim> &fe_collection
+);

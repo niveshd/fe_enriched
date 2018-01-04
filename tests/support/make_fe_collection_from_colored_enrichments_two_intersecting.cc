@@ -62,7 +62,7 @@ unsigned int patches = 10;
 
 template <int dim>
 void plot_shape_function
-  (hp::DoFHandler<dim> &dof_handler)
+(hp::DoFHandler<dim> &dof_handler)
 {
   deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
@@ -122,7 +122,8 @@ void plot_shape_function
 }
 
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
@@ -142,10 +143,10 @@ int main(int argc, char** argv) {
   std::vector<EnrichmentFunction<dim>> vec_enrichments;
   vec_enrichments.reserve( vec_predicates.size() );
   for (unsigned int i=0; i<vec_predicates.size(); ++i)
-  {
+    {
       EnrichmentFunction<dim> func(10+i);  //constant function
       vec_enrichments.push_back( func );
-  }
+    }
 
   //find colors for predicates
   predicate_colors.resize(vec_predicates.size());
@@ -153,61 +154,61 @@ int main(int argc, char** argv) {
     = color_predicates (triangulation, vec_predicates, predicate_colors);
 
   std::map<unsigned int,
-    std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
+      std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
   std::vector <std::set<unsigned int>> fe_sets;
 
   set_cellwise_color_set_and_fe_index
-    (dof_handler,
-     vec_predicates,
-     predicate_colors,
-     cellwise_color_predicate_map,
-     fe_sets);
+  (dof_handler,
+   vec_predicates,
+   predicate_colors,
+   cellwise_color_predicate_map,
+   fe_sets);
 
- std::vector<
+  std::vector<
   std::function<const Function<dim>*
-    (const typename Triangulation<dim>::cell_iterator&)> >
-      color_enrichments;
+  (const typename Triangulation<dim>::cell_iterator &)> >
+  color_enrichments;
 
   make_colorwise_enrichment_functions
-    (num_colors,          //needs number of colors
-     vec_enrichments,     //enrichment functions based on predicate id
-     cellwise_color_predicate_map,
-     color_enrichments);
+  (num_colors,          //needs number of colors
+   vec_enrichments,     //enrichment functions based on predicate id
+   cellwise_color_predicate_map,
+   color_enrichments);
 
   FE_Q<dim> fe_base(2);
   FE_Q<dim> fe_enriched(1);
   FE_Nothing<dim> fe_nothing(1,true);
   hp::FECollection<dim> fe_collection;
   make_fe_collection_from_colored_enrichments
-   (num_colors,
-    fe_sets,         //total list of color sets possible
-    color_enrichments,  //color wise enrichment functions
-    fe_base,            //basic fe element
-    fe_enriched,        //fe element multiplied by enrichment function
-    fe_nothing,
-    fe_collection);
+  (num_colors,
+   fe_sets,         //total list of color sets possible
+   color_enrichments,  //color wise enrichment functions
+   fe_base,            //basic fe element
+   fe_enriched,        //fe element multiplied by enrichment function
+   fe_nothing,
+   fe_collection);
 
   deallog << "fe sets:" << std::endl;
   for (auto fe_set : fe_sets)
-  {
-    deallog << "color:";
-    for (auto color : fe_set)
-      deallog << ":" << color;
-    deallog << std::endl;
-  }
+    {
+      deallog << "color:";
+      for (auto color : fe_set)
+        deallog << ":" << color;
+      deallog << std::endl;
+    }
 
   deallog << "fe_collection[index] mapping:" << std::endl;
   for (unsigned int index = 0; index != fe_collection.size(); ++index)
-  {
-    deallog <<"name:"<<fe_collection[index].get_name() << std::endl;
-    deallog <<"n_blocks:"<<fe_collection[index].n_blocks()<<std::endl;
-    deallog <<"n_comp:"<< fe_collection[index].n_components() << std::endl;
-    deallog <<"n_dofs:"<< fe_collection[index].n_dofs_per_cell() << std::endl;
-  }
+    {
+      deallog <<"name:"<<fe_collection[index].get_name() << std::endl;
+      deallog <<"n_blocks:"<<fe_collection[index].n_blocks()<<std::endl;
+      deallog <<"n_comp:"<< fe_collection[index].n_components() << std::endl;
+      deallog <<"n_dofs:"<< fe_collection[index].n_dofs_per_cell() << std::endl;
+    }
 
   GridTools::partition_triangulation
-    (Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD),
-     triangulation);
+  (Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD),
+   triangulation);
   dof_handler.distribute_dofs(fe_collection);
 
 #ifdef DATA_OUT_FE_ENRICHED

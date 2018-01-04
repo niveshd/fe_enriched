@@ -55,7 +55,8 @@
 
 const unsigned int dim = 2;
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
@@ -79,40 +80,40 @@ int main(int argc, char** argv) {
   predicate_colors[2] = 1;
 
   std::map<unsigned int,
-    std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
+      std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
   std::vector <std::set<unsigned int>> fe_sets;
 
   set_cellwise_color_set_and_fe_index
-    (dof_handler,
-     vec_predicates,
-     predicate_colors,
-     cellwise_color_predicate_map,
-     fe_sets);
+  (dof_handler,
+   vec_predicates,
+   predicate_colors,
+   cellwise_color_predicate_map,
+   fe_sets);
 
   auto cell = dof_handler.begin_active();
   auto endc = dof_handler.end();
   for (unsigned int cell_index=0; cell != endc; ++cell, ++cell_index)
-  {
-    //print true predicates for a cell as a binary code
-    deallog << cell->index() << ":predicates=";
-    for (auto predicate : vec_predicates)
-      deallog << predicate(cell) << ":";
-
-    //print color predicate pairs for a cell
-    deallog << "(color, enrichment_func_id):";
-    for (auto color_predicate_pair : cellwise_color_predicate_map[cell_index])
     {
-      deallog << "("
-        << color_predicate_pair.first << ","
-        << color_predicate_pair.second << "):";
+      //print true predicates for a cell as a binary code
+      deallog << cell->index() << ":predicates=";
+      for (auto predicate : vec_predicates)
+        deallog << predicate(cell) << ":";
+
+      //print color predicate pairs for a cell
+      deallog << "(color, enrichment_func_id):";
+      for (auto color_predicate_pair : cellwise_color_predicate_map[cell_index])
+        {
+          deallog << "("
+                  << color_predicate_pair.first << ","
+                  << color_predicate_pair.second << "):";
+        }
+      //print fe active index and fe set for a cell.
+      //{1,2} indicates 2 enrichment functions of color 1 and 2
+      deallog << ":fe_active_index:" << cell->active_fe_index() << ":fe_set:";
+      for (auto fe_set_element : fe_sets[cell->active_fe_index()])
+        deallog << fe_set_element << ":";
+      deallog << std::endl;
     }
-    //print fe active index and fe set for a cell.
-    //{1,2} indicates 2 enrichment functions of color 1 and 2
-    deallog << ":fe_active_index:" << cell->active_fe_index() << ":fe_set:";
-    for (auto fe_set_element : fe_sets[cell->active_fe_index()])
-      deallog << fe_set_element << ":";
-    deallog << std::endl;
-  }
 
   return 0;
 }

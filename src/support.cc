@@ -35,9 +35,9 @@
 
 template <int dim, class MeshType>
 unsigned int color_predicates
-  (const MeshType &mesh,
-   const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
-   std::vector<unsigned int> &predicate_colors)
+(const MeshType &mesh,
+ const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+ std::vector<unsigned int> &predicate_colors)
 {
   unsigned int num_indices = vec_predicates.size();
 
@@ -46,10 +46,10 @@ unsigned int color_predicates
 
   //find connections between subdomains defined by predicates
   for (unsigned int i = 0; i < num_indices; ++i)
-      for (unsigned int j = i+1; j < num_indices; ++j)
-          if ( GridTools::find_connection_between_subdomains
-                  (mesh, vec_predicates[i], vec_predicates[j]) )
-              dsp.add(i,j);
+    for (unsigned int j = i+1; j < num_indices; ++j)
+      if ( GridTools::find_connection_between_subdomains
+           (mesh, vec_predicates[i], vec_predicates[j]) )
+        dsp.add(i,j);
 
   dsp.symmetrize();
 
@@ -69,43 +69,43 @@ unsigned int color_predicates
 template <int dim, class MeshType>
 void
 set_cellwise_color_set_and_fe_index
-  (MeshType &mesh,
-   const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
-   const std::vector<unsigned int> &predicate_colors,
-   std::map<unsigned int,
-      std::map<unsigned int, unsigned int> >
-        &cellwise_color_predicate_map,
-   std::vector <std::set<unsigned int>> &fe_sets)
+(MeshType &mesh,
+ const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+ const std::vector<unsigned int> &predicate_colors,
+ std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
+ std::vector <std::set<unsigned int>> &fe_sets)
 {
-    //set first element of fe_sets size to empty
-    fe_sets.resize(1);
+  //set first element of fe_sets size to empty
+  fe_sets.resize(1);
 
-    //loop throught cells and build fe table
-    unsigned int cell_index = 0;
+  //loop throught cells and build fe table
+  unsigned int cell_index = 0;
 
-    auto cell = mesh.begin_active();
-    auto endc = mesh.end();
-    for (unsigned int cell_index=0;
-         cell != endc; ++cell, ++cell_index)
+  auto cell = mesh.begin_active();
+  auto endc = mesh.end();
+  for (unsigned int cell_index=0;
+       cell != endc; ++cell, ++cell_index)
     {
-        cell->set_active_fe_index (0);  //No enrichment at all
-        std::set<unsigned int> color_list;
+      cell->set_active_fe_index (0);  //No enrichment at all
+      std::set<unsigned int> color_list;
 
-        //loop through predicate function to find connected subdomains
-        //connections between same color regions is checked again.
-        for (unsigned int i=0; i<vec_predicates.size(); ++i)
+      //loop through predicate function to find connected subdomains
+      //connections between same color regions is checked again.
+      for (unsigned int i=0; i<vec_predicates.size(); ++i)
         {
-            //add if predicate true to vector of functions
-            if (vec_predicates[i](cell))
+          //add if predicate true to vector of functions
+          if (vec_predicates[i](cell))
             {
-                //add color and predicate pair to each cell if predicate is true.
-                auto ret = cellwise_color_predicate_map[cell_index].insert
-                    (std::pair <unsigned int, unsigned int> (predicate_colors[i], i));
+              //add color and predicate pair to each cell if predicate is true.
+              auto ret = cellwise_color_predicate_map[cell_index].insert
+                         (std::pair <unsigned int, unsigned int> (predicate_colors[i], i));
 
-                color_list.insert(predicate_colors[i]);
+              color_list.insert(predicate_colors[i]);
 
-                //A single predicate for a single color! repeat addition not accepted.
-                Assert( ret.second == true, ExcInternalError () );
+              //A single predicate for a single color! repeat addition not accepted.
+              Assert( ret.second == true, ExcInternalError () );
 
 //                 pcout << " - " << predicate_colors[i] << "(" << i << ")" ;
             }
@@ -114,31 +114,32 @@ set_cellwise_color_set_and_fe_index
 //         if (!color_list.empty())
 //                 pcout << std::endl;
 
-        bool found = false;
-        //check if color combination is already added
-        if ( !color_list.empty() )
+      bool found = false;
+      //check if color combination is already added
+      if ( !color_list.empty() )
         {
-            for ( unsigned int j=0; j<fe_sets.size(); ++j)
+          for ( unsigned int j=0; j<fe_sets.size(); ++j)
             {
-                if (fe_sets[j] ==  color_list)
+              if (fe_sets[j] ==  color_list)
                 {
 //                     pcout << "color combo set found at " << j << std::endl;
-                    found=true;
-                    cell->set_active_fe_index(j);
-                    break;
+                  found=true;
+                  cell->set_active_fe_index(j);
+                  break;
                 }
             }
 
 
-            if (!found){
-                fe_sets.push_back(color_list);
-                cell->set_active_fe_index(fe_sets.size()-1);
-                /*
-                num_colors+1 = (num_colors+1 > color_list.size())?
-                                       num_colors+1:
-                                       color_list.size();
-//                 pcout << "color combo set pushed at " << fe_sets.size()-1 << std::endl;
-                */
+          if (!found)
+            {
+              fe_sets.push_back(color_list);
+              cell->set_active_fe_index(fe_sets.size()-1);
+              /*
+              num_colors+1 = (num_colors+1 > color_list.size())?
+                                     num_colors+1:
+                                     color_list.size();
+              //                 pcout << "color combo set pushed at " << fe_sets.size()-1 << std::endl;
+              */
             }
 
         }
@@ -148,218 +149,219 @@ set_cellwise_color_set_and_fe_index
 
 template <int dim>
 void make_colorwise_enrichment_functions
-  (const unsigned int &num_colors,          //needs number of colors
+(const unsigned int &num_colors,          //needs number of colors
 
-   const std::vector<EnrichmentFunction<dim>>
-    &vec_enrichments,     //enrichment functions based on predicate id
+ const std::vector<EnrichmentFunction<dim>>
+ &vec_enrichments,     //enrichment functions based on predicate id
 
-   const std::map<unsigned int,
-    std::map<unsigned int, unsigned int> >
-      &cellwise_color_predicate_map,
+ const std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
 
-   std::vector<
-    std::function<const Function<dim>*
-      (const typename Triangulation<dim>::cell_iterator&)> >
-        &color_enrichments)   //colorwise enrichment functions indexed from 0!
-    //color_enrichments[0] is color 1 enrichment function
-  {
-    color_enrichments.resize (num_colors);
+ std::vector<
+ std::function<const Function<dim>*
+ (const typename Triangulation<dim>::cell_iterator &)> >
+ &color_enrichments)   //colorwise enrichment functions indexed from 0!
+//color_enrichments[0] is color 1 enrichment function
+{
+  color_enrichments.resize (num_colors); // <<-- return by value and keep as a class member
 
-    for (unsigned int i = 0; i < num_colors; ++i)
+  for (unsigned int i = 0; i < num_colors; ++i)
     {
       color_enrichments[i] =
-        [&,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
-            {
-                unsigned int id = cell->index();
+        [ &,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
+      {
+        unsigned int id = cell->index();
 
-                //i'th function corresponds to i+1 color
-                  return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
-            };
+        //i'th function corresponds to i+1 color
+        return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
+      };
     }
-  }
-
+}
 
 template <int dim>
 void make_fe_collection_from_colored_enrichments
-  (
-    const unsigned int &num_colors,
-    const std::vector <std::set<unsigned int>>
-      &fe_sets,         //total list of color sets possible
+(
+  const unsigned int &num_colors,
+  const std::vector <std::set<unsigned int>>
+  &fe_sets,         //total list of color sets possible
 
-    const std::vector<
-      std::function<const Function<dim>*
-        (const typename Triangulation<dim>::cell_iterator&)> >
-          &color_enrichments,  //color wise enrichment functions
+  const std::vector<
+  std::function<const Function<dim>*
+  (const typename Triangulation<dim>::cell_iterator &)> >
+  &color_enrichments,  //color wise enrichment functions
 
-    const FE_Q<dim> &fe_base,            //basic fe element
-    const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
-    const FE_Nothing<dim> &fe_nothing,
-    hp::FECollection<dim> &fe_collection
-  )
+  const FE_Q<dim> &fe_base,            //basic fe element
+  const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
+  const FE_Nothing<dim> &fe_nothing,
+  hp::FECollection<dim> &fe_collection
+)
 {
   std::vector<const FiniteElement<dim> *> vec_fe_enriched;
-  std::vector<std::vector<std::function<const Function<dim> *
-          (const typename Triangulation<dim, dim>::cell_iterator &) >>>
-          functions;
+  EnrichmentFunctionArray<dim> functions; // <<-- a vector of this object to the class (use typedef to make life easier)
+  std::vector<EnrichmentFunctionArray<dim>> function_array;
 
   for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
     {
-        vec_fe_enriched.assign(num_colors, &fe_nothing);
-        functions.assign(num_colors, {nullptr});
+      vec_fe_enriched.assign(num_colors, &fe_nothing);
+      functions.assign(num_colors, {nullptr});
 
-        //ind = 0 means color id
-        unsigned int ind = 0;
-        for (auto it=fe_sets[color_set_id].begin();
-             it != fe_sets[color_set_id].end();
-             ++it)
+      //ind = 0 means color id
+      unsigned int ind = 0;
+      for (auto it=fe_sets[color_set_id].begin();
+           it != fe_sets[color_set_id].end();
+           ++it)
         {
-            ind = *it-1;
-            AssertIndexRange(ind, vec_fe_enriched.size());
+          ind = *it-1;
+          AssertIndexRange(ind, vec_fe_enriched.size());
 
-            vec_fe_enriched[ind] = &fe_enriched;
+          vec_fe_enriched[ind] = &fe_enriched;
 
-            AssertIndexRange(ind, functions.size());
-            AssertIndexRange(ind, color_enrichments.size());
+          AssertIndexRange(ind, functions.size());
+          AssertIndexRange(ind, color_enrichments.size());
 
-            //color_set_id'th color function is (color_set_id-1) element of color wise enrichments
-            functions[ind].assign(1,color_enrichments[ind]);
+          //color_set_id'th color function is (color_set_id-1) element of color wise enrichments
+          functions[ind].assign(1,color_enrichments[ind]);
         }
 
-        AssertDimension(vec_fe_enriched.size(), functions.size());
+      AssertDimension(vec_fe_enriched.size(), functions.size());
 
-        FE_Enriched<dim> fe_component(&fe_base,
-                                     vec_fe_enriched,
-                                     functions);
+      FE_Enriched<dim> fe_component(&fe_base,
+                                    vec_fe_enriched,
+                                    functions);
 
-      {//TODO delete after testing
-      ConditionalOStream pcout
+      function_array.pushback(functions);
+
+      {
+        //TODO delete after testing
+        ConditionalOStream pcout
         (std::cout, (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0));
 
-      pcout << "Function set : \t ";
-      for (auto enrichment_function_array : functions )
-        for (auto func_component : enrichment_function_array)
-          if (func_component)
-            pcout << " X ";
-          else
-            pcout << " O ";
+        pcout << "Function set : \t ";
+        for (auto enrichment_function_array : functions )
+          for (auto func_component : enrichment_function_array)
+            if (func_component)
+              pcout << " X ";
+            else
+              pcout << " O ";
 
-      pcout << std::endl;
+        pcout << std::endl;
       }
 
-        fe_collection.push_back (fe_component);
+      fe_collection.push_back (fe_component);
     }
 }
 
 
 //template instantiations
 template unsigned int color_predicates
-  (const Triangulation<2,2> &mesh,
-   const std::vector<EnrichmentPredicate<2>> &,
-   std::vector<unsigned int> &);
+(const Triangulation<2,2> &mesh,
+ const std::vector<EnrichmentPredicate<2>> &,
+ std::vector<unsigned int> &);
 
 template unsigned int color_predicates
-  (const hp::DoFHandler<2,2> &mesh,
-   const std::vector<EnrichmentPredicate<2>> &,
-   std::vector<unsigned int> &);
+(const hp::DoFHandler<2,2> &mesh,
+ const std::vector<EnrichmentPredicate<2>> &,
+ std::vector<unsigned int> &);
 
 
 template unsigned int color_predicates
-  (const hp::DoFHandler<3,3> &mesh,
-   const std::vector<EnrichmentPredicate<3>> &,
-   std::vector<unsigned int> &);
+(const hp::DoFHandler<3,3> &mesh,
+ const std::vector<EnrichmentPredicate<3>> &,
+ std::vector<unsigned int> &);
 
 
 template
 void
 set_cellwise_color_set_and_fe_index
-  (hp::DoFHandler<2,2> &mesh,
-   const std::vector<EnrichmentPredicate<2>> &vec_predicates,
-   const std::vector<unsigned int> &predicate_colors,
-   std::map<unsigned int,
-      std::map<unsigned int, unsigned int> >
-        &cellwise_color_predicate_map,
-   std::vector <std::set<unsigned int>> &fe_sets);
+(hp::DoFHandler<2,2> &mesh,
+ const std::vector<EnrichmentPredicate<2>> &vec_predicates,
+ const std::vector<unsigned int> &predicate_colors,
+ std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
+ std::vector <std::set<unsigned int>> &fe_sets);
 
 
 template
 void
 set_cellwise_color_set_and_fe_index
-  (hp::DoFHandler<3,3> &mesh,
-   const std::vector<EnrichmentPredicate<3>> &vec_predicates,
-   const std::vector<unsigned int> &predicate_colors,
-   std::map<unsigned int,
-      std::map<unsigned int, unsigned int> >
-        &cellwise_color_predicate_map,
-   std::vector <std::set<unsigned int>> &fe_sets);
+(hp::DoFHandler<3,3> &mesh,
+ const std::vector<EnrichmentPredicate<3>> &vec_predicates,
+ const std::vector<unsigned int> &predicate_colors,
+ std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
+ std::vector <std::set<unsigned int>> &fe_sets);
 
 
 
 template
 void make_colorwise_enrichment_functions
-  (const unsigned int &num_colors,          //needs number of colors
+(const unsigned int &num_colors,          //needs number of colors
 
-   const std::vector<EnrichmentFunction<2>>
-    &vec_enrichments,     //enrichment functions based on predicate id
+ const std::vector<EnrichmentFunction<2>>
+ &vec_enrichments,     //enrichment functions based on predicate id
 
-   const std::map<unsigned int,
-    std::map<unsigned int, unsigned int> >
-      &cellwise_color_predicate_map,
+ const std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
 
-   std::vector<
-    std::function<const Function<2>*
-      (const typename Triangulation<2>::cell_iterator&)> >
-        &color_enrichments);
+ std::vector<
+ std::function<const Function<2>*
+ (const typename Triangulation<2>::cell_iterator &)> >
+ &color_enrichments);
 
 template
 void make_colorwise_enrichment_functions
-  (const unsigned int &num_colors,          //needs number of colors
+(const unsigned int &num_colors,          //needs number of colors
 
-   const std::vector<EnrichmentFunction<3>>
-    &vec_enrichments,     //enrichment functions based on predicate id
+ const std::vector<EnrichmentFunction<3>>
+ &vec_enrichments,     //enrichment functions based on predicate id
 
-   const std::map<unsigned int,
-    std::map<unsigned int, unsigned int> >
-      &cellwise_color_predicate_map,
+ const std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
 
-   std::vector<
-    std::function<const Function<3>*
-      (const typename Triangulation<3>::cell_iterator&)> >
-        &color_enrichments);
-
-
-template
-void make_fe_collection_from_colored_enrichments
-  (
-    const unsigned int &num_colors,
-    const std::vector <std::set<unsigned int>>
-      &fe_sets,         //total list of color sets possible
-
-    const std::vector<
-      std::function<const Function<2>*
-        (const typename Triangulation<2>::cell_iterator&)> >
-          &color_enrichments,  //color wise enrichment functions
-
-    const FE_Q<2> &fe_base,            //basic fe element
-    const FE_Q<2> &fe_enriched,        //fe element multiplied by enrichment function
-    const FE_Nothing<2> &fe_nothing,
-    hp::FECollection<2> &fe_collection
-  );
+ std::vector<
+ std::function<const Function<3>*
+ (const typename Triangulation<3>::cell_iterator &)> >
+ &color_enrichments);
 
 
 template
 void make_fe_collection_from_colored_enrichments
-  (
-    const unsigned int &num_colors,
-    const std::vector <std::set<unsigned int>>
-      &fe_sets,         //total list of color sets possible
+(
+  const unsigned int &num_colors,
+  const std::vector <std::set<unsigned int>>
+  &fe_sets,         //total list of color sets possible
 
-    const std::vector<
-      std::function<const Function<3>*
-        (const typename Triangulation<3>::cell_iterator&)> >
-          &color_enrichments,  //color wise enrichment functions
+  const std::vector<
+  std::function<const Function<2>*
+  (const typename Triangulation<2>::cell_iterator &)> >
+  &color_enrichments,  //color wise enrichment functions
 
-    const FE_Q<3> &fe_base,            //basic fe element
-    const FE_Q<3> &fe_enriched,        //fe element multiplied by enrichment function
-    const FE_Nothing<3> &fe_nothing,
-    hp::FECollection<3> &fe_collection
-  );
+  const FE_Q<2> &fe_base,            //basic fe element
+  const FE_Q<2> &fe_enriched,        //fe element multiplied by enrichment function
+  const FE_Nothing<2> &fe_nothing,
+  hp::FECollection<2> &fe_collection
+                             );
+
+
+template
+void make_fe_collection_from_colored_enrichments
+(
+  const unsigned int &num_colors,
+  const std::vector <std::set<unsigned int>>
+  &fe_sets,         //total list of color sets possible
+
+  const std::vector<
+  std::function<const Function<3>*
+  (const typename Triangulation<3>::cell_iterator &)> >
+  &color_enrichments,  //color wise enrichment functions
+
+  const FE_Q<3> &fe_base,            //basic fe element
+  const FE_Q<3> &fe_enriched,        //fe element multiplied by enrichment function
+  const FE_Nothing<3> &fe_nothing,
+  hp::FECollection<3> &fe_collection
+                             );
