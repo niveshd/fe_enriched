@@ -1,3 +1,34 @@
+#include <deal.II/base/utilities.h>
+#include <deal.II/base/function.h>
+#include <deal.II/base/conditional_ostream.h>
+
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/dofs/dof_renumbering.h>
+
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_tools.h>
+#include <deal.II/grid/grid_refinement.h>
+
+#include <deal.II/numerics/data_postprocessor.h>
+#include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/error_estimator.h>
+
+#include <deal.II/hp/dof_handler.h>
+#include <deal.II/hp/fe_values.h>
+#include <deal.II/hp/q_collection.h>
+#include <deal.II/hp/fe_collection.h>
+
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_nothing.h>
+#include <deal.II/fe/fe_system.h>
+#include <deal.II/fe/fe_enriched.h>
+#include <deal.II/fe/fe_values.h>
+
+#include <deal.II/lac/sparsity_tools.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_sparse_matrix.h>
+
 #include <vector>
 #include <map>
 
@@ -102,6 +133,9 @@ public:
   virtual double value(const Point<dim> &point,
                        const unsigned int component = 0) const
   {
+    //TODO remove
+    std::cout << "value asked:" << coefficient << std::endl;
+
     Tensor<1,dim> dist = point-origin;
     const double r = dist.norm();
     return coefficient*std::exp(-Z*r);

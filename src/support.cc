@@ -1,36 +1,3 @@
-#include <deal.II/base/utilities.h>
-#include <deal.II/base/function.h>
-#include <deal.II/base/conditional_ostream.h>
-
-#include <deal.II/dofs/dof_tools.h>
-#include <deal.II/dofs/dof_renumbering.h>
-
-#include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/grid_tools.h>
-#include <deal.II/grid/grid_refinement.h>
-
-#include <deal.II/numerics/data_postprocessor.h>
-#include <deal.II/numerics/data_out.h>
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/error_estimator.h>
-
-#include <deal.II/hp/dof_handler.h>
-#include <deal.II/hp/fe_values.h>
-#include <deal.II/hp/q_collection.h>
-#include <deal.II/hp/fe_collection.h>
-
-#include <deal.II/fe/fe_q.h>
-#include <deal.II/fe/fe_nothing.h>
-#include <deal.II/fe/fe_system.h>
-#include <deal.II/fe/fe_enriched.h>
-#include <deal.II/fe/fe_values.h>
-
-#include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/petsc_parallel_vector.h>
-#include <deal.II/lac/petsc_parallel_sparse_matrix.h>
-
-#include <vector>
-#include <map>
 #include "support.h"
 
 template <int dim, class MeshType>
@@ -200,19 +167,40 @@ void make_fe_collection_from_colored_enrichments
   EnrichmentFunctionArray<dim> functions; // <<-- a vector of this object to the class (use typedef to make life easier)
   function_array.clear();
 
-  for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
+  //define dummy function
+  using cell_function = std::function<const Function<dim>*
+                        (const typename Triangulation<dim>::cell_iterator &)>;
+  cell_function dummy_function;
+
+  //TODO remove
+  static EnrichmentFunction<dim> zero_enrichment(0);
+
+  dummy_function = [=] (const typename Triangulation<dim>::cell_iterator &)
+                   -> const Function<dim> *
+  {
+//    TODO UNCOMMENT
+//    AssertThrow(false, ExcMessage("Called enrichment function for FE_Nothing"));
+
+//    return nullptr;
+
+    return &zero_enrichment;
+  };
+
+  //loop through color sets ignore starting empty sets
+  //TODO remove volatile
+  for (volatile unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
     {
       vec_fe_enriched.assign(num_colors, &fe_nothing);
-      functions.assign(num_colors, {nullptr});
+      functions.assign(num_colors, {dummy_function});
 
       //ind = 0 means color id
       //make fe collection by constructing fe_enriched and corresponding
       //array of functions
-      unsigned int ind = 0;
-      unsigned int func_ind = 0;
+      //TODO remove volatile
+      volatile unsigned int ind = 0;
       for (auto it=fe_sets[color_set_id].begin();
            it != fe_sets[color_set_id].end();
-           ++it, ++func_ind)
+           ++it)
         {
           ind = *it-1;
           AssertIndexRange(ind, vec_fe_enriched.size());
@@ -232,7 +220,7 @@ void make_fe_collection_from_colored_enrichments
 
       FE_Enriched<dim> fe_component(&fe_base,
                                     vec_fe_enriched,
-                                    function_array[func_ind]);
+                                    function_array.back());
 
 
 
@@ -244,10 +232,7 @@ void make_fe_collection_from_colored_enrichments
         pcout << "Function set : \t ";
         for (auto enrichment_function_array : functions )
           for (auto func_component : enrichment_function_array)
-            if (func_component)
-              pcout << " X ";
-            else
-              pcout << " O ";
+            pcout << "x ";
 
         pcout << std::endl;
       }

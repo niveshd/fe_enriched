@@ -52,7 +52,6 @@
 
 #include "support.h"
 
-#include <map>
 #include <fstream>
 
 //TODO need 3d test example?
@@ -95,38 +94,38 @@ void plot_shape_function
       shape_functions.push_back(shape_function);
 
       //TODO separate later
-      {
-        std::map<types::global_dof_index, Point<dim> > support_points;
-        MappingQ1<dim> mapping;
-        hp::MappingCollection<dim> hp_mapping;
-        for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
-          hp_mapping.push_back(mapping);
-        DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
+       {
+         std::map<types::global_dof_index, Point<dim> > support_points;
+         MappingQ1<dim> mapping;
+         hp::MappingCollection<dim> hp_mapping;
+         for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
+           hp_mapping.push_back(mapping);
+         DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
 
-        const std::string base_filename =
-          "grid" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+         const std::string base_filename =
+           "grid" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
 
-        const std::string filename = base_filename + ".gp";
-        std::ofstream f(filename.c_str());
+         const std::string filename = base_filename + ".gp";
+         std::ofstream f(filename.c_str());
 
-        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-          << "set output \"" << base_filename << ".png\"" << std::endl
-          << "set size square" << std::endl
-          << "set view equal xy" << std::endl
-          << "unset xtics                                                                                   " << std::endl
-          << "unset ytics" << std::endl
-          << "unset grid" << std::endl
-          << "unset border" << std::endl
-          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-        GridOut grid_out;
-        grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
-        f << "e" << std::endl;
+         f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+           << "set output \"" << base_filename << ".png\"" << std::endl
+           << "set size square" << std::endl
+           << "set view equal xy" << std::endl
+           << "unset xtics                                                                                   " << std::endl
+           << "unset ytics" << std::endl
+           << "unset grid" << std::endl
+           << "unset border" << std::endl
+           << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+         GridOut grid_out;
+         grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
+         f << "e" << std::endl;
 
-        DoFTools::write_gnuplot_dof_support_point_info(f,
-                                                       support_points);
+         DoFTools::write_gnuplot_dof_support_point_info(f,
+                                                        support_points);
 
-        f << "e" << std::endl;
-      }
+         f << "e" << std::endl;
+       }
 
     }
 
@@ -144,8 +143,8 @@ void plot_shape_function
     }
   data_out.add_data_vector(fe_index, "fe_index");
 
-  for (unsigned int i = 0; i < shape_functions.size(); i++)
-    data_out.add_data_vector (shape_functions[i], names[i]);
+   for (unsigned int i = 0; i < shape_functions.size(); i++)
+     data_out.add_data_vector (shape_functions[i], names[i]);
 
   data_out.build_patches(patches);
 
@@ -192,6 +191,7 @@ namespace Step1
     FE_Q<dim> fe_enriched;
     FE_Nothing<dim> fe_nothing;
 
+
     IndexSet locally_owned_dofs;
     IndexSet locally_relevant_dofs;
 
@@ -209,12 +209,12 @@ namespace Step1
 
     RightHandSide<dim> right_hand_side;
 
+    using cell_function = std::function<const Function<dim>*
+                          (const typename Triangulation<dim>::cell_iterator &)>;
+
     std::vector<EnrichmentFunction<dim>> vec_enrichments;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
-    std::vector<
-    std::function<const Function<dim>*
-    (const typename Triangulation<dim>::cell_iterator &)> >
-    color_enrichments;
+    std::vector<cell_function>  color_enrichments;
 
     //each predicate is assigned a color depending on overlap of vertices.
     std::vector<unsigned int> predicate_colors;
@@ -242,6 +242,7 @@ namespace Step1
 
   };
 
+  //TODO fe_nothing is false or true? if false dominating error
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem ()
     :
@@ -260,7 +261,7 @@ namespace Step1
     //initialize vector of vec_predicates
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
-    // vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
+//    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
     // FIXME: switch to using ParameterHandler (require .prm file as an argument
     // in main.cc)
     // Then read positions from that file.
@@ -332,7 +333,8 @@ namespace Step1
     //build fe table. should be called everytime number of cells change!
     build_tables();
 
-    {//print fe index
+    {
+      //print fe index
       const std::string base_filename =
         "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
       const std::string filename =  base_filename + ".gp";
@@ -354,7 +356,8 @@ namespace Step1
       f << std::flush << "e" << std::endl;
     }
 
-    {//print cell ids
+    {
+      //print cell ids
       const std::string base_filename =
         "cell_id" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
       const std::string filename =  base_filename + ".gp";
@@ -401,9 +404,10 @@ namespace Step1
           {
             unsigned int id = cell->index();
 
-            pcout << "test " << cell-> index()
-                  << " " << i
-                  << " " << cellwise_color_predicate_map.at(id).at(i+1)
+            //TODO remove
+            pcout << "vector lambda called:c:" << cell-> index()
+                  << ":i:" << i
+                  << ":p:" << cellwise_color_predicate_map.at(id).at(i+1)
                   << std::endl;
 
             //i'th function corresponds to i+1 color
@@ -438,15 +442,15 @@ namespace Step1
           //fe enriched copied from this fe element has enrichment function
           //but doesn't have the correct function
 
-//       pcout << "Function set : \t ";
-//       for (auto enrichment_function_array : functions)
-//         for (auto func_component : enrichment_function_array)
-//           if (func_component)
-//             pcout << " X ";
-//           else
-//             pcout << " O ";
-//
-//       pcout << std::endl;
+            pcout << "Function set : \t ";
+            for (auto enrichment_function_array : functions)
+             for (auto func_component : enrichment_function_array)
+               if (func_component)
+                 pcout << " X ";
+               else
+                 pcout << " O ";
+
+            pcout << std::endl;
         }
     }
 
@@ -631,7 +635,7 @@ namespace Step1
     // solution.reinit (locally_owned_dofs, mpi_communicator);
     // system_rhs.reinit (locally_owned_dofs, mpi_communicator);
 
-    // pcout << "-----system set up complete" << std::endl;
+    pcout << "-----system set up complete" << std::endl;
   }
 
 
@@ -881,6 +885,8 @@ namespace Step1
 //         output_results(cycle);
         //refine_grid ();
 //         pcout << "Number of iterations " << n_iterations << std::endl;
+
+        pcout << "step run complete" << std::endl;
       }
   }
 }
