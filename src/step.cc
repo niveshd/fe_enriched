@@ -242,7 +242,6 @@ namespace Step1
 
   };
 
-  //TODO fe_nothing is false or true? if false dominating error
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem ()
     :
@@ -388,33 +387,10 @@ namespace Step1
 
     //setup color wise enrichment functions
     //i'th function corresponds to (i+1) color!
-    //TODO uncomment and remove comment 1
-    // make_colorwise_enrichment_functions (num_colors,
-    // vec_enrichments,
-    // cellwise_color_predicate_map,
-    // color_enrichments);
-    //TODO Remove after uncommenting above.
-    {
-      color_enrichments.resize (num_colors); // <<-- return by value and keep as a class member
-
-      for (unsigned int i = 0; i < num_colors; ++i)
-        {
-          color_enrichments[i] =
-            [ &,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
-          {
-            unsigned int id = cell->index();
-
-            //TODO remove
-            pcout << "vector lambda called:c:" << cell-> index()
-                  << ":i:" << i
-                  << ":p:" << cellwise_color_predicate_map.at(id).at(i+1)
-                  << std::endl;
-
-            //i'th function corresponds to i+1 color
-            return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
-          };
-        }
-    }
+     make_colorwise_enrichment_functions (num_colors,
+     vec_enrichments,
+     cellwise_color_predicate_map,
+     color_enrichments);
 
     make_fe_collection_from_colored_enrichments (num_colors,
                                                  fe_sets,

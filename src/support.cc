@@ -163,8 +163,6 @@ void make_fe_collection_from_colored_enrichments
  hp::FECollection<dim> &fe_collection,
  std::vector<EnrichmentFunctionArray<dim>> &function_array)
 {
-  std::vector<const FiniteElement<dim> *> vec_fe_enriched;
-  EnrichmentFunctionArray<dim> functions; // <<-- a vector of this object to the class (use typedef to make life easier)
   function_array.clear();
 
   //define dummy function
@@ -172,37 +170,29 @@ void make_fe_collection_from_colored_enrichments
                         (const typename Triangulation<dim>::cell_iterator &)>;
   cell_function dummy_function;
 
-  //TODO remove
-  static EnrichmentFunction<dim> zero_enrichment(0);
-
   dummy_function = [=] (const typename Triangulation<dim>::cell_iterator &)
                    -> const Function<dim> *
   {
-//    TODO UNCOMMENT
-//    AssertThrow(false, ExcMessage("Called enrichment function for FE_Nothing"));
-
-//    return nullptr;
-
-    return &zero_enrichment;
+    AssertThrow(false, ExcMessage("Called enrichment function for FE_Nothing"));
+    return nullptr;
   };
 
   //loop through color sets ignore starting empty sets
   //TODO remove volatile
   for (volatile unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
     {
-      vec_fe_enriched.assign(num_colors, &fe_nothing);
-      functions.assign(num_colors, {dummy_function});
+      std::vector<const FiniteElement<dim> *> vec_fe_enriched (num_colors, &fe_nothing);
+      EnrichmentFunctionArray<dim> functions(num_colors, {dummy_function});
 
-      //ind = 0 means color id
-      //make fe collection by constructing fe_enriched and corresponding
-      //array of functions
-      //TODO remove volatile
-      volatile unsigned int ind = 0;
+      // FIXME: remove
+      std::set<unsigned int> set_components;
       for (auto it=fe_sets[color_set_id].begin();
            it != fe_sets[color_set_id].end();
            ++it)
         {
-          ind = *it-1;
+          const unsigned int ind = *it-1;
+          set_components.insert(ind);
+
           AssertIndexRange(ind, vec_fe_enriched.size());
 
           vec_fe_enriched[ind] = &fe_enriched;
@@ -222,17 +212,19 @@ void make_fe_collection_from_colored_enrichments
                                     vec_fe_enriched,
                                     function_array.back());
 
-
-
       {
         //TODO delete after testing
         ConditionalOStream pcout
         (std::cout, (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0));
 
-        pcout << "Function set : \t ";
-        for (auto enrichment_function_array : functions )
-          for (auto func_component : enrichment_function_array)
-            pcout << "x ";
+        pcout << "Function set (compoenents) : \t ";
+        for (auto comp : set_components)
+            pcout << comp << " ";
+
+
+//        for (auto enrichment_function_array : functions )
+//          for (auto func_component : enrichment_function_array)
+//            pcout << "x ";
 
         pcout << std::endl;
       }

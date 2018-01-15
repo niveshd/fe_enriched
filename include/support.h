@@ -133,9 +133,6 @@ public:
   virtual double value(const Point<dim> &point,
                        const unsigned int component = 0) const
   {
-    //TODO remove
-    std::cout << "value asked:" << coefficient << std::endl;
-
     Tensor<1,dim> dist = point-origin;
     const double r = dist.norm();
     return coefficient*std::exp(-Z*r);
