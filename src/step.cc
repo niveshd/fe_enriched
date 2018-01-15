@@ -94,38 +94,38 @@ void plot_shape_function
       shape_functions.push_back(shape_function);
 
       //TODO separate later
-       {
-         std::map<types::global_dof_index, Point<dim> > support_points;
-         MappingQ1<dim> mapping;
-         hp::MappingCollection<dim> hp_mapping;
-         for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
-           hp_mapping.push_back(mapping);
-         DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
+      {
+        std::map<types::global_dof_index, Point<dim> > support_points;
+        MappingQ1<dim> mapping;
+        hp::MappingCollection<dim> hp_mapping;
+        for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
+          hp_mapping.push_back(mapping);
+        DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
 
-         const std::string base_filename =
-           "grid" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+        const std::string base_filename =
+          "grid" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
 
-         const std::string filename = base_filename + ".gp";
-         std::ofstream f(filename.c_str());
+        const std::string filename = base_filename + ".gp";
+        std::ofstream f(filename.c_str());
 
-         f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-           << "set output \"" << base_filename << ".png\"" << std::endl
-           << "set size square" << std::endl
-           << "set view equal xy" << std::endl
-           << "unset xtics                                                                                   " << std::endl
-           << "unset ytics" << std::endl
-           << "unset grid" << std::endl
-           << "unset border" << std::endl
-           << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-         GridOut grid_out;
-         grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
-         f << "e" << std::endl;
+        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+          << "set output \"" << base_filename << ".png\"" << std::endl
+          << "set size square" << std::endl
+          << "set view equal xy" << std::endl
+          << "unset xtics                                                                                   " << std::endl
+          << "unset ytics" << std::endl
+          << "unset grid" << std::endl
+          << "unset border" << std::endl
+          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+        GridOut grid_out;
+        grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
+        f << "e" << std::endl;
 
-         DoFTools::write_gnuplot_dof_support_point_info(f,
-                                                        support_points);
+        DoFTools::write_gnuplot_dof_support_point_info(f,
+                                                       support_points);
 
-         f << "e" << std::endl;
-       }
+        f << "e" << std::endl;
+      }
 
     }
 
@@ -143,8 +143,8 @@ void plot_shape_function
     }
   data_out.add_data_vector(fe_index, "fe_index");
 
-   for (unsigned int i = 0; i < shape_functions.size(); i++)
-     data_out.add_data_vector (shape_functions[i], names[i]);
+  for (unsigned int i = 0; i < shape_functions.size(); i++)
+    data_out.add_data_vector (shape_functions[i], names[i]);
 
   data_out.build_patches(patches);
 
@@ -387,10 +387,10 @@ namespace Step1
 
     //setup color wise enrichment functions
     //i'th function corresponds to (i+1) color!
-     make_colorwise_enrichment_functions (num_colors,
-     vec_enrichments,
-     cellwise_color_predicate_map,
-     color_enrichments);
+    make_colorwise_enrichment_functions (num_colors,
+                                         vec_enrichments,
+                                         cellwise_color_predicate_map,
+                                         color_enrichments);
 
     make_fe_collection_from_colored_enrichments (num_colors,
                                                  fe_sets,
@@ -418,15 +418,15 @@ namespace Step1
           //fe enriched copied from this fe element has enrichment function
           //but doesn't have the correct function
 
-            pcout << "Function set : \t ";
-            for (auto enrichment_function_array : functions)
-             for (auto func_component : enrichment_function_array)
-               if (func_component)
-                 pcout << " X ";
-               else
-                 pcout << " O ";
+          pcout << "Function set : \t ";
+          for (auto enrichment_function_array : functions)
+            for (auto func_component : enrichment_function_array)
+              if (func_component)
+                pcout << " X ";
+              else
+                pcout << " O ";
 
-            pcout << std::endl;
+          pcout << std::endl;
         }
     }
 

@@ -219,7 +219,7 @@ void make_fe_collection_from_colored_enrichments
 
         pcout << "Function set (compoenents) : \t ";
         for (auto comp : set_components)
-            pcout << comp << " ";
+          pcout << comp << " ";
 
 
 //        for (auto enrichment_function_array : functions )
