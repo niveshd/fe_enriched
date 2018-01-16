@@ -169,6 +169,7 @@ namespace Step1
     void run ();
 
   private:
+    void read_parameters();
     void build_tables ();
     void setup_system ();
     void assemble_system ();
@@ -180,6 +181,8 @@ namespace Step1
 
     int argc;
     char **argv;
+    int size;
+    unsigned int global_refinement;
     ParameterHandler prm;
 
     Triangulation<dim>  triangulation;
@@ -245,6 +248,30 @@ namespace Step1
   };
 
   template <int dim>
+  void LaplaceProblem<dim>::read_parameters()
+  {
+    //declare parameters
+    prm.enter_subsection("geometry");
+    prm.declare_entry("size",
+                      "1",
+                      Patterns::Double(0));
+    prm.declare_entry("Global refinement",
+                      "1",
+                      Patterns::Integer(1));
+    prm.leave_subsection();
+
+    //parse parameter file
+    AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
+    prm.parse_input(argv[1]);
+
+    //get parameters
+    prm.enter_subsection("geometry");
+    size = prm.get_integer("size");
+    global_refinement = prm.get_integer("Global refinement");
+    prm.leave_subsection();
+  }
+
+  template <int dim>
   LaplaceProblem<dim>::LaplaceProblem (int argc,char **argv)
     :
     argc(argc),
@@ -258,23 +285,7 @@ namespace Step1
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0))
   {
-    //read geometry
-    prm.enter_subsection("geometry");
-    prm.declare_entry("size",
-                      "1",
-                      Patterns::Double(0));
-    prm.declare_entry("Global refinement",
-                      "1",
-                      Patterns::Integer(1));
-    prm.leave_subsection();
-
-    AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
-    prm.parse_input(argv[1]);
-
-    prm.enter_subsection("geometry");
-    int size = prm.get_integer("size");
-    unsigned int global_refinement = prm.get_integer("Global refinement");
-    prm.leave_subsection();
+    read_parameters();
 
     pcout << "Size : "<< size << std::endl;
     pcout << "Global refinement : " << global_refinement << std::endl;
