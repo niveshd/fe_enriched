@@ -49,9 +49,10 @@
 #include <deal.II/lac/petsc_solver.h>
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
+#include <deal.II/base/parameter_handler.h>
 
 #include "support.h"
-
+#include <string>
 #include <fstream>
 
 //TODO need 3d test example?
@@ -163,7 +164,7 @@ namespace Step1
   class LaplaceProblem
   {
   public:
-    LaplaceProblem ();
+    LaplaceProblem (int argc,char **argv);
     virtual ~LaplaceProblem();
     void run ();
 
@@ -176,6 +177,10 @@ namespace Step1
     void refine_grid ();
     void output_results (const unsigned int cycle) const;
     void output_test ();  //change to const later
+
+    int argc;
+    char **argv;
+    ParameterHandler prm;
 
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
@@ -240,8 +245,10 @@ namespace Step1
   };
 
   template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem ()
+  LaplaceProblem<dim>::LaplaceProblem (int argc,char **argv)
     :
+    argc(argc),
+    argv(argv),
     dof_handler (triangulation),
     fe_base(2),
     fe_enriched(1),
@@ -251,22 +258,35 @@ namespace Step1
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0))
   {
-    GridGenerator::hyper_cube (triangulation, -2, 2); // <-- same here, read geometry from .prm file
-    triangulation.refine_global (2);
+    //read geometry
+    prm.enter_subsection("geometry");
+    prm.declare_entry("size",
+                      "1",
+                      Patterns::Double(0));
+    prm.declare_entry("Global refinement",
+                      "1",
+                      Patterns::Integer(1));
+    prm.leave_subsection();
+
+    AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
+    prm.parse_input(argv[1]);
+
+    prm.enter_subsection("geometry");
+    int size = prm.get_integer("size");
+    unsigned int global_refinement = prm.get_integer("Global refinement");
+    prm.leave_subsection();
+
+    pcout << "Size : "<< size << std::endl;
+    pcout << "Global refinement : " << global_refinement << std::endl;
+
+    GridGenerator::hyper_cube (triangulation, -size, size);
+    triangulation.refine_global (global_refinement);
 
     //initialize vector of vec_predicates
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
     vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
 //    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
     // FIXME: switch to using ParameterHandler (require .prm file as an argument
-    // in main.cc)
-    // Then read positions from that file.
-    // Roughly, the content:
-    //
-    // section geometry
-    //   set Size = 4
-    //   set Global refinement = 2;
-    // end
     // section Solver
     //   ..
     // end
@@ -745,7 +765,7 @@ int main (int argc,char **argv)
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        Step1::LaplaceProblem<dim> step1;
+        Step1::LaplaceProblem<dim> step1(argc,argv);
 //         PETScWrappers::set_option_value("-eps_target","-1.0");
 //         PETScWrappers::set_option_value("-st_type","sinvert");
 //         PETScWrappers::set_option_value("-st_ksp_type","cg");

@@ -1,0 +1,4 @@
+subsection geometry
+    set size = 2
+    set Global refinement = 2
+end
