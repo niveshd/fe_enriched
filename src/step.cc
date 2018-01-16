@@ -93,7 +93,7 @@ void plot_shape_function
       constraints.distribute(shape_function);
       shape_functions.push_back(shape_function);
 
-      //TODO separate later
+      //print support points
       {
         std::map<types::global_dof_index, Point<dim> > support_points;
         MappingQ1<dim> mapping;
@@ -126,7 +126,6 @@ void plot_shape_function
 
         f << "e" << std::endl;
       }
-
     }
 
   DataOut<dim,hp::DoFHandler<dim>> data_out;
@@ -183,8 +182,6 @@ namespace Step1
 
     std::vector<EnrichmentFunctionArray<dim>> function_array;
     hp::FECollection<dim> fe_collection;
-    hp::FECollection<dim> fe_collection_test; //TODO remove after testing
-    hp::FECollection<dim> dummy_fe;
     hp::QCollection<dim> q_collection;
 
     FE_Q<dim> fe_base;
@@ -400,123 +397,7 @@ namespace Step1
                                                  fe_nothing,
                                                  fe_collection,
                                                  function_array);
-
-    {
-      //print content of fe_collection
-      pcout << "\n Printing fe collection" << std::endl;
-
-      for (unsigned int id = 0; id < fe_collection.size(); ++id)
-        {
-          pcout << "Fe Set : " << fe_collection[id].get_name() << std::endl;
-
-          FE_Enriched<dim> fe_component(fe_collection[id]);
-          auto functions = fe_component.get_enrichments();
-
-          //TODO how to retrieve function from fe_collection
-          //...individual element of fe_collection is fe_element
-          //fe element has no get_enrichments function
-          //fe enriched copied from this fe element has enrichment function
-          //but doesn't have the correct function
-
-          pcout << "Function set : \t ";
-          for (auto enrichment_function_array : functions)
-            for (auto func_component : enrichment_function_array)
-              if (func_component)
-                pcout << " X ";
-              else
-                pcout << " O ";
-
-          pcout << std::endl;
-        }
-    }
-
-    {
-      //test fe_collection
-      //fe_collection should look like this in the end
-      // {
-      //
-      //         auto func1 = [&]
-      //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
-      //           {
-      //               unsigned int id = cell->index();
-      //               return &vec_enrichments[cellwise_color_predicate_map[id][1]];
-      //           };
-      //
-      //         auto func2 = [&]
-      //           (const typename Triangulation<dim, dim>::cell_iterator & cell)
-      //           {
-      //               unsigned int id = cell->index();
-      //               return &vec_enrichments[cellwise_color_predicate_map[id][2]];
-      //           };
-      //
-      //       fe_collection_test.push_back
-      //         (FE_Enriched<dim> (&fe_base,
-      //                           {&fe_nothing, &fe_nothing},
-      //                           {{nullptr}, {nullptr}}));
-      //        fe_collection_test.push_back
-      //         (FE_Enriched<dim> (&fe_base,
-      //                           {&fe_enriched, &fe_nothing},
-      //                           {{func1}, {nullptr}}));
-      //        fe_collection_test.push_back
-      //         (FE_Enriched<dim> (&fe_base,
-      //                           {&fe_enriched, &fe_nothing},
-      //                           {{func2}, {nullptr}}));
-      //        fe_collection_test.push_back
-      //         (FE_Enriched<dim> (&fe_base,
-      //                           {&fe_enriched, &fe_enriched},
-      //                           {{func1}, {func2}}));
-      //
-      //
-      //
-      // pcout << "\n Printing fe collection test" << std::endl;
-      //
-      // for (unsigned int id = 0; id < fe_collection_test.size(); ++id)
-      // {
-      //   pcout << "Fe Set : " << fe_collection_test[id].get_name() << std::endl;
-      //
-      //   FE_Enriched<dim> fe_component(fe_collection_test[id]);
-      //   auto functions = fe_component.get_enrichments();
-      //
-      //   pcout << "Function set : \t ";
-      //   for (auto enrichment_function_array : functions)
-      //     for (auto func_component : enrichment_function_array)
-      //       if (func_component)
-      //         pcout << " X ";
-      //       else
-      //         pcout << " O ";
-      //
-      //   pcout << std::endl;
-      // }
-      // }
-//
-//     //simple fe collection
-//     {
-//
-// //       fe_collection_test.push_back (FE_Enriched<dim> (fe_base));
-//          static auto func = [&]
-//               (const typename Triangulation<dim, dim>::cell_iterator & cell)
-//               {
-//                   unsigned int id = cell->index();
-//                   pcout << " fe collection test "
-//                             << id << " : " << cellwise_color_predicate_map[id][1]
-//                             << std::endl;
-//                   return &vec_enrichments[cellwise_color_predicate_map[id][1]];
-//               };
-//
-//       fe_collection_test.push_back
-//         (FE_Enriched<dim> (&fe_base,
-//                            {&fe_nothing},
-//                            {{nullptr}}));
-//       fe_collection_test.push_back
-//         (FE_Enriched<dim> (&fe_base,
-//                            {&fe_enriched},
-//                            {{func}}));
-//      }
-    }
     pcout << "-----constructor complete" << std::endl;
-
-    {}
-
   }
 
   template <int dim>
@@ -553,17 +434,7 @@ namespace Step1
 
     GridTools::partition_triangulation (n_mpi_processes, triangulation);
 
-    // for (unsigned int i = 0; i < fe_collection.size(); ++i)
-    //   dummy_fe.push_back(FE_System<dim>(fe_base,fe_nothing,fe_nothing...); // <-- change this to FE_System(...) with same input as in FE_Enriched
-
-    // <-- change this to FE_System(...) with same input as in FE_Enriched
-    dummy_fe.push_back(FESystem<dim>(fe_base,fe_nothing,fe_nothing));
-    dummy_fe.push_back(FESystem<dim>(fe_base,fe_enriched,fe_nothing));
-    dummy_fe.push_back(FESystem<dim>(fe_base,fe_enriched,fe_enriched));
-    dummy_fe.push_back(FESystem<dim>(fe_base,fe_nothing,fe_enriched));
-
     dof_handler.distribute_dofs (fe_collection);
-    // dof_handler.distribute_dofs (dummy_fe);
 
     // //TODO renumbering screws up numbering of cell ids?
     // DoFRenumbering::subdomain_wise (dof_handler);
