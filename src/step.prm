@@ -2,3 +2,16 @@ subsection geometry
     set size = 2
     set Global refinement = 2
 end
+
+#end-of-dealii parser
+
+#num of enrichment predicates
+2
+
+#points for enrichment functions
+-1 1
+0 1
+
+#radii
+1
+1

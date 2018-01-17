@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------
+// -------------------------------------------
 //
 // Copyright (C) 2016 - 2017 by the deal.II authors
 //
@@ -11,7 +11,7 @@
 // The full text of the license can be found in the file LICENSE at
 // the top level of the deal.II distribution.
 //
-// ---------------------------------------------------------------------
+// -------------------------------------------
 
 
 #include <deal.II/base/utilities.h>
@@ -53,9 +53,9 @@
 
 #include "support.h"
 #include <string>
+#include <sstream>
 #include <fstream>
 
-//TODO need 3d test example?
 const unsigned int dim = 2;
 unsigned int patches = 10;
 
@@ -183,6 +183,9 @@ namespace Step1
     char **argv;
     int size;
     unsigned int global_refinement;
+    unsigned int n_enrichments;
+    std::vector<Point<dim>> points_enrichments;
+    std::vector<unsigned int> radii_enrichments;
     ParameterHandler prm;
 
     Triangulation<dim>  triangulation;
@@ -250,6 +253,8 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::read_parameters()
   {
+    pcout << "---Reading parameters" << std::endl;
+
     //declare parameters
     prm.enter_subsection("geometry");
     prm.declare_entry("size",
@@ -262,13 +267,95 @@ namespace Step1
 
     //parse parameter file
     AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
-    prm.parse_input(argv[1]);
+    prm.parse_input(argv[1], "#end-of-dealii parser");
 
     //get parameters
     prm.enter_subsection("geometry");
     size = prm.get_integer("size");
     global_refinement = prm.get_integer("Global refinement");
     prm.leave_subsection();
+
+    pcout << "Size : "<< size << std::endl;
+    pcout << "Global refinement : " << global_refinement << std::endl;
+
+    //manual parsing
+    //open parameter file
+    AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
+    std::ifstream prm_file(argv[1]);
+
+    //read lines until "#end-of-dealii parser" is reached
+    std::string line;
+    while (getline(prm_file,line))
+      if (line == "#end-of-dealii parser")
+        break;
+
+    AssertThrow(line == "#end-of-dealii parser",
+                ExcMessage("line missing in parameter file = \'#end-of-dealii parser\' "));
+
+    //function to read next line not starting with # or empty
+    auto skiplines = [&] ()
+    {
+      while (getline(prm_file,line))
+        {
+          if (line.size()==0 || line[0] == '#' || line[0] == ' ')
+            continue;
+          else
+            break;
+        }
+    };
+
+    std::stringstream s_stream;
+
+    //read num of enrichement points
+    skiplines();
+    s_stream.str(line);
+    s_stream >> n_enrichments;
+    pcout << "Number of enrichments : " << n_enrichments << std::endl;
+
+    //note vector of points
+    for (unsigned int i=0; i!=n_enrichments; ++i)
+      {
+        skiplines();
+        s_stream.clear();
+        s_stream.str(line);
+
+        if (dim==2)
+          {
+            double x,y;
+            s_stream >> x >> y;
+            points_enrichments.push_back({x,y});
+          }
+        else if (dim==3)
+          {
+            double x,y,z;
+            s_stream << x << y << z;
+            points_enrichments.push_back({x,y,z});
+          }
+        else
+          AssertThrow(false, ExcMessage("Dimension not implemented"));
+      }
+
+    pcout << "Enrichment points : " << std::endl;
+    for (auto p:points_enrichments)
+      pcout << p << std::endl;
+
+    //note vector of coefficients
+    for (unsigned int i=0; i!=n_enrichments; ++i)
+      {
+        skiplines();
+        s_stream.clear();
+        s_stream.str(line);
+
+        unsigned int r;
+        s_stream >> r;
+        radii_enrichments.push_back(r);
+      }
+
+    pcout << "Enrichment radii : " << std::endl;
+    for (auto r:radii_enrichments)
+      pcout << r << std::endl;
+
+    pcout << "---Parameter reading complete." << std::endl;
   }
 
   template <int dim>
@@ -287,26 +374,25 @@ namespace Step1
   {
     read_parameters();
 
-    pcout << "Size : "<< size << std::endl;
-    pcout << "Global refinement : " << global_refinement << std::endl;
-
     GridGenerator::hyper_cube (triangulation, -size, size);
     triangulation.refine_global (global_refinement);
 
+    Assert(points_enrichments.size()==n_enrichments &&
+           radii_enrichments.size()==n_enrichments,
+           ExcMessage("Incorrect number of enrichment points and radii"));
     //initialize vector of vec_predicates
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
-//    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
-    // FIXME: switch to using ParameterHandler (require .prm file as an argument
-    // section Solver
+    for (unsigned int i=0; i != n_enrichments; ++i)
+      {
+        vec_predicates.push_back( EnrichmentPredicate<dim>(points_enrichments[i],
+                                                           radii_enrichments[i]) );
+      }
+
+    //TODO
+    // Add section Solver to parameter file
     //   ..
     // end
     //
-    // #end-of-dealii parser <-- use this line to Parameter handler
-    // here do some simple parsing of points in any format, maybe
-    // <N_points>
-    // X1 Y1 Z1
-    // X2 Y2 Z2
+    // Add input function parser into enrichment functions
 
 
     //vector of enrichment functions
@@ -338,7 +424,6 @@ namespace Step1
     num_colors = color_predicates (dof_handler, vec_predicates, predicate_colors);
 
     {
-      //TODO comment
       //print color_indices
       for (unsigned int i=0; i<predicate_colors.size(); ++i)
         pcout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
@@ -428,7 +513,7 @@ namespace Step1
                                                  fe_nothing,
                                                  fe_collection,
                                                  function_array);
-    pcout << "-----constructor complete" << std::endl;
+    pcout << "---constructor complete" << std::endl;
   }
 
   template <int dim>
@@ -454,7 +539,7 @@ namespace Step1
         }
     }
 
-    pcout << "-----build tables complete" << std::endl;
+    pcout << "---build tables complete" << std::endl;
 
 
   }
@@ -513,7 +598,7 @@ namespace Step1
     // solution.reinit (locally_owned_dofs, mpi_communicator);
     // system_rhs.reinit (locally_owned_dofs, mpi_communicator);
 
-    pcout << "-----system set up complete" << std::endl;
+    pcout << "---system set up complete" << std::endl;
   }
 
 
@@ -592,7 +677,7 @@ namespace Step1
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
 
-    pcout << "-----assemble_system complete" << std::endl;
+    pcout << "---assemble_system complete" << std::endl;
 
   }
 
@@ -615,7 +700,7 @@ namespace Step1
 
     return solver_control.last_step();
 
-    pcout << "-----solve step complete" << std::endl;
+    pcout << "---solve step complete" << std::endl;
   }
 
   template <int dim>
@@ -742,7 +827,7 @@ namespace Step1
   void
   LaplaceProblem<dim>::run()
   {
-    //TODO cycle to be set to 4 after testing
+    //TODO need cyles?
     for (unsigned int cycle = 0; cycle < 1; ++cycle)
       {
         pcout << "Cycle "<<cycle <<std::endl;
@@ -788,12 +873,12 @@ int main (int argc,char **argv)
   catch (std::exception &exc)
     {
       std::cerr << std::endl   << std::endl
-                << "----------------------------------------------------"
+                << "--------------------------------"
                 << std::endl;
       std::cerr << "Exception on processing: " << std::endl
                 << exc.what() << std::endl
                 << "Aborting!" << std::endl
-                << "----------------------------------------------------"
+                << "--------------------------------"
                 << std::endl;
 
       return 1;
@@ -801,11 +886,11 @@ int main (int argc,char **argv)
   catch (...)
     {
       std::cerr << std::endl << std::endl
-                << "----------------------------------------------------"
+                << "--------------------------------"
                 << std::endl;
       std::cerr << "Unknown exception!" << std::endl
                 << "Aborting!" << std::endl
-                << "----------------------------------------------------"
+                << "--------------------------------"
                 << std::endl;
       return 1;
     };
