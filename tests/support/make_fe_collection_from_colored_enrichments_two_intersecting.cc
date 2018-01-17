@@ -56,7 +56,7 @@
 const unsigned int dim = 2;
 
 //uncomment when debugging
-#define DATA_OUT_FE_ENRICHED
+//#define DATA_OUT_FE_ENRICHED
 
 unsigned int patches = 10;
 

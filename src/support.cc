@@ -160,11 +160,8 @@ void make_fe_collection_from_colored_enrichments
  const FE_Q<dim> &fe_base,            //basic fe element
  const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
  const FE_Nothing<dim> &fe_nothing,
- hp::FECollection<dim> &fe_collection,
- std::vector<EnrichmentFunctionArray<dim>> &function_array)
+ hp::FECollection<dim> &fe_collection)
 {
-  function_array.clear();
-
   //define dummy function
   using cell_function = std::function<const Function<dim>*
                         (const typename Triangulation<dim>::cell_iterator &)>;
@@ -206,27 +203,14 @@ void make_fe_collection_from_colored_enrichments
 
       AssertDimension(vec_fe_enriched.size(), functions.size());
 
-      function_array.push_back(functions);
-
       FE_Enriched<dim> fe_component(&fe_base,
                                     vec_fe_enriched,
-                                    function_array.back());
+                                    functions);
 
       {
         //TODO delete after testing
         ConditionalOStream pcout
         (std::cout, (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0));
-
-        pcout << "Function set (compoenents) : \t ";
-        for (auto comp : set_components)
-          pcout << comp << " ";
-
-
-//        for (auto enrichment_function_array : functions )
-//          for (auto func_component : enrichment_function_array)
-//            pcout << "x ";
-
-        pcout << std::endl;
       }
 
       fe_collection.push_back (fe_component);
@@ -325,8 +309,7 @@ void make_fe_collection_from_colored_enrichments
   const FE_Q<2> &fe_base,            //basic fe element
   const FE_Q<2> &fe_enriched,        //fe element multiplied by enrichment function
   const FE_Nothing<2> &fe_nothing,
-  hp::FECollection<2> &fe_collection,
-  std::vector<EnrichmentFunctionArray<2>> &function_array);
+  hp::FECollection<2> &fe_collection);
 
 
 template
@@ -344,5 +327,4 @@ void make_fe_collection_from_colored_enrichments
   const FE_Q<3> &fe_base,            //basic fe element
   const FE_Q<3> &fe_enriched,        //fe element multiplied by enrichment function
   const FE_Nothing<3> &fe_nothing,
-  hp::FECollection<3> &fe_collection,
-  std::vector<EnrichmentFunctionArray<3>> &function_array);
+  hp::FECollection<3> &fe_collection);

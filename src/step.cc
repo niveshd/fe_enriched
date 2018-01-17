@@ -191,7 +191,6 @@ namespace Step1
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
 
-    std::vector<EnrichmentFunctionArray<dim>> function_array;
     hp::FECollection<dim> fe_collection;
     hp::QCollection<dim> q_collection;
 
@@ -511,8 +510,7 @@ namespace Step1
                                                  fe_base,
                                                  fe_enriched,
                                                  fe_nothing,
-                                                 fe_collection,
-                                                 function_array);
+                                                 fe_collection);
     pcout << "---constructor complete" << std::endl;
   }
 
