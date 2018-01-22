@@ -390,10 +390,8 @@ namespace Step1
     // Add section Solver to parameter file
     //   ..
     // end
-    //
-    // Add input function parser into enrichment functions
 
-
+    //TODO Add input function parser into enrichment functions
     //vector of enrichment functions
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
       {
