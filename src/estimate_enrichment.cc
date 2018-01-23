@@ -63,22 +63,13 @@ void EstimateEnrichmentFunction<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
   GridGenerator::hyper_cube (triangulation, -50*sigma, 50*sigma);
-  triangulation.refine_global (10);
-  std::cout << "   Number of active cells: "
-            << triangulation.n_active_cells()
-            << std::endl
-            << "   Total number of cells: "
-            << triangulation.n_cells()
-            << std::endl;
+  triangulation.refine_global (5);
 }
 
 template <int dim>
 void EstimateEnrichmentFunction<dim>::setup_system ()
 {
   dof_handler.distribute_dofs (fe);
-  std::cout << "   Number of degrees of freedom: "
-            << dof_handler.n_dofs()
-            << std::endl;
   DynamicSparsityPattern dsp(dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern (dof_handler, dsp);
   sparsity_pattern.copy_from(dsp);
@@ -111,20 +102,19 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
         {
           double radius = center.distance(fe_values.quadrature_point(q_index));
           AssertThrow(radius != 0, ExcMessage("Radius is zero"));
-          double factor = -(1.0/radius);
 
-          //-u_xx-1/x*u_x = f form converts to
-          // (-u_xx, v) - (1/x) * (u_x,v) = (f,v)
+          //-1/r (r*u_r) = f form converts to
+          // r(u_r, v_r) = (r*f,v)
           for (unsigned int i=0; i<dofs_per_cell; ++i)
             {
               for (unsigned int j=0; j<dofs_per_cell; ++j)
                 cell_matrix(i,j) += (radius*
-                                    fe_values.shape_grad (i, q_index) *
-                                    fe_values.shape_grad (j, q_index)
+                                     fe_values.shape_grad (i, q_index) *
+                                     fe_values.shape_grad (j, q_index)
                                     )*fe_values.JxW (q_index);
               cell_rhs(i) += radius*(fe_values.shape_value (i, q_index) *
-                              right_hand_side.value (fe_values.quadrature_point (q_index)) *
-                              fe_values.JxW (q_index));
+                                     right_hand_side.value (fe_values.quadrature_point (q_index)) *
+                                     fe_values.JxW (q_index));
             }
         }
       cell->get_dof_indices (local_dof_indices);
@@ -162,9 +152,7 @@ void EstimateEnrichmentFunction<dim>::solve ()
   SolverCG<>              solver (solver_control);
   solver.solve (system_matrix, solution, system_rhs,
                 PreconditionIdentity());
-  std::cout << "   " << solver_control.last_step()
-            << " CG iterations needed to obtain convergence."
-            << std::endl;
+
 }
 
 template <int dim>
@@ -183,9 +171,34 @@ void EstimateEnrichmentFunction<dim>::run ()
 {
   std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
   make_grid();
-  setup_system ();
-  assemble_system ();
-  solve ();
+
+  double old_value=0, value=1, relative_change = 1;
+  int cycles = 0;
+  bool start = true;
+  do
+    {
+      triangulation.refine_global (1);
+      ++cycles;
+      setup_system ();
+      assemble_system ();
+      solve ();
+
+      value = VectorTools::point_value(dof_handler, solution, Point<dim>(0));
+      if (!start)
+        {
+          relative_change = fabs((old_value - value)/old_value);
+          old_value = value;
+        }
+      start = false;
+    }
+  while (relative_change > 0.001);
+
+  std::cout << "point value at origin = "
+            << value
+            << " after additional cycles "
+            << cycles
+            << std::endl;
+
   output_results ();
 }
 

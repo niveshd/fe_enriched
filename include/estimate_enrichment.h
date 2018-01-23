@@ -22,6 +22,7 @@
 #include <deal.II/numerics/data_out.h>
 #include <fstream>
 #include <iostream>
+#include <math.h>
 #include <deal.II/base/logstream.h>
 
 using namespace dealii;

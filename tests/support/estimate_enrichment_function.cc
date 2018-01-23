@@ -113,21 +113,13 @@ void PoissonSolver<dim>::make_grid ()
   static SphericalManifold<dim> spherical_manifold(center);
   triangulation.set_manifold(0,spherical_manifold);
 
-  triangulation.refine_global (4);
-  std::cout << "   Number of active cells: "
-            << triangulation.n_active_cells()
-            << std::endl
-            << "   Total number of cells: "
-            << triangulation.n_cells()
-            << std::endl;
+  triangulation.refine_global (5);
 }
+
 template <int dim>
 void PoissonSolver<dim>::setup_system ()
 {
   dof_handler.distribute_dofs (fe);
-  std::cout << "   Number of degrees of freedom: "
-            << dof_handler.n_dofs()
-            << std::endl;
   DynamicSparsityPattern dsp(dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern (dof_handler, dsp);
   sparsity_pattern.copy_from(dsp);
@@ -135,6 +127,7 @@ void PoissonSolver<dim>::setup_system ()
   solution.reinit (dof_handler.n_dofs());
   system_rhs.reinit (dof_handler.n_dofs());
 }
+
 template <int dim>
 void PoissonSolver<dim>::assemble_system ()
 {
@@ -188,14 +181,12 @@ void PoissonSolver<dim>::assemble_system ()
 template <int dim>
 void PoissonSolver<dim>::solve ()
 {
-  SolverControl           solver_control (1000, 1e-12);
+  SolverControl           solver_control (10000, 1e-12);
   SolverCG<>              solver (solver_control);
   solver.solve (system_matrix, solution, system_rhs,
                 PreconditionIdentity());
-  std::cout << "   " << solver_control.last_step()
-            << " CG iterations needed to obtain convergence."
-            << std::endl;
 }
+
 template <int dim>
 void PoissonSolver<dim>::output_results () const
 {
@@ -203,21 +194,48 @@ void PoissonSolver<dim>::output_results () const
   data_out.attach_dof_handler (dof_handler);
   data_out.add_data_vector (solution, "solution");
   data_out.build_patches ();
-  std::ofstream output (dim == 2 ?
-                        "solution-2d.vtk" :
-                        "solution-3d.vtk");
+  std::ofstream output ("solution-2d.vtk");
   data_out.write_vtk (output);
 }
+
 template <int dim>
 void PoissonSolver<dim>::run ()
 {
   std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
   make_grid();
-  setup_system ();
-  assemble_system ();
-  solve ();
+
+  double old_value=0, value=1, relative_change = 1;
+  int cycles = 0;
+  bool start = true;
+  do
+    {
+      triangulation.refine_global (1);
+      ++cycles;
+      setup_system ();
+      assemble_system ();
+      solve ();
+
+      value = VectorTools::point_value(dof_handler, solution, Point<dim>(0,0));
+      if (!start)
+        {
+          relative_change = fabs((old_value - value)/old_value);
+          old_value = value;
+        }
+      start = false;
+    }
+  while (relative_change > 0.001);
+
+  std::cout << "point value at origin = "
+            << value
+            << " after additional cycles "
+            << cycles
+            << std::endl;
+
   output_results ();
 }
+
+
+
 int main ()
 {
   deallog.depth_console (0);
@@ -229,6 +247,5 @@ int main ()
     EstimateEnrichmentFunction<1> estimator(Point<1>(0), 1);
     estimator.run();
   }
-
   return 0;
 }
