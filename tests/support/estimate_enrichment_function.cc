@@ -22,12 +22,16 @@
 #include <fstream>
 #include <iostream>
 #include <deal.II/base/logstream.h>
+
+#include <estimate_enrichment.h>
+
 using namespace dealii;
+
 template <int dim>
-class estimate_enrichment_function
+class PoissonSolver
 {
 public:
-  estimate_enrichment_function (Point<dim> center, double sigma);
+  PoissonSolver (Point<dim> center, double sigma);
   void run ();
 private:
   void make_grid ();
@@ -45,7 +49,6 @@ private:
   Vector<double>       solution;
   Vector<double>       system_rhs;
 };
-
 
 
 template <int dim>
@@ -93,8 +96,8 @@ double BoundaryValues<dim>::value (const Point<dim> &p,
 
 
 template <int dim>
-estimate_enrichment_function<dim>::estimate_enrichment_function
-  (Point<dim> center, double sigma)
+PoissonSolver<dim>::PoissonSolver
+(Point<dim> center, double sigma)
   :
   center(center),
   sigma(sigma),
@@ -102,7 +105,7 @@ estimate_enrichment_function<dim>::estimate_enrichment_function
   dof_handler (triangulation)
 {}
 template <int dim>
-void estimate_enrichment_function<dim>::make_grid ()
+void PoissonSolver<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
   GridGenerator::hyper_ball (triangulation, center, 50*sigma);
@@ -119,7 +122,7 @@ void estimate_enrichment_function<dim>::make_grid ()
             << std::endl;
 }
 template <int dim>
-void estimate_enrichment_function<dim>::setup_system ()
+void PoissonSolver<dim>::setup_system ()
 {
   dof_handler.distribute_dofs (fe);
   std::cout << "   Number of degrees of freedom: "
@@ -133,7 +136,7 @@ void estimate_enrichment_function<dim>::setup_system ()
   system_rhs.reinit (dof_handler.n_dofs());
 }
 template <int dim>
-void estimate_enrichment_function<dim>::assemble_system ()
+void PoissonSolver<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
   const RightHandSide<dim> right_hand_side(center,sigma);
@@ -183,7 +186,7 @@ void estimate_enrichment_function<dim>::assemble_system ()
                                       system_rhs);
 }
 template <int dim>
-void estimate_enrichment_function<dim>::solve ()
+void PoissonSolver<dim>::solve ()
 {
   SolverControl           solver_control (1000, 1e-12);
   SolverCG<>              solver (solver_control);
@@ -194,7 +197,7 @@ void estimate_enrichment_function<dim>::solve ()
             << std::endl;
 }
 template <int dim>
-void estimate_enrichment_function<dim>::output_results () const
+void PoissonSolver<dim>::output_results () const
 {
   DataOut<dim> data_out;
   data_out.attach_dof_handler (dof_handler);
@@ -206,7 +209,7 @@ void estimate_enrichment_function<dim>::output_results () const
   data_out.write_vtk (output);
 }
 template <int dim>
-void estimate_enrichment_function<dim>::run ()
+void PoissonSolver<dim>::run ()
 {
   std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
   make_grid();
@@ -219,10 +222,12 @@ int main ()
 {
   deallog.depth_console (0);
   {
-    estimate_enrichment_function<2> laplace_problem(Point<2>(0,0), 1);
-
+    PoissonSolver<2> laplace_problem(Point<2>(0,0), 1);
     //TODO make an enrichment function for 1D with changed laplace.
     laplace_problem.run ();
+
+    EstimateEnrichmentFunction<1> estimator(Point<1>(0), 1);
+    estimator.run();
   }
 
   return 0;

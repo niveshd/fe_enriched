@@ -1,7 +1,7 @@
 # src/CMakeLists.txt
 
 # set up shared library by hand:
-ADD_LIBRARY(support SHARED support.cc)
+ADD_LIBRARY(support SHARED support.cc estimate_enrichment.cc)
 DEAL_II_SETUP_TARGET(support)
 
 # set up executable with autopilot macro:
