@@ -33,6 +33,9 @@ class PoissonSolver
 public:
   PoissonSolver (Point<dim> center, double sigma);
   void run ();
+  void interpolate
+  (std::vector< double >  &interpolation_points,
+   std::vector< double >   &interpolation_values);
 private:
   void make_grid ();
   void setup_system();
@@ -201,7 +204,7 @@ void PoissonSolver<dim>::output_results () const
 template <int dim>
 void PoissonSolver<dim>::run ()
 {
-  std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
+//  std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
   make_grid();
 
   double old_value=0, value=1, relative_change = 1;
@@ -225,27 +228,62 @@ void PoissonSolver<dim>::run ()
     }
   while (relative_change > 0.001);
 
-  std::cout << "point value at origin = "
-            << value
-            << " after additional cycles "
-            << cycles
-            << std::endl;
+//  std::cout << "point value at origin = "
+//            << value
+//            << " after additional cycles "
+//            << cycles
+//            << std::endl;
 
   output_results ();
 }
 
 
 
+template <int dim>
+void PoissonSolver<dim>::interpolate
+(std::vector< double >  &interpolation_points,
+ std::vector< double >   &interpolation_values)
+{
+  unsigned int size = 50;
+  interpolation_points.reserve(size);
+  interpolation_values.reserve(size);
+
+  double h = sigma/size, x = 0;
+  for (unsigned int i = 0; i != size; ++i)
+    {
+      interpolation_points.push_back(x); //only x coordinate
+
+      double value = VectorTools::point_value(dof_handler, solution, Point<dim>(x,0));
+      interpolation_values.push_back(value);
+
+      x += h;
+    }
+}
+
+
 int main ()
 {
-  deallog.depth_console (0);
+  deallog.depth_console (1);
   {
-    PoissonSolver<2> laplace_problem(Point<2>(0,0), 1);
-    //TODO make an enrichment function for 1D with changed laplace.
-    laplace_problem.run ();
+    PoissonSolver<2> problem_2d(Point<2>(0,0), 1);
+    problem_2d.run ();
 
-    EstimateEnrichmentFunction<1> estimator(Point<1>(0), 1);
-    estimator.run();
+    std::vector<double> interpolation_points_2d, interpolation_values_2d;
+    problem_2d.interpolate(interpolation_points_2d,interpolation_values_2d);
+
+    EstimateEnrichmentFunction<1> problem_1d(Point<1>(0), 1);
+    problem_1d.run();
+
+    std::vector<double> interpolation_points_1d, interpolation_values_1d;
+    problem_1d.interpolate(interpolation_points_1d,interpolation_values_1d);
+
+    AssertDimension(interpolation_points_1d.size(),interpolation_points_2d.size());
+    AssertDimension(interpolation_values_1d.size(),interpolation_values_2d.size());
+    for (unsigned int i = 0; i != interpolation_points_1d.size(); ++i)
+      {
+        double error = interpolation_values_1d[i] - interpolation_values_2d[i];
+        deallog << "error_ok::" << (error<1e-3) << std::endl;
+      }
   }
   return 0;
 }

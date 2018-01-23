@@ -34,6 +34,9 @@ class EstimateEnrichmentFunction
 public:
   EstimateEnrichmentFunction (Point<dim> center, double sigma);
   void run ();
+  void interpolate
+  (std::vector< double >  &interpolation_points,
+   std::vector< double >   &interpolation_values);
 private:
   void make_grid ();
   void setup_system();

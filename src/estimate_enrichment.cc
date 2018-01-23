@@ -169,7 +169,7 @@ void EstimateEnrichmentFunction<dim>::output_results () const
 template <int dim>
 void EstimateEnrichmentFunction<dim>::run ()
 {
-  std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
+//  std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
   make_grid();
 
   double old_value=0, value=1, relative_change = 1;
@@ -193,15 +193,35 @@ void EstimateEnrichmentFunction<dim>::run ()
     }
   while (relative_change > 0.001);
 
-  std::cout << "point value at origin = "
-            << value
-            << " after additional cycles "
-            << cycles
-            << std::endl;
+//  std::cout << "point value at origin = "
+//            << value
+//            << " after additional cycles "
+//            << cycles
+//            << std::endl;
 
   output_results ();
 }
 
+template <int dim>
+void EstimateEnrichmentFunction<dim>::interpolate
+(std::vector< double >  &interpolation_points,
+ std::vector< double >   &interpolation_values)
+{
+  unsigned int size=50;
+  interpolation_points.reserve(size);
+  interpolation_values.reserve(size);
+
+  double h = sigma/size, x = 0;
+  for (unsigned int i = 0; i != size; ++i)
+    {
+      interpolation_points.push_back(x); //only x coordinate
+
+      double value = VectorTools::point_value(dof_handler, solution, Point<dim>(x));
+      interpolation_values.push_back(value);
+
+      x += h;
+    }
+}
 
 //instantiations
 template struct EstimateEnrichmentFunction<1>;
