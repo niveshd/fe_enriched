@@ -118,16 +118,11 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
           for (unsigned int i=0; i<dofs_per_cell; ++i)
             {
               for (unsigned int j=0; j<dofs_per_cell; ++j)
-                cell_matrix(i,j) += (
+                cell_matrix(i,j) += (radius*
                                     fe_values.shape_grad (i, q_index) *
                                     fe_values.shape_grad (j, q_index)
-                                    +
-                                    factor*
-                                    (fe_values.shape_value(i,q_index)*
-                                     fe_values.shape_grad(j,q_index))[0]
-//TODO BETTER WAY for 1d this converts a tensor<1,1> to a scalar!
                                     )*fe_values.JxW (q_index);
-              cell_rhs(i) += (fe_values.shape_value (i, q_index) *
+              cell_rhs(i) += radius*(fe_values.shape_value (i, q_index) *
                               right_hand_side.value (fe_values.quadrature_point (q_index)) *
                               fe_values.JxW (q_index));
             }
@@ -164,11 +159,11 @@ template <int dim>
 void EstimateEnrichmentFunction<dim>::solve ()
 {
   SolverControl           solver_control (10000, 1e-12);
-  SolverBicgstab<>              solver (solver_control);
+  SolverCG<>              solver (solver_control);
   solver.solve (system_matrix, solution, system_rhs,
                 PreconditionIdentity());
   std::cout << "   " << solver_control.last_step()
-            << " BICG iterations needed to obtain convergence."
+            << " CG iterations needed to obtain convergence."
             << std::endl;
 }
 
