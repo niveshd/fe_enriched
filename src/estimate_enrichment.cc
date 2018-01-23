@@ -23,7 +23,7 @@ namespace
                                     const unsigned int /*component*/) const
   {
     double return_value = 0.0;
-    return_value = exp(-p.distance_square(center)/sigma);
+    return_value = exp(-p.distance_square(center)/(sigma*sigma));
 
     return return_value;
   }
