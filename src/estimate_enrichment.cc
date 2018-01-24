@@ -56,13 +56,15 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
   sigma(sigma),
   fe (1),
   dof_handler (triangulation)
-{}
+{
+  AssertDimension(dim,1);
+}
 
 template <int dim>
 void EstimateEnrichmentFunction<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
-  GridGenerator::hyper_cube (triangulation, -50*sigma, 50*sigma);
+  GridGenerator::hyper_cube (triangulation, center[0]-50*sigma, center[0]+50*sigma);
   triangulation.refine_global (5);
 }
 
@@ -101,7 +103,6 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
       for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
         {
           double radius = center.distance(fe_values.quadrature_point(q_index));
-          AssertThrow(radius != 0, ExcMessage("Radius is zero"));
 
           //-1/r (r*u_r) = f form converts to
           // r(u_r, v_r) = (r*f,v)
@@ -211,17 +212,20 @@ void EstimateEnrichmentFunction<dim>::interpolate
   interpolation_points.reserve(size);
   interpolation_values.reserve(size);
 
-  double h = sigma/size, x = 0;
-  for (unsigned int i = 0; i != size; ++i)
+  double h = 2*sigma/size, x = center[0];
+  for (; x < 2*sigma; x += h)
     {
       interpolation_points.push_back(x); //only x coordinate
 
       double value = VectorTools::point_value(dof_handler, solution, Point<dim>(x));
       interpolation_values.push_back(value);
-
-      x += h;
     }
 }
 
+template <int dim>
+EstimateEnrichmentFunction<dim>::~EstimateEnrichmentFunction()
+{
+  triangulation.clear();
+}
 //instantiations
 template struct EstimateEnrichmentFunction<1>;

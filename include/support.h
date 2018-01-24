@@ -1,6 +1,7 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/conditional_ostream.h>
+#include <deal.II/base/function_cspline.h>
 
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_renumbering.h>
@@ -112,30 +113,45 @@ class EnrichmentFunction : public Function<dim>
 {
 public:
   EnrichmentFunction(const Point<dim> &origin,
-                     const double     &Z,
-                     const double     &radius)
+                     const double     &radius,
+                     const std::vector<double> &interpolation_points_1d,
+                     const std::vector<double> &interpolation_values_1d)
     : Function<dim>(1),
-      coefficient(1),
       origin(origin),
-      Z(Z),
-      radius(radius)
+      radius(radius),
+      interpolation_points(interpolation_points_1d),
+      interpolation_values(interpolation_values_1d),
+      cspline(interpolation_points, interpolation_values)
   {}
 
-  //constant function
-  EnrichmentFunction(const double coefficient)
-    : Function<dim>(1),
-      coefficient(coefficient),
-      origin(Point<dim>()),
-      Z(0), //exponent factor = 1
-      radius(1)
-  {}
+  EnrichmentFunction(EnrichmentFunction&& other)
+    :
+    origin(other.origin),
+    radius(other.radius),
+    interpolation_points(other.interpolation_points),
+    interpolation_values(other.interpolation_values),
+    cspline(interpolation_points,interpolation_values)
+  {
+  }
+
+  EnrichmentFunction(const EnrichmentFunction& other)
+    :
+    origin(other.origin),
+    radius(other.radius),
+    interpolation_points(other.interpolation_points),
+    interpolation_values(other.interpolation_values),
+    cspline(interpolation_points,interpolation_values)
+  {
+  }
+
+
 
   virtual double value(const Point<dim> &point,
                        const unsigned int component = 0) const
   {
     Tensor<1,dim> dist = point-origin;
     const double r = dist.norm();
-    return coefficient*std::exp(-Z*r);
+    return cspline.value(Point<1>(r));
   }
 
   //TODO remove?
@@ -155,25 +171,24 @@ public:
     Assert (r > 0.,
             ExcDivideByZero());
     dist/=r;
-    return -coefficient*Z*std::exp(-Z*r)*dist;
+    Assert(component == 0, ExcMessage("Not implemented"));
+    return cspline.gradient(Point<1>(r))[0]*dist;
   }
 
 private:
-  const double coefficient;
   /**
    * origin
    */
   const Point<dim> origin;
-
-  /**
-   * charge
-   */
-  const double Z;
-
   /**
    * enrichment radius
    */
   const double radius;
+  //
+  std::vector<double> interpolation_points;
+  std::vector<double> interpolation_values;
+  //enrichement function as CSpline based on radius
+  Functions::CSpline<1> cspline;
 };
 
 

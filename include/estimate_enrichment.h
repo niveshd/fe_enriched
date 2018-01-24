@@ -33,6 +33,7 @@ class EstimateEnrichmentFunction
 {
 public:
   EstimateEnrichmentFunction (Point<dim> center, double sigma);
+  ~EstimateEnrichmentFunction();
   void run ();
   void interpolate
   (std::vector< double >  &interpolation_points,

@@ -51,10 +51,12 @@
 #include <deal.II/lac/slepc_solver.h>
 #include <deal.II/base/parameter_handler.h>
 
-#include "support.h"
 #include <string>
 #include <sstream>
 #include <fstream>
+
+#include "support.h"
+#include "estimate_enrichment.h"
 
 const unsigned int dim = 2;
 unsigned int patches = 10;
@@ -393,10 +395,30 @@ namespace Step1
 
     //TODO Add input function parser into enrichment functions
     //vector of enrichment functions
+//    for (unsigned int i=0; i<vec_predicates.size(); ++i)
+//      {
+//        EnrichmentFunction<dim> func(10+i);  //constant function
+//        vec_enrichments.push_back( func );
+//      }
+
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
       {
-        EnrichmentFunction<dim> func(10+i);  //constant function
-        vec_enrichments.push_back( func );
+        //formulate a 1d problem with x coordinate and radius (i.e sigma)
+        double x = points_enrichments[i][0];
+        double radius = radii_enrichments[i];
+        EstimateEnrichmentFunction<1> problem_1d(Point<1>(x), radius);
+        problem_1d.run();
+        std::vector<double> interpolation_points_1d, interpolation_values_1d;
+        problem_1d.interpolate(interpolation_points_1d,interpolation_values_1d);
+        std::cout << "solved problem with " << x << ":" << radius << std::endl;
+
+        //construct enrichment function and push
+        EnrichmentFunction<dim> func(points_enrichments[i],
+                                     radii_enrichments[i],
+                                     interpolation_points_1d,
+                                     interpolation_values_1d);
+        vec_enrichments.push_back(func);
+
       }
 
     {

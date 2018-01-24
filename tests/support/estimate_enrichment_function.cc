@@ -23,7 +23,7 @@
 #include <iostream>
 #include <deal.II/base/logstream.h>
 
-#include <estimate_enrichment.h>
+#include "estimate_enrichment.h"
 
 using namespace dealii;
 
@@ -248,15 +248,13 @@ void PoissonSolver<dim>::interpolate
   interpolation_points.reserve(size);
   interpolation_values.reserve(size);
 
-  double h = sigma/size, x = 0;
-  for (unsigned int i = 0; i != size; ++i)
+  double h = 2*sigma/size, x = center[0];
+  for (; x < 2*sigma; x += h)
     {
       interpolation_points.push_back(x); //only x coordinate
 
       double value = VectorTools::point_value(dof_handler, solution, Point<dim>(x,0));
       interpolation_values.push_back(value);
-
-      x += h;
     }
 }
 
