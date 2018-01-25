@@ -124,6 +124,17 @@ public:
       cspline(interpolation_points, interpolation_values)
   {}
 
+  EnrichmentFunction(const Point<dim> &origin,
+                     const double &radius,
+                     const double& constant)
+    : Function<dim>(1),
+      origin(origin),
+      radius(radius),
+      interpolation_points({origin[0], origin[0]+radius, origin[0]+2*radius}),
+      interpolation_values({constant, constant, constant}),
+      cspline(interpolation_points, interpolation_values)
+  {}
+
   EnrichmentFunction(EnrichmentFunction &&other)
     :
     origin(other.origin),

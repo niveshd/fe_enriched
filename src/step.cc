@@ -411,7 +411,9 @@ namespace Step1
 //     const enrichment functions!
 //    for (unsigned int i=0; i<vec_predicates.size(); ++i)
 //      {
-//        EnrichmentFunction<dim> func(10+i);  //constant function
+//        EnrichmentFunction<dim> func(Point<2> (0,0),
+//                                     2,
+//                                     10+i);  //constant function
 //        vec_enrichments.push_back( func );
 //      }
 
