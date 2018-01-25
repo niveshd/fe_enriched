@@ -212,6 +212,9 @@ void EstimateEnrichmentFunction<dim>::interpolate
   interpolation_points.reserve(size);
   interpolation_values.reserve(size);
 
+  //x varies from 0 to 2*sigma.
+  //factor 2 because once a cell is decided to be enriched based on its center,
+  //its quadrature points can cause x to be twice!
   double h = 2*sigma/size, x = center[0];
   for (; x < 2*sigma; x += h)
     {

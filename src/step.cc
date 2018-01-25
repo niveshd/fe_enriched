@@ -249,6 +249,10 @@ namespace Step1
     Vector<float> color_output;
     Vector<float> active_fe_index;
 
+    //solver parameters
+    unsigned int max_iterations;
+    double tolerance;
+
   };
 
   template <int dim>
@@ -266,6 +270,15 @@ namespace Step1
                       Patterns::Integer(1));
     prm.leave_subsection();
 
+    prm.enter_subsection("solver");
+    prm.declare_entry("max iterations",
+                      "1000",
+                      Patterns::Integer(1));
+    prm.declare_entry("tolerance",
+                      "1e-8",
+                      Patterns::Double(0));
+    prm.leave_subsection();
+
     //parse parameter file
     AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
     prm.parse_input(argv[1], "#end-of-dealii parser");
@@ -276,8 +289,15 @@ namespace Step1
     global_refinement = prm.get_integer("Global refinement");
     prm.leave_subsection();
 
+    prm.enter_subsection("solver");
+    max_iterations = prm.get_integer("max iterations");
+    tolerance = prm.get_double("tolerance");
+    prm.leave_subsection();
+
     pcout << "Size : "<< size << std::endl;
     pcout << "Global refinement : " << global_refinement << std::endl;
+    pcout << "Max Iterations : " << max_iterations << std::endl;
+    pcout << "Tolerance : " << tolerance << std::endl;
 
     //manual parsing
     //open parameter file
@@ -388,13 +408,7 @@ namespace Step1
                                                            radii_enrichments[i]) );
       }
 
-    //TODO
-    // Add section Solver to parameter file
-    //   ..
-    // end
-
-    //TODO Add input function parser into enrichment functions
-    //vector of enrichment functions
+//     const enrichment functions!
 //    for (unsigned int i=0; i<vec_predicates.size(); ++i)
 //      {
 //        EnrichmentFunction<dim> func(10+i);  //constant function
@@ -440,7 +454,10 @@ namespace Step1
     }
 
     //make a sparsity pattern based on connections between regions
-    num_colors = color_predicates (dof_handler, vec_predicates, predicate_colors);
+    if (vec_predicates.size() != 0)
+      num_colors = color_predicates (dof_handler, vec_predicates, predicate_colors);
+    else
+      num_colors = 0;
 
     {
       //print color_indices
@@ -570,51 +587,50 @@ namespace Step1
 
     dof_handler.distribute_dofs (fe_collection);
 
-    // //TODO renumbering screws up numbering of cell ids?
-    // DoFRenumbering::subdomain_wise (dof_handler);
-    // //...
-    // //?
-    // std::vector<IndexSet> locally_owned_dofs_per_proc
-    //   = DoFTools::locally_owned_dofs_per_subdomain (dof_handler);
-    // locally_owned_dofs = locally_owned_dofs_per_proc[this_mpi_process];
-    // locally_relevant_dofs.clear();
-    // DoFTools::extract_locally_relevant_dofs (dof_handler,
-    //                                          locally_relevant_dofs);
-    // //?
-    //
-    // constraints.clear();
-    // constraints.reinit (locally_relevant_dofs);
-    // DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
-    // //TODO  crashing here!
-    // VectorTools::interpolate_boundary_values (dof_handler,
-    //                                           0,
-    //                                           Functions::ZeroFunction<dim> (1),
-    //                                           constraints);
-    // constraints.close ();
-    //
-    // // Initialise the stiffness and mass matrices
-    // DynamicSparsityPattern dsp (locally_relevant_dofs);
-    // DoFTools::make_sparsity_pattern (dof_handler, dsp,
-    //                                  constraints,
-    //                                  false);
-    // ...
-    // std::vector<types::global_dof_index> n_locally_owned_dofs(n_mpi_processes);
-    // for (unsigned int i = 0; i < n_mpi_processes; ++i)
-    //   n_locally_owned_dofs[i] = locally_owned_dofs_per_proc[i].n_elements();
-    //
-    // SparsityTools::distribute_sparsity_pattern
-    // (dsp,
-    //  n_locally_owned_dofs,
-    //  mpi_communicator,
-    //  locally_relevant_dofs);
-    //
-    // system_matrix.reinit (locally_owned_dofs,
-    //                       locally_owned_dofs,
-    //                       dsp,
-    //                       mpi_communicator);
-    //
-    // solution.reinit (locally_owned_dofs, mpi_communicator);
-    // system_rhs.reinit (locally_owned_dofs, mpi_communicator);
+    //TODO renumbering screws up numbering of cell ids?
+    DoFRenumbering::subdomain_wise (dof_handler);
+    //...
+    //?
+    std::vector<IndexSet> locally_owned_dofs_per_proc
+      = DoFTools::locally_owned_dofs_per_subdomain (dof_handler);
+    locally_owned_dofs = locally_owned_dofs_per_proc[this_mpi_process];
+    locally_relevant_dofs.clear();
+    DoFTools::extract_locally_relevant_dofs (dof_handler,
+                                             locally_relevant_dofs);
+    //?
+
+    constraints.clear();
+    constraints.reinit (locally_relevant_dofs);
+    DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
+    //TODO  crashing here!
+    VectorTools::interpolate_boundary_values (dof_handler,
+                                              0,
+                                              Functions::ZeroFunction<dim> (1),
+                                              constraints);
+    constraints.close ();
+
+    // Initialise the stiffness and mass matrices
+    DynamicSparsityPattern dsp (locally_relevant_dofs);
+    DoFTools::make_sparsity_pattern (dof_handler, dsp,
+                                     constraints,
+                                     false);
+    std::vector<types::global_dof_index> n_locally_owned_dofs(n_mpi_processes);
+    for (unsigned int i = 0; i < n_mpi_processes; ++i)
+      n_locally_owned_dofs[i] = locally_owned_dofs_per_proc[i].n_elements();
+
+    SparsityTools::distribute_sparsity_pattern
+    (dsp,
+     n_locally_owned_dofs,
+     mpi_communicator,
+     locally_relevant_dofs);
+
+    system_matrix.reinit (locally_owned_dofs,
+                          locally_owned_dofs,
+                          dsp,
+                          mpi_communicator);
+
+    solution.reinit (locally_owned_dofs, mpi_communicator);
+    system_rhs.reinit (locally_owned_dofs, mpi_communicator);
 
     pcout << "---system set up complete" << std::endl;
   }
@@ -702,8 +718,8 @@ namespace Step1
   template <int dim>
   unsigned int LaplaceProblem<dim>::solve()
   {
-    SolverControl           solver_control (solution.size(),
-                                            1e-8*system_rhs.l2_norm());
+    SolverControl           solver_control (max_iterations,
+                                            tolerance);
     PETScWrappers::SolverCG cg (solver_control,
                                 mpi_communicator);
     PETScWrappers::PreconditionBlockJacobi preconditioner(system_matrix);
@@ -711,7 +727,7 @@ namespace Step1
               preconditioner);
 
     Vector<double> localized_solution (solution);
-    pcout << "local solution " << localized_solution.size() << ":" << solution.size() << std::endl;
+//    pcout << "local solution " << localized_solution.size() << ":" << solution.size() << std::endl;
 
     constraints.distribute (localized_solution);
     solution = localized_solution;
@@ -753,7 +769,7 @@ namespace Step1
 //     GridRefinement::refine (triangulation,
 //                             estimated_error_per_cell,
 //                             threshold);
-//
+
 //     triangulation.prepare_coarsening_and_refinement ();
 //     triangulation.execute_coarsening_and_refinement ();
   }
@@ -848,7 +864,7 @@ namespace Step1
     //TODO need cyles?
     for (unsigned int cycle = 0; cycle < 1; ++cycle)
       {
-        pcout << "Cycle "<<cycle <<std::endl;
+        pcout << "Cycle "<< cycle <<std::endl;
         setup_system ();
 
         pcout << "   Number of active cells:       "
@@ -860,14 +876,23 @@ namespace Step1
 
         plot_shape_function<dim>(dof_handler);
 
-//         assemble_system ();
-//         auto n_iterations = solve ();
-        //estimate_error ();
-//         output_results(cycle);
-        //refine_grid ();
-//         pcout << "Number of iterations " << n_iterations << std::endl;
+        assemble_system ();
+        auto n_iterations = solve ();
 
-        pcout << "step run complete" << std::endl;
+        //TODO Uncomment. correct function body
+//        estimate_error ();
+
+        output_results(cycle);
+
+        //TODO UNCOMMENT. correct function body
+//        refine_grid ();
+
+        //TODO COMMENT after uncommenting refine grid function
+        triangulation.refine_global(1);
+
+        pcout << "Number of iterations " << n_iterations << std::endl;
+
+        pcout << "---step run complete" << std::endl;
       }
   }
 }

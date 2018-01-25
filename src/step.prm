@@ -1,6 +1,11 @@
 subsection geometry
     set size = 2
-    set Global refinement = 2
+    set Global refinement = 4
+end
+
+subsection solver
+    set max iterations = 10000
+    set tolerance = 1e-8
 end
 
 #end-of-dealii parser

@@ -85,11 +85,11 @@ RightHandSide<dim>::RightHandSide () :
 template <int dim>
 inline
 void RightHandSide<dim>::value (const Point<dim> &p,
-                                double           &values) const
+                                double           &value) const
 {
   Assert (dim >= 2, ExcInternalError());
 
-  values = 1;
+  value = 100;
 }
 
 
@@ -124,7 +124,7 @@ public:
       cspline(interpolation_points, interpolation_values)
   {}
 
-  EnrichmentFunction(EnrichmentFunction&& other)
+  EnrichmentFunction(EnrichmentFunction &&other)
     :
     origin(other.origin),
     radius(other.radius),
@@ -134,7 +134,7 @@ public:
   {
   }
 
-  EnrichmentFunction(const EnrichmentFunction& other)
+  EnrichmentFunction(const EnrichmentFunction &other)
     :
     origin(other.origin),
     radius(other.radius),
