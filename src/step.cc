@@ -59,7 +59,7 @@
 #include "estimate_enrichment.h"
 
 const unsigned int dim = 2;
-unsigned int patches = 10;
+unsigned int patches = 15;
 
 template <int dim>
 void plot_shape_function
@@ -385,7 +385,7 @@ namespace Step1
     argc(argc),
     argv(argv),
     dof_handler (triangulation),
-    fe_base(2),
+    fe_base(1),
     fe_enriched(1),
     fe_nothing(1,true),
     mpi_communicator(MPI_COMM_WORLD),
@@ -408,7 +408,11 @@ namespace Step1
                                                            radii_enrichments[i]) );
       }
 
-//     const enrichment functions!
+    //set right hand side function
+    right_hand_side.set_points(Point<dim>());
+    right_hand_side.set_sigmas(1);
+
+//    //const enrichment functions!
 //    for (unsigned int i=0; i<vec_predicates.size(); ++i)
 //      {
 //        EnrichmentFunction<dim> func(Point<2> (0,0),
@@ -434,7 +438,6 @@ namespace Step1
                                      interpolation_points_1d,
                                      interpolation_values_1d);
         vec_enrichments.push_back(func);
-
       }
 
     {
@@ -530,6 +533,7 @@ namespace Step1
     }
 
     //q collections the same size as different material identities
+    //TODO in parameter file
     q_collection.push_back(QGauss<dim>(4));
 
     for (unsigned int i=1; i!=fe_sets.size(); ++i)
@@ -890,7 +894,7 @@ namespace Step1
 //        refine_grid ();
 
         //TODO COMMENT after uncommenting refine grid function
-        triangulation.refine_global(1);
+//        triangulation.refine_global(1);
 
         pcout << "Number of iterations " << n_iterations << std::endl;
 

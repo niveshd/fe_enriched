@@ -66,8 +66,12 @@ private:
 template <int dim>
 class RightHandSide :  public Function<dim>
 {
+  Point<dim> center;
+  double sigma;
 public:
   RightHandSide ();
+  void set_points(const Point<dim> &points);
+  void set_sigmas(const double &sigmas);
   virtual void value (const Point<dim> &p,
                       double   &values) const;
   virtual void value_list (const std::vector<Point<dim> > &points,
@@ -77,10 +81,28 @@ public:
 
 
 template <int dim>
-RightHandSide<dim>::RightHandSide () :
-  Function<dim> ()
+RightHandSide<dim>::RightHandSide ()
+  :
+  Function<dim> (),
+  center(Point<dim>()),
+  sigma(1)
 {}
 
+template <int dim>
+inline
+void RightHandSide<dim>::set_points(const Point<dim> &p)
+{
+  //TODO change to vector
+  center = p;
+}
+
+template <int dim>
+inline
+void RightHandSide<dim>::set_sigmas(const double &values)
+{
+  //TODO change to vector
+  sigma = values;
+}
 
 template <int dim>
 inline
@@ -88,8 +110,8 @@ void RightHandSide<dim>::value (const Point<dim> &p,
                                 double           &value) const
 {
   Assert (dim >= 2, ExcInternalError());
-
-  value = 100;
+  double r_squared = p.distance_square(center);
+  value = exp(-r_squared/(sigma*sigma));
 }
 
 
@@ -124,15 +146,24 @@ public:
       cspline(interpolation_points, interpolation_values)
   {}
 
+  //To be used only for debugging
   EnrichmentFunction(const Point<dim> &origin,
                      const double &radius,
-                     const double& constant)
-    : Function<dim>(1),
-      origin(origin),
-      radius(radius),
-      interpolation_points({origin[0], origin[0]+radius, origin[0]+2*radius}),
-      interpolation_values({constant, constant, constant}),
-      cspline(interpolation_points, interpolation_values)
+                     const double &constant)
+    :
+    Function<dim>(1),
+    origin(origin),
+    radius(radius),
+    interpolation_points({origin[0],
+                         origin[0]+radius,
+                         origin[0]+2*radius
+  }),
+  interpolation_values({constant,
+                        constant,
+                        constant
+                       }),
+  cspline(interpolation_points,
+          interpolation_values)
   {}
 
   EnrichmentFunction(EnrichmentFunction &&other)

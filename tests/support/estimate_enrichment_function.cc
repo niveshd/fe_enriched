@@ -228,11 +228,11 @@ void PoissonSolver<dim>::run ()
     }
   while (relative_change > 0.001);
 
-//  std::cout << "point value at origin = "
-//            << value
-//            << " after additional cycles "
-//            << cycles
-//            << std::endl;
+  std::cout << "point value at origin = "
+            << value
+            << " after additional cycles "
+            << cycles
+            << std::endl;
 
   output_results ();
 }
@@ -280,6 +280,7 @@ int main ()
     for (unsigned int i = 0; i != interpolation_points_1d.size(); ++i)
       {
         double error = interpolation_values_1d[i] - interpolation_values_2d[i];
+        std::cout << interpolation_values_1d[i] << std::endl;
         deallog << "error_ok::" << (error<1e-3) << std::endl;
       }
   }

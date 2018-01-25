@@ -194,11 +194,11 @@ void EstimateEnrichmentFunction<dim>::run ()
     }
   while (relative_change > 0.001);
 
-//  std::cout << "point value at origin = "
-//            << value
-//            << " after additional cycles "
-//            << cycles
-//            << std::endl;
+  std::cout << "point value at origin = "
+            << value
+            << " after additional cycles "
+            << cycles
+            << std::endl;
 
   output_results ();
 }
@@ -208,15 +208,15 @@ void EstimateEnrichmentFunction<dim>::interpolate
 (std::vector< double >  &interpolation_points,
  std::vector< double >   &interpolation_values)
 {
-  unsigned int size=50;
+  unsigned int size=10;
   interpolation_points.reserve(size);
   interpolation_values.reserve(size);
 
   //x varies from 0 to 2*sigma.
   //factor 2 because once a cell is decided to be enriched based on its center,
   //its quadrature points can cause x to be twice!
-  double h = 2*sigma/size, x = center[0];
-  for (; x < 2*sigma; x += h)
+  double h = sigma/2, x = center[0];
+  for (; x < center[0]+50*sigma; x += h)
     {
       interpolation_points.push_back(x); //only x coordinate
 
