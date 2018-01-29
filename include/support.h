@@ -62,85 +62,17 @@ private:
 };
 
 
-
-template <int dim>
-class RightHandSide :  public Function<dim>
-{
-  Point<dim> center;
-  double sigma;
-public:
-  RightHandSide ();
-  void set_points(const Point<dim> &points);
-  void set_sigmas(const double &sigmas);
-  virtual void value (const Point<dim> &p,
-                      double   &values) const;
-  virtual void value_list (const std::vector<Point<dim> > &points,
-                           std::vector<double >           &value_list) const;
-};
-
-
-
-template <int dim>
-RightHandSide<dim>::RightHandSide ()
-  :
-  Function<dim> (),
-  center(Point<dim>()),
-  sigma(1)
-{}
-
-template <int dim>
-inline
-void RightHandSide<dim>::set_points(const Point<dim> &p)
-{
-  //TODO change to vector
-  center = p;
-}
-
-template <int dim>
-inline
-void RightHandSide<dim>::set_sigmas(const double &values)
-{
-  //TODO change to vector
-  sigma = values;
-}
-
-template <int dim>
-inline
-void RightHandSide<dim>::value (const Point<dim> &p,
-                                double           &value) const
-{
-  Assert (dim >= 2, ExcInternalError());
-  double r_squared = p.distance_square(center);
-  value = exp(-r_squared/(sigma*sigma));
-}
-
-
-
-template <int dim>
-void RightHandSide<dim>::value_list (const std::vector<Point<dim> > &points,
-                                     std::vector<double >           &value_list) const
-{
-  const unsigned int n_points = points.size();
-
-  AssertDimension(points.size(), value_list.size());
-
-  for (unsigned int p=0; p<n_points; ++p)
-    RightHandSide<dim>::value (points[p],
-                               value_list[p]);
-}
-
-
 template <int dim>
 class EnrichmentFunction : public Function<dim>
 {
 public:
   EnrichmentFunction(const Point<dim> &origin,
-                     const double     &radius,
+                     const double     &sigma,
                      const std::vector<double> &interpolation_points_1d,
                      const std::vector<double> &interpolation_values_1d)
     : Function<dim>(1),
       origin(origin),
-      radius(radius),
+      sigma(sigma),
       interpolation_points(interpolation_points_1d),
       interpolation_values(interpolation_values_1d),
       cspline(interpolation_points, interpolation_values)
@@ -148,15 +80,15 @@ public:
 
   //To be used only for debugging
   EnrichmentFunction(const Point<dim> &origin,
-                     const double &radius,
+                     const double &sigma,
                      const double &constant)
     :
     Function<dim>(1),
     origin(origin),
-    radius(radius),
+    sigma(sigma),
     interpolation_points({origin[0],
-                         origin[0]+radius,
-                         origin[0]+2*radius
+                         origin[0]+25*sigma,
+                         origin[0]+50*sigma
   }),
   interpolation_values({constant,
                         constant,
@@ -169,7 +101,7 @@ public:
   EnrichmentFunction(EnrichmentFunction &&other)
     :
     origin(other.origin),
-    radius(other.radius),
+    sigma(other.sigma),
     interpolation_points(other.interpolation_points),
     interpolation_values(other.interpolation_values),
     cspline(interpolation_points,interpolation_values)
@@ -179,7 +111,7 @@ public:
   EnrichmentFunction(const EnrichmentFunction &other)
     :
     origin(other.origin),
-    radius(other.radius),
+    sigma(other.sigma),
     interpolation_points(other.interpolation_points),
     interpolation_values(other.interpolation_values),
     cspline(interpolation_points,interpolation_values)
@@ -199,7 +131,7 @@ public:
   //TODO remove?
   bool is_enriched(const Point<dim> &point) const
   {
-    if (origin.distance(point) < radius)
+    if (origin.distance(point) < sigma)
       return true;
     else
       return false;
@@ -225,7 +157,7 @@ private:
   /**
    * enrichment radius
    */
-  const double radius;
+  const double sigma;
   //
   std::vector<double> interpolation_points;
   std::vector<double> interpolation_values;

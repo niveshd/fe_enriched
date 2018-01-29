@@ -1,7 +1,7 @@
 #include <estimate_enrichment.h>
 
 //unnamed namespace
-namespace
+namespace EstimateEnrichment
 {
   template <int dim>
   class RightHandSide : public Function<dim>
@@ -54,6 +54,7 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
   :
   center(center),
   sigma(sigma),
+  refinement(5),
   fe (1),
   dof_handler (triangulation)
 {
@@ -65,7 +66,7 @@ void EstimateEnrichmentFunction<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
   GridGenerator::hyper_cube (triangulation, center[0]-50*sigma, center[0]+50*sigma);
-  triangulation.refine_global (5);
+  triangulation.refine_global (refinement);
 }
 
 template <int dim>
@@ -84,7 +85,7 @@ template <int dim>
 void EstimateEnrichmentFunction<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const RightHandSide<dim> right_hand_side(center,sigma);
+  const EstimateEnrichment::RightHandSide<dim> right_hand_side(center,sigma);
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
@@ -131,13 +132,13 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            BoundaryValues<dim>(),
+                                            EstimateEnrichment::BoundaryValues<dim>(),
                                             boundary_values);
   //TODO find a better way to do this!
   AssertDimension(dim,1);   //Here we assume a 1D problem
   VectorTools::interpolate_boundary_values (dof_handler,
                                             1,
-                                            BoundaryValues<dim>(),
+                                            EstimateEnrichment::BoundaryValues<dim>(),
                                             boundary_values);
 
   MatrixTools::apply_boundary_values (boundary_values,
@@ -163,7 +164,7 @@ void EstimateEnrichmentFunction<dim>::output_results () const
   data_out.attach_dof_handler (dof_handler);
   data_out.add_data_vector (solution, "solution");
   data_out.build_patches ();
-  std::ofstream output ("solution-estimate.vtk");
+  std::ofstream output ("solution-1d-estimate.vtk");
   data_out.write_vtk (output);
 }
 
@@ -178,7 +179,7 @@ void EstimateEnrichmentFunction<dim>::run ()
   bool start = true;
   do
     {
-      triangulation.refine_global (1);
+      triangulation.refine_global (1); ++refinement;
       ++cycles;
       setup_system ();
       assemble_system ();
@@ -188,16 +189,16 @@ void EstimateEnrichmentFunction<dim>::run ()
       if (!start)
         {
           relative_change = fabs((old_value - value)/old_value);
-          old_value = value;
         }
       start = false;
+      old_value = value;
     }
   while (relative_change > 0.001);
 
-  std::cout << "point value at origin = "
+  std::cout << "1D solution at origin = "
             << value
-            << " after additional cycles "
-            << cycles
+            << " after global refinement "
+            << refinement
             << std::endl;
 
   output_results ();
@@ -208,10 +209,6 @@ void EstimateEnrichmentFunction<dim>::interpolate
 (std::vector< double >  &interpolation_points,
  std::vector< double >   &interpolation_values)
 {
-  unsigned int size=10;
-  interpolation_points.reserve(size);
-  interpolation_values.reserve(size);
-
   //x varies from 0 to 2*sigma.
   //factor 2 because once a cell is decided to be enriched based on its center,
   //its quadrature points can cause x to be twice!

@@ -24,6 +24,8 @@
 #include <deal.II/base/logstream.h>
 
 #include "estimate_enrichment.h"
+#include "support.h"
+#include "../tests.h"
 
 using namespace dealii;
 
@@ -45,6 +47,7 @@ private:
   Point<dim> center;
   double sigma;
   Triangulation<dim>   triangulation;
+  unsigned int refinement;
   FE_Q<dim>            fe;
   DoFHandler<dim>      dof_handler;
   SparsityPattern      sparsity_pattern;
@@ -71,7 +74,7 @@ public:
 
 template <int dim>
 double RightHandSide<dim>::value (const Point<dim> &p,
-                                  const unsigned int /*component*/) const
+                           const unsigned int /*component*/) const
 {
   double return_value = 0.0;
   return_value = exp(-p.distance_square(center)/(sigma*sigma));
@@ -91,7 +94,7 @@ public:
 
 template <int dim>
 double BoundaryValues<dim>::value (const Point<dim> &p,
-                                   const unsigned int /*component*/) const
+                                      const unsigned int /*component*/) const
 {
   return 0; //TODO is the boundary value 0? just use constant function!
 }
@@ -104,6 +107,7 @@ PoissonSolver<dim>::PoissonSolver
   :
   center(center),
   sigma(sigma),
+  refinement(5),
   fe (1),
   dof_handler (triangulation)
 {}
@@ -212,7 +216,7 @@ void PoissonSolver<dim>::run ()
   bool start = true;
   do
     {
-      triangulation.refine_global (1);
+      triangulation.refine_global (1); ++refinement;
       ++cycles;
       setup_system ();
       assemble_system ();
@@ -222,16 +226,16 @@ void PoissonSolver<dim>::run ()
       if (!start)
         {
           relative_change = fabs((old_value - value)/old_value);
-          old_value = value;
         }
       start = false;
+      old_value = value;
     }
   while (relative_change > 0.001);
 
-  std::cout << "point value at origin = "
+  std::cout << "2D solution at origin = "
             << value
-            << " after additional cycles "
-            << cycles
+            << " after global refinement "
+            << refinement
             << std::endl;
 
   output_results ();
@@ -244,12 +248,8 @@ void PoissonSolver<dim>::interpolate
 (std::vector< double >  &interpolation_points,
  std::vector< double >   &interpolation_values)
 {
-  unsigned int size = 50;
-  interpolation_points.reserve(size);
-  interpolation_values.reserve(size);
-
-  double h = 2*sigma/size, x = center[0];
-  for (; x < 2*sigma; x += h)
+  double h = sigma/2, x = center[0];
+  for (; x < center[0]+50*sigma; x += h)
     {
       interpolation_points.push_back(x); //only x coordinate
 
@@ -259,30 +259,37 @@ void PoissonSolver<dim>::interpolate
 }
 
 
-int main ()
+int main (int argc, char **argv)
 {
-  deallog.depth_console (1);
-  {
-    PoissonSolver<2> problem_2d(Point<2>(0,0), 1);
-    problem_2d.run ();
+  //
+  double sigma = 1;
+  //solve 2d problem
+  PoissonSolver<2> problem_2d(Point<2>(0,0), sigma);
+  problem_2d.run ();
+  std::vector<double> interpolation_points_2d, interpolation_values_2d;
+  problem_2d.interpolate(interpolation_points_2d,interpolation_values_2d);
 
-    std::vector<double> interpolation_points_2d, interpolation_values_2d;
-    problem_2d.interpolate(interpolation_points_2d,interpolation_values_2d);
+  //solve 1d problem
+  EstimateEnrichmentFunction<1> problem_1d(Point<1>(0), sigma);
+  problem_1d.run();
+  std::vector<double> interpolation_points_1d, interpolation_values_1d;
+  problem_1d.interpolate(interpolation_points_1d,interpolation_values_1d);
 
-    EstimateEnrichmentFunction<1> problem_1d(Point<1>(0), 1);
-    problem_1d.run();
+  //Test if 1d and 2d solutions match
+  AssertDimension(interpolation_points_1d.size(),interpolation_points_2d.size());
+  AssertDimension(interpolation_values_1d.size(),interpolation_values_2d.size());
+  for (unsigned int i = 0; i != interpolation_points_1d.size(); ++i)
+    {
+      double error = interpolation_values_1d[i] - interpolation_values_2d[i];
+      deallog << "error_ok::" << (error<1e-3) << std::endl;
+    }
 
-    std::vector<double> interpolation_points_1d, interpolation_values_1d;
-    problem_1d.interpolate(interpolation_points_1d,interpolation_values_1d);
+  //cspline function within enrichment function
+  EnrichmentFunction<2> func(Point<2>(),
+                             sigma,
+                             interpolation_points_1d,
+                             interpolation_values_1d);
+//  for (int x=0; x<50*sigma)
 
-    AssertDimension(interpolation_points_1d.size(),interpolation_points_2d.size());
-    AssertDimension(interpolation_values_1d.size(),interpolation_values_2d.size());
-    for (unsigned int i = 0; i != interpolation_points_1d.size(); ++i)
-      {
-        double error = interpolation_values_1d[i] - interpolation_values_2d[i];
-        std::cout << interpolation_values_1d[i] << std::endl;
-        deallog << "error_ok::" << (error<1e-3) << std::endl;
-      }
-  }
   return 0;
 }

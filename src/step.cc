@@ -61,6 +61,76 @@
 const unsigned int dim = 2;
 unsigned int patches = 15;
 
+
+
+template <int dim>
+class RightHandSide :  public Function<dim>
+{
+  Point<dim> center;
+  double sigma;
+public:
+  RightHandSide ();
+  void set_points(const Point<dim> &points);
+  void set_sigmas(const double &sigmas);
+  virtual void value (const Point<dim> &p,
+                      double   &values) const;
+  virtual void value_list (const std::vector<Point<dim> > &points,
+                           std::vector<double >           &value_list) const;
+};
+
+
+
+template <int dim>
+RightHandSide<dim>::RightHandSide ()
+  :
+  Function<dim> (),
+  center(Point<dim>()),
+  sigma(1)
+{}
+
+template <int dim>
+inline
+void RightHandSide<dim>::set_points(const Point<dim> &p)
+{
+  //TODO change to vector
+  center = p;
+}
+
+template <int dim>
+inline
+void RightHandSide<dim>::set_sigmas(const double &values)
+{
+  //TODO change to vector
+  sigma = values;
+}
+
+template <int dim>
+inline
+void RightHandSide<dim>::value (const Point<dim> &p,
+                                double           &value) const
+{
+  Assert (dim >= 2, ExcInternalError());
+  double r_squared = p.distance_square(center);
+  value = exp(-r_squared/(sigma*sigma));
+}
+
+
+
+template <int dim>
+void RightHandSide<dim>::value_list (const std::vector<Point<dim> > &points,
+                                     std::vector<double >           &value_list) const
+{
+  const unsigned int n_points = points.size();
+
+  AssertDimension(points.size(), value_list.size());
+
+  for (unsigned int p=0; p<n_points; ++p)
+    RightHandSide<dim>::value (points[p],
+                               value_list[p]);
+}
+
+
+
 template <int dim>
 void plot_shape_function
 (hp::DoFHandler<dim> &dof_handler)

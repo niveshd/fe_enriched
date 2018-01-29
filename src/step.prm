@@ -11,13 +11,13 @@ end
 #end-of-dealii parser
 
 #num of enrichment predicates
-0
+1
 
 #points for enrichment functions
--1 0
-0 1
-#0 0
+#-1 0
+#0 1
+0 0
 
 #radii
-1
+#1
 1

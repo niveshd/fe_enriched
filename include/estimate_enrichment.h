@@ -47,6 +47,7 @@ private:
   Point<dim> center;
   double sigma;
   Triangulation<dim>   triangulation;
+  unsigned int refinement;
   FE_Q<dim>            fe;
   DoFHandler<dim>      dof_handler;
   SparsityPattern      sparsity_pattern;
