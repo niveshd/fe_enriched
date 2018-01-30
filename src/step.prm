@@ -1,6 +1,6 @@
 subsection geometry
-    set size = 2
-    set Global refinement = 2
+    set size = 100
+    set Global refinement = 7
 end
 
 subsection solver

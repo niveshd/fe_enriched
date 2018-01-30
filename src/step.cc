@@ -61,7 +61,7 @@
 const unsigned int dim = 2;
 unsigned int patches = 15;
 
-
+//#define DATA_OUT
 
 template <int dim>
 class RightHandSide :  public Function<dim>
@@ -253,7 +253,7 @@ namespace Step1
 
     int argc;
     char **argv;
-    int size;
+    double size;
     unsigned int global_refinement;
     unsigned int n_enrichments;
     std::vector<Point<dim>> points_enrichments;
@@ -355,7 +355,7 @@ namespace Step1
 
     //get parameters
     prm.enter_subsection("geometry");
-    size = prm.get_integer("size");
+    size = prm.get_double("size");
     global_refinement = prm.get_integer("Global refinement");
     prm.leave_subsection();
 
@@ -465,7 +465,7 @@ namespace Step1
   {
     read_parameters();
 
-    GridGenerator::hyper_cube (triangulation, -size, size);
+    GridGenerator::hyper_cube (triangulation, -size/2, size/2);
     triangulation.refine_global (global_refinement);
 
     Assert(points_enrichments.size()==n_enrichments &&
@@ -495,18 +495,28 @@ namespace Step1
       {
         //formulate a 1d problem with x coordinate and radius (i.e sigma)
         double x = points_enrichments[i][0];
-        double radius = radii_enrichments[i];
-        EstimateEnrichmentFunction<1> problem_1d(Point<1>(x), radius);
+        double sigma = radii_enrichments[i];
+        EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
+                                                 sigma,
+                                                 50);
         problem_1d.run();
-        std::vector<double> interpolation_points_1d, interpolation_values_1d;
-        problem_1d.interpolate(interpolation_points_1d,interpolation_values_1d);
-        std::cout << "solved problem with " << x << ":" << radius << std::endl;
+
+        //make points at which solution needs to interpolated
+        std::vector<double> interpolation_points_1D, interpolation_values_1D;
+        double factor = 2;
+        interpolation_points_1D.push_back(0);
+        for (double x = 0.25; x < 2*sigma; x*=factor)
+          interpolation_points_1D.push_back(x);
+        interpolation_points_1D.push_back(2*sigma);
+
+        problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+        std::cout << "solved problem with " << x << ":" << sigma << std::endl;
 
         //construct enrichment function and push
         EnrichmentFunction<dim> func(points_enrichments[i],
                                      radii_enrichments[i],
-                                     interpolation_points_1d,
-                                     interpolation_values_1d);
+                                     interpolation_points_1D,
+                                     interpolation_values_1D);
         vec_enrichments.push_back(func);
       }
 
@@ -556,6 +566,8 @@ namespace Step1
     //build fe table. should be called everytime number of cells change!
     build_tables();
 
+#ifdef DATA_OUT
+
     {
       //print fe index
       const std::string base_filename =
@@ -601,6 +613,7 @@ namespace Step1
 
       f << std::flush << "e" << std::endl;
     }
+#endif
 
     //q collections the same size as different material identities
     //TODO in parameter file
@@ -798,7 +811,8 @@ namespace Step1
                                             tolerance);
     PETScWrappers::SolverCG cg (solver_control,
                                 mpi_communicator);
-    PETScWrappers::PreconditionBlockJacobi preconditioner(system_matrix);
+//    PETScWrappers::PreconditionBoomerAMG preconditioner(system_matrix);
+    PETScWrappers::PreconditionJacobi preconditioner(system_matrix);
     cg.solve (system_matrix, solution, system_rhs,
               preconditioner);
 
@@ -884,7 +898,7 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::output_test ()
   {
-    std::string file_name = "output";
+    std::string file_name = "pre_solution";
 
 //     std::vector<Vector<float>> shape_funct(dof_handler.n_dofs(),
 //                                            Vector<float>(dof_handler.n_dofs()));
@@ -926,7 +940,7 @@ namespace Step1
             data_out.add_data_vector (shape_funct[i], "shape_funct_" + std::to_string(i));
         */
 
-        data_out.build_patches (); // <--- this is the one to additionally refine cells for output only
+        data_out.build_patches (); //TODO <--- this is the one to additionally refine cells for output only
         data_out.write_vtk (output);
       }
 
@@ -949,11 +963,12 @@ namespace Step1
               << "   Number of degrees of freedom: "
               << dof_handler.n_dofs ()
               << std::endl;
-
+#ifdef DATA_OUT
         plot_shape_function<dim>(dof_handler);
-
+#endif
         assemble_system ();
         auto n_iterations = solve ();
+        pcout << "Number of iterations " << n_iterations << std::endl;
 
         //TODO Uncomment. correct function body
 //        estimate_error ();
@@ -962,11 +977,6 @@ namespace Step1
 
         //TODO UNCOMMENT. correct function body
 //        refine_grid ();
-
-        //TODO COMMENT after uncommenting refine grid function
-//        triangulation.refine_global(1);
-
-        pcout << "Number of iterations " << n_iterations << std::endl;
 
         pcout << "---step run complete" << std::endl;
       }
@@ -981,10 +991,11 @@ int main (int argc,char **argv)
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
         Step1::LaplaceProblem<dim> step1(argc,argv);
-//         PETScWrappers::set_option_value("-eps_target","-1.0");
-//         PETScWrappers::set_option_value("-st_type","sinvert");
-//         PETScWrappers::set_option_value("-st_ksp_type","cg");
-//         PETScWrappers::set_option_value("-st_pc_type", "jacobi");
+        //TODO options not needed?
+        PETScWrappers::set_option_value("-eps_target","-1.0");
+        PETScWrappers::set_option_value("-st_type","sinvert");
+        PETScWrappers::set_option_value("-st_ksp_type","cg");
+        PETScWrappers::set_option_value("-st_pc_type", "jacobi");
         step1.run();
       }
 

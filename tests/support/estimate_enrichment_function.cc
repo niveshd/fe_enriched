@@ -33,11 +33,14 @@ template <int dim>
 class PoissonSolver
 {
 public:
-  PoissonSolver (Point<dim> center, double sigma);
+  PoissonSolver (Point<dim> center,
+                 double sigma,
+                 unsigned int domain_multiplier);
   void run ();
-  void interpolate
+  void evaluate_at_x_values
   (std::vector< double >  &interpolation_points,
    std::vector< double >   &interpolation_values);
+  double evaluate (const Point<dim> &p);
 private:
   void make_grid ();
   void setup_system();
@@ -46,6 +49,7 @@ private:
   void output_results () const;
   Point<dim> center;
   double sigma;
+  unsigned int domain_multiplier;
   Triangulation<dim>   triangulation;
   unsigned int refinement;
   FE_Q<dim>            fe;
@@ -74,7 +78,7 @@ public:
 
 template <int dim>
 double RightHandSide<dim>::value (const Point<dim> &p,
-                           const unsigned int /*component*/) const
+                                  const unsigned int /*component*/) const
 {
   double return_value = 0.0;
   return_value = exp(-p.distance_square(center)/(sigma*sigma));
@@ -94,7 +98,7 @@ public:
 
 template <int dim>
 double BoundaryValues<dim>::value (const Point<dim> &p,
-                                      const unsigned int /*component*/) const
+                                   const unsigned int /*component*/) const
 {
   return 0; //TODO is the boundary value 0? just use constant function!
 }
@@ -103,10 +107,13 @@ double BoundaryValues<dim>::value (const Point<dim> &p,
 
 template <int dim>
 PoissonSolver<dim>::PoissonSolver
-(Point<dim> center, double sigma)
+(Point<dim> center,
+ double sigma,
+ unsigned int domain_multiplier)
   :
   center(center),
   sigma(sigma),
+  domain_multiplier(domain_multiplier),
   refinement(5),
   fe (1),
   dof_handler (triangulation)
@@ -115,7 +122,7 @@ template <int dim>
 void PoissonSolver<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
-  GridGenerator::hyper_ball (triangulation, center, 50*sigma);
+  GridGenerator::hyper_ball (triangulation, center, domain_multiplier*sigma);
   triangulation.set_all_manifold_ids_on_boundary(0);
   static SphericalManifold<dim> spherical_manifold(center);
   triangulation.set_manifold(0,spherical_manifold);
@@ -216,7 +223,8 @@ void PoissonSolver<dim>::run ()
   bool start = true;
   do
     {
-      triangulation.refine_global (1); ++refinement;
+      triangulation.refine_global (1);
+      ++refinement;
       ++cycles;
       setup_system ();
       assemble_system ();
@@ -244,52 +252,89 @@ void PoissonSolver<dim>::run ()
 
 
 template <int dim>
-void PoissonSolver<dim>::interpolate
+void PoissonSolver<dim>::evaluate_at_x_values
 (std::vector< double >  &interpolation_points,
  std::vector< double >   &interpolation_values)
 {
-  double h = sigma/2, x = center[0];
-  for (; x < center[0]+50*sigma; x += h)
+  AssertDimension(interpolation_values.size(),0);
+  for (auto x:interpolation_points)
     {
-      interpolation_points.push_back(x); //only x coordinate
-
       double value = VectorTools::point_value(dof_handler, solution, Point<dim>(x,0));
       interpolation_values.push_back(value);
     }
 }
 
 
+template <int dim>
+double PoissonSolver<dim>::evaluate
+(const Point<dim> &p)
+{
+  return VectorTools::point_value(dof_handler, solution, p);
+}
+
+
 int main (int argc, char **argv)
 {
-  //
+  //calculate vector of points at which solution needs to be interpolated
   double sigma = 1;
+  double domain_multiplier = 50;
+  double left_bound = -domain_multiplier*sigma;
+  double right_bound = -left_bound;
+  std::vector<double> interpolation_points, interpolation_values_2D;
+  double factor = 2;
+  interpolation_points.push_back(0);
+  for (double x = 0.25; x < 2*sigma; x*=factor)
+    interpolation_points.push_back(x);
+  interpolation_points.push_back(2*sigma);
+//  for (double x = 10*sigma; x < right_bound; x+=10*sigma)
+//     interpolation_points.push_back(x);
+//  interpolation_points.push_back(right_bound);
+
   //solve 2d problem
-  PoissonSolver<2> problem_2d(Point<2>(0,0), sigma);
+  PoissonSolver<2> problem_2d(Point<2>(0,0), sigma, domain_multiplier);
   problem_2d.run ();
-  std::vector<double> interpolation_points_2d, interpolation_values_2d;
-  problem_2d.interpolate(interpolation_points_2d,interpolation_values_2d);
+  problem_2d.evaluate_at_x_values(interpolation_points,interpolation_values_2D);
 
   //solve 1d problem
-  EstimateEnrichmentFunction<1> problem_1d(Point<1>(0), sigma);
+  EstimateEnrichmentFunction<1> problem_1d(Point<1>(0), sigma, domain_multiplier);
   problem_1d.run();
-  std::vector<double> interpolation_points_1d, interpolation_values_1d;
-  problem_1d.interpolate(interpolation_points_1d,interpolation_values_1d);
+  std::vector<double> interpolation_values_1D;
+  problem_1d.evaluate_at_x_values(interpolation_points,interpolation_values_1D);
 
   //Test if 1d and 2d solutions match
-  AssertDimension(interpolation_points_1d.size(),interpolation_points_2d.size());
-  AssertDimension(interpolation_values_1d.size(),interpolation_values_2d.size());
-  for (unsigned int i = 0; i != interpolation_points_1d.size(); ++i)
+  AssertDimension(interpolation_values_1D.size(),interpolation_values_2D.size());
+  for (unsigned int i = 0; i != interpolation_points.size(); ++i)
     {
-      double error = interpolation_values_1d[i] - interpolation_values_2d[i];
+      double error = interpolation_values_1D[i] - interpolation_values_2D[i];
       deallog << "error_ok::" << (error<1e-3) << std::endl;
     }
 
   //cspline function within enrichment function
   EnrichmentFunction<2> func(Point<2>(),
                              sigma,
-                             interpolation_points_1d,
-                             interpolation_values_1d);
-//  for (int x=0; x<50*sigma)
+                             interpolation_points,
+                             interpolation_values_1D);
+  double max_error=0;
+  std::ofstream file("spline_accuracy.data", std::ios::out);
+  double h = sigma/100;
+  for (double x=0; x <= 2*sigma; x+=h)
+    {
+      double func_value = func.value(Point<2> (x,0));
+      double prob_value = problem_1d.value(Point<1> (x));
+      double relative_error = (func_value != 0) ? (func_value-prob_value)/func_value :
+                              0;
+      file << x
+           << " " << func_value
+           << " " << prob_value
+           << " " << relative_error
+           << std::endl;
+      max_error = (max_error < relative_error)?
+                  relative_error :
+                  max_error;
+    }
+
+  std::cout << "Max error due to spline approximation: " << max_error << std::endl;
+  file.close();
 
   return 0;
 }

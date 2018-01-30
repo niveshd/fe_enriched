@@ -32,12 +32,15 @@ template <int dim>
 class EstimateEnrichmentFunction
 {
 public:
-  EstimateEnrichmentFunction (Point<dim> center, double sigma);
+  EstimateEnrichmentFunction (Point<dim> center,
+                              double sigma,
+                              unsigned int domain_multiplier);
   ~EstimateEnrichmentFunction();
   void run ();
-  void interpolate
+  void evaluate_at_x_values
   (std::vector< double >  &interpolation_points,
    std::vector< double >   &interpolation_values);
+  double value (const Point<dim> &p);
 private:
   void make_grid ();
   void setup_system();
@@ -46,6 +49,7 @@ private:
   void output_results () const;
   Point<dim> center;
   double sigma;
+  unsigned int domain_multiplier;
   Triangulation<dim>   triangulation;
   unsigned int refinement;
   FE_Q<dim>            fe;

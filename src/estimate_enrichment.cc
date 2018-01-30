@@ -50,10 +50,11 @@ namespace EstimateEnrichment
 
 template <int dim>
 EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
-(Point<dim> center, double sigma)
+(Point<dim> center, double sigma, unsigned int domain_multiplier)
   :
   center(center),
   sigma(sigma),
+  domain_multiplier(domain_multiplier),
   refinement(5),
   fe (1),
   dof_handler (triangulation)
@@ -65,7 +66,9 @@ template <int dim>
 void EstimateEnrichmentFunction<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
-  GridGenerator::hyper_cube (triangulation, center[0]-50*sigma, center[0]+50*sigma);
+  GridGenerator::hyper_cube (triangulation,
+                             center[0]-domain_multiplier*sigma,
+                             center[0]+domain_multiplier*sigma);
   triangulation.refine_global (refinement);
 }
 
@@ -179,7 +182,8 @@ void EstimateEnrichmentFunction<dim>::run ()
   bool start = true;
   do
     {
-      triangulation.refine_global (1); ++refinement;
+      triangulation.refine_global (1);
+      ++refinement;
       ++cycles;
       setup_system ();
       assemble_system ();
@@ -205,21 +209,26 @@ void EstimateEnrichmentFunction<dim>::run ()
 }
 
 template <int dim>
-void EstimateEnrichmentFunction<dim>::interpolate
+void EstimateEnrichmentFunction<dim>::evaluate_at_x_values
 (std::vector< double >  &interpolation_points,
  std::vector< double >   &interpolation_values)
 {
+  AssertDimension(interpolation_values.size(),0);
   //x varies from 0 to 2*sigma.
   //factor 2 because once a cell is decided to be enriched based on its center,
   //its quadrature points can cause x to be twice!
-  double h = sigma/2, x = center[0];
-  for (; x < center[0]+50*sigma; x += h)
+  for (auto x:interpolation_points)
     {
-      interpolation_points.push_back(x); //only x coordinate
-
       double value = VectorTools::point_value(dof_handler, solution, Point<dim>(x));
       interpolation_values.push_back(value);
     }
+}
+
+template <int dim>
+double EstimateEnrichmentFunction<dim>::value
+(const Point<dim> &p)
+{
+  return VectorTools::point_value(dof_handler, solution, p);
 }
 
 template <int dim>
