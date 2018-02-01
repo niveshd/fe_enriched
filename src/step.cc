@@ -1,4 +1,4 @@
-// -------------------------------------------
+// ..........................................-
 //
 // Copyright (C) 2016 - 2017 by the deal.II authors
 //
@@ -11,7 +11,7 @@
 // The full text of the license can be found in the file LICENSE at
 // the top level of the deal.II distribution.
 //
-// -------------------------------------------
+// ..........................................-
 
 
 #include <deal.II/base/utilities.h>
@@ -135,6 +135,8 @@ template <int dim>
 void plot_shape_function
 (hp::DoFHandler<dim> &dof_handler)
 {
+  std::cout << "...plotting shape function" << std::endl;
+
   deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
   ConstraintMatrix constraints;
@@ -162,44 +164,47 @@ void plot_shape_function
       names.push_back(std::string("N_") +
                       dealii::Utilities::int_to_string(s,2));
 
-      // make continuous/constrain:
+      // make continuous/constraint:
       constraints.distribute(shape_function);
       shape_functions.push_back(shape_function);
-
-      //print support points
-      {
-        std::map<types::global_dof_index, Point<dim> > support_points;
-        MappingQ1<dim> mapping;
-        hp::MappingCollection<dim> hp_mapping;
-        for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
-          hp_mapping.push_back(mapping);
-        DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
-
-        const std::string base_filename =
-          "grid" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
-
-        const std::string filename = base_filename + ".gp";
-        std::ofstream f(filename.c_str());
-
-        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-          << "set output \"" << base_filename << ".png\"" << std::endl
-          << "set size square" << std::endl
-          << "set view equal xy" << std::endl
-          << "unset xtics                                                                                   " << std::endl
-          << "unset ytics" << std::endl
-          << "unset grid" << std::endl
-          << "unset border" << std::endl
-          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-        GridOut grid_out;
-        grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
-        f << "e" << std::endl;
-
-        DoFTools::write_gnuplot_dof_support_point_info(f,
-                                                       support_points);
-
-        f << "e" << std::endl;
-      }
     }
+
+  {
+    std::cout << "...printing support points" << std::endl;
+
+    std::map<types::global_dof_index, Point<dim> > support_points;
+    MappingQ1<dim> mapping;
+    hp::MappingCollection<dim> hp_mapping;
+    for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
+      hp_mapping.push_back(mapping);
+    DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
+
+    const std::string base_filename =
+      "grid" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+
+    const std::string filename = base_filename + ".gp";
+    std::ofstream f(filename.c_str());
+
+    f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+      << "set output \"" << base_filename << ".png\"" << std::endl
+      << "set size square" << std::endl
+      << "set view equal xy" << std::endl
+      << "unset xtics                                                                                   " << std::endl
+      << "unset ytics" << std::endl
+      << "unset grid" << std::endl
+      << "unset border" << std::endl
+      << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+    GridOut grid_out;
+    grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
+    f << "e" << std::endl;
+
+    DoFTools::write_gnuplot_dof_support_point_info(f,
+                                                   support_points);
+
+    f << "e" << std::endl;
+
+    std::cout << "...finished printing support points" << std::endl;
+  }
 
   DataOut<dim,hp::DoFHandler<dim>> data_out;
   data_out.attach_dof_handler (dof_handler);
@@ -223,6 +228,8 @@ void plot_shape_function
   std::string filename = "shape_functions.vtu";
   std::ofstream output (filename.c_str ());
   data_out.write_vtu (output);
+
+  std::cout << "...finished plotting shape functions" << std::endl;
 }
 
 
@@ -248,7 +255,7 @@ namespace Step1
     unsigned int solve ();
     void estimate_error ();
     void refine_grid ();
-    void output_results (const unsigned int cycle) const;
+    void output_results (const unsigned int cycle);
     void output_test ();  //change to const later
 
     int argc;
@@ -256,6 +263,7 @@ namespace Step1
     double size;
     unsigned int global_refinement;
     unsigned int n_enrichments;
+    unsigned int n_enriched_cells;
     std::vector<Point<dim>> points_enrichments;
     std::vector<unsigned int> radii_enrichments;
     ParameterHandler prm;
@@ -328,7 +336,7 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::read_parameters()
   {
-    pcout << "---Reading parameters" << std::endl;
+    pcout << "...reading parameters" << std::endl;
 
     //declare parameters
     prm.enter_subsection("geometry");
@@ -446,7 +454,7 @@ namespace Step1
     for (auto r:radii_enrichments)
       pcout << r << std::endl;
 
-    pcout << "---Parameter reading complete." << std::endl;
+    pcout << "...finished parameter reading." << std::endl;
   }
 
   template <int dim>
@@ -454,6 +462,7 @@ namespace Step1
     :
     argc(argc),
     argv(argv),
+    n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(1),
     fe_enriched(1),
@@ -463,6 +472,8 @@ namespace Step1
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0))
   {
+    std::cout << "...start constructor" << std::endl;
+
     read_parameters();
 
     GridGenerator::hyper_cube (triangulation, -size/2, size/2);
@@ -569,6 +580,8 @@ namespace Step1
 #ifdef DATA_OUT
 
     {
+      pcout << "...start print fe indices" << std::endl;
+
       //print fe index
       const std::string base_filename =
         "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
@@ -589,9 +602,12 @@ namespace Step1
         f << it->center() << " \"" << it->active_fe_index() << "\"\n";
 
       f << std::flush << "e" << std::endl;
+      pcout << "...finished print fe indices" << std::endl;
     }
 
     {
+      pcout << "...start print cell indices" << std::endl;
+
       //print cell ids
       const std::string base_filename =
         "cell_id" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
@@ -612,6 +628,8 @@ namespace Step1
         f << it->center() << " \"" << it->index() << "\"\n";
 
       f << std::flush << "e" << std::endl;
+
+      pcout << "...end print cell indices" << std::endl;
     }
 #endif
 
@@ -637,12 +655,13 @@ namespace Step1
                                                  fe_enriched,
                                                  fe_nothing,
                                                  fe_collection);
-    pcout << "---constructor complete" << std::endl;
+    pcout << "...finished constructor" << std::endl;
   }
 
   template <int dim>
   void LaplaceProblem<dim>::build_tables ()
   {
+    pcout << "...start build tables" << std::endl;
     set_cellwise_color_set_and_fe_index (dof_handler,
                                          vec_predicates,
                                          predicate_colors,
@@ -663,7 +682,7 @@ namespace Step1
         }
     }
 
-    pcout << "---build tables complete" << std::endl;
+    pcout << "...finish build tables" << std::endl;
 
 
   }
@@ -671,6 +690,7 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::setup_system ()
   {
+    pcout << "...start setup system" << std::endl;
 
     GridTools::partition_triangulation (n_mpi_processes, triangulation);
 
@@ -721,7 +741,7 @@ namespace Step1
     solution.reinit (locally_owned_dofs, mpi_communicator);
     system_rhs.reinit (locally_owned_dofs, mpi_communicator);
 
-    pcout << "---system set up complete" << std::endl;
+    pcout << "...finished setup system" << std::endl;
   }
 
 
@@ -729,6 +749,8 @@ namespace Step1
   void
   LaplaceProblem<dim>::assemble_system()
   {
+    pcout << "...assemble system" << std::endl;
+
     system_matrix = 0;
     system_rhs = 0;
 
@@ -800,13 +822,15 @@ namespace Step1
     system_matrix.compress (VectorOperation::add);
     system_rhs.compress (VectorOperation::add);
 
-    pcout << "---assemble_system complete" << std::endl;
+    pcout << "...finished assemble system" << std::endl;
 
   }
 
   template <int dim>
   unsigned int LaplaceProblem<dim>::solve()
   {
+    pcout << "...solving" << std::endl;
+
     SolverControl           solver_control (max_iterations,
                                             tolerance);
     PETScWrappers::SolverCG cg (solver_control,
@@ -824,7 +848,7 @@ namespace Step1
 
     return solver_control.last_step();
 
-    pcout << "---solve step complete" << std::endl;
+    pcout << "...finished solving" << std::endl;
   }
 
   template <int dim>
@@ -865,17 +889,23 @@ namespace Step1
   }
 
   template <int dim>
-  void LaplaceProblem<dim>::output_results (const unsigned int cycle) const
+  void LaplaceProblem<dim>::output_results (const unsigned int cycle)
   {
+    pcout << "...output results" << std::endl;
+
     Vector<float> fe_index(triangulation.n_active_cells());
     {
       typename hp::DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
+      n_enriched_cells = 0;
       for (unsigned int index=0; cell!=endc; ++cell, ++index)
         {
           fe_index(index) = cell->active_fe_index();
+          if (fe_index(index) != 0)
+            ++n_enriched_cells;
         }
+      pcout << "Number of enriched cells: " << n_enriched_cells << std::endl;
     }
 
     Assert (cycle < 10, ExcNotImplemented());
@@ -893,11 +923,15 @@ namespace Step1
         data_out.write_vtk (output);
         output.close();
       }
+
+    pcout << "...finished output results" << std::endl;
   }
 
   template <int dim>
   void LaplaceProblem<dim>::output_test ()
   {
+    pcout << "...output pre-solution" << std::endl;
+
     std::string file_name = "pre_solution";
 
 //     std::vector<Vector<float>> shape_funct(dof_handler.n_dofs(),
@@ -940,10 +974,10 @@ namespace Step1
             data_out.add_data_vector (shape_funct[i], "shape_funct_" + std::to_string(i));
         */
 
-        data_out.build_patches (); //TODO <--- this is the one to additionally refine cells for output only
+        data_out.build_patches (); //TODO <... this is the one to additionally refine cells for output only
         data_out.write_vtk (output);
       }
-
+    pcout << "...finished output pre-solution" << std::endl;
   }
 
 
@@ -951,6 +985,8 @@ namespace Step1
   void
   LaplaceProblem<dim>::run()
   {
+    pcout << "...run problem" << std::endl;
+
     //TODO need cyles?
     for (unsigned int cycle = 0; cycle < 1; ++cycle)
       {
@@ -978,8 +1014,9 @@ namespace Step1
         //TODO UNCOMMENT. correct function body
 //        refine_grid ();
 
-        pcout << "---step run complete" << std::endl;
+        pcout << "...step run complete" << std::endl;
       }
+    pcout << "...finished run problem" << std::endl;
   }
 }
 
@@ -1003,12 +1040,12 @@ int main (int argc,char **argv)
   catch (std::exception &exc)
     {
       std::cerr << std::endl   << std::endl
-                << "--------------------------------"
+                << "..............................--"
                 << std::endl;
       std::cerr << "Exception on processing: " << std::endl
                 << exc.what() << std::endl
                 << "Aborting!" << std::endl
-                << "--------------------------------"
+                << "..............................--"
                 << std::endl;
 
       return 1;
@@ -1016,11 +1053,11 @@ int main (int argc,char **argv)
   catch (...)
     {
       std::cerr << std::endl << std::endl
-                << "--------------------------------"
+                << "..............................--"
                 << std::endl;
       std::cerr << "Unknown exception!" << std::endl
                 << "Aborting!" << std::endl
-                << "--------------------------------"
+                << "..............................--"
                 << std::endl;
       return 1;
     };
