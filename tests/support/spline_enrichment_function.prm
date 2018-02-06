@@ -1,0 +1,26 @@
+subsection geometry
+    set size = 100
+    set Global refinement = 7
+end
+
+#normal size, r = 100, 7
+#test   4,2
+
+subsection solver
+    set max iterations = 10000
+    set tolerance = 1e-8
+end
+
+#end-of-dealii parser
+
+#num of enrichment predicates
+1
+
+#points for enrichment functions
+#-1 0
+#0 1
+0 0
+
+#radii
+#1
+1

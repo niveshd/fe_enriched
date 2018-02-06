@@ -1,6 +1,8 @@
 #ifndef SOLVER_H
 #define SOLVER_H
 
+#include <set>
+
 unsigned int patches = 10;
 #define DATA_OUT
 
@@ -82,30 +84,38 @@ void plot_shape_function
   dealii::DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
   constraints.close ();
 
+  //find set of dofs which belong to enriched cells
+  std::set<unsigned int> enriched_cell_dofs;
+  for (auto cell : dof_handler.active_cell_iterators())
+    if (cell->active_fe_index() != 0)
+      {
+        unsigned int dofs_per_cell = cell->get_fe().dofs_per_cell;
+        std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+        cell->get_dof_indices(local_dof_indices);
+        enriched_cell_dofs.insert(local_dof_indices.begin(), local_dof_indices.end());
+      }
+
   // output to check if all is good:
   std::vector<Vector<double>> shape_functions;
   std::vector<std::string> names;
-  for (unsigned int s=0; s < dof_handler.n_dofs(); s++)
+  for (auto dof : enriched_cell_dofs)
     {
       Vector<double> shape_function;
       shape_function.reinit(dof_handler.n_dofs());
-      shape_function[s] = 1.0;
+      shape_function[dof] = 1.0;
 
       // if the dof is constrained, first output unconstrained vector
-      if (constraints.is_constrained(s))
-        {
-          names.push_back(std::string("UN_") +
-                          dealii::Utilities::int_to_string(s,2));
+          names.push_back(std::string("C_") +
+                          dealii::Utilities::int_to_string(dof,2));
           shape_functions.push_back(shape_function);
-        }
 
-      names.push_back(std::string("N_") +
-                      dealii::Utilities::int_to_string(s,2));
+//      names.push_back(std::string("UC_") +
+//                      dealii::Utilities::int_to_string(s,2));
 
-      // make continuous/constraint:
-      constraints.distribute(shape_function);
-      shape_functions.push_back(shape_function);
-    }
+//      // make continuous/constraint:
+//      constraints.distribute(shape_function);
+//      shape_functions.push_back(shape_function);
+}
 
   {
     std::cout << "...printing support points" << std::endl;
@@ -187,12 +197,14 @@ namespace Step1
     void run ();
 
   protected:
-    void read_parameters();
-    void build_tables ();
+    void build_fe_space();
+    virtual void make_enrichment_function();
     void setup_system ();
-    void output_cell_attributes ();  //change to const later
 
   private:
+    void read_parameters();
+    void build_tables ();
+    void output_cell_attributes ();  //change to const later
     void assemble_system ();
     unsigned int solve ();
     void estimate_error ();
@@ -269,6 +281,51 @@ namespace Step1
     unsigned int max_iterations;
     double tolerance;
   };
+
+
+
+  template <int dim>
+  LaplaceProblem<dim>::LaplaceProblem (int argc,char **argv)
+    :
+    argc(argc),
+    argv(argv),
+    n_enriched_cells(0),
+    dof_handler (triangulation),
+    fe_base(1),
+    fe_enriched(1),
+    fe_nothing(1,true),
+    mpi_communicator(MPI_COMM_WORLD),
+    n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
+    this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
+    pcout (std::cout, (this_mpi_process == 0))
+  {
+    std::cout << "...start constructor" << std::endl;
+
+    read_parameters();
+
+    //set up basic grid
+    GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
+    triangulation.refine_global (global_refinement);
+
+    Assert(points_enrichments.size()==n_enrichments &&
+           radii_enrichments.size()==n_enrichments,
+           ExcMessage("Incorrect number of enrichment points and radii"));
+
+    //initialize vector of vec_predicates
+    for (unsigned int i=0; i != n_enrichments; ++i)
+      {
+        vec_predicates.push_back( EnrichmentPredicate<dim>(points_enrichments[i],
+                                                           radii_enrichments[i]) );
+      }
+
+    //set right hand side function. TODO change to incorporate a sum of such funcs
+    right_hand_side.set_points(Point<dim>());
+    right_hand_side.set_sigmas(1);
+
+    pcout << "...finished constructor" << std::endl;
+  }
+
+
 
   template <int dim>
   void LaplaceProblem<dim>::read_parameters()
@@ -393,84 +450,14 @@ namespace Step1
     pcout << "...finished parameter reading." << std::endl;
   }
 
+
+
   template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem (int argc,char **argv)
-    :
-    argc(argc),
-    argv(argv),
-    n_enriched_cells(0),
-    dof_handler (triangulation),
-    fe_base(1),
-    fe_enriched(1),
-    fe_nothing(1,true),
-    mpi_communicator(MPI_COMM_WORLD),
-    n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
-    this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0))
+  void LaplaceProblem<dim>::build_fe_space()
   {
-    std::cout << "...start constructor" << std::endl;
+    pcout << "...building fe space" << std::endl;
 
-    read_parameters();
-
-    //set up basic grid
-    GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
-    triangulation.refine_global (global_refinement);
-
-    Assert(points_enrichments.size()==n_enrichments &&
-           radii_enrichments.size()==n_enrichments,
-           ExcMessage("Incorrect number of enrichment points and radii"));
-
-    //initialize vector of vec_predicates
-    for (unsigned int i=0; i != n_enrichments; ++i)
-      {
-        vec_predicates.push_back( EnrichmentPredicate<dim>(points_enrichments[i],
-                                                           radii_enrichments[i]) );
-      }
-
-    //set right hand side function. TODO change to incorporate a sum of such funcs
-    right_hand_side.set_points(Point<dim>());
-    right_hand_side.set_sigmas(1);
-
-//    //const enrichment functions!
-//    for (unsigned int i=0; i<vec_predicates.size(); ++i)
-//      {
-//        EnrichmentFunction<dim> func(Point<2> (0,0),
-//                                     2,
-//                                     10+i);  //constant function
-//        vec_enrichments.push_back( func );
-//      }
-
-    //make enrichment functions
-    for (unsigned int i=0; i<vec_predicates.size(); ++i)
-      {
-        //formulate a 1d problem with x coordinate and radius (i.e sigma)
-        double x = points_enrichments[i][0];
-        double sigma = radii_enrichments[i];
-        EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
-                                                 sigma,
-                                                 50);
-        problem_1d.run();
-
-        //make points at which solution needs to interpolated
-        std::vector<double> interpolation_points_1D, interpolation_values_1D;
-        double factor = 2;
-        interpolation_points_1D.push_back(0);
-        for (double x = 0.25; x < 2*sigma; x*=factor)
-          interpolation_points_1D.push_back(x);
-        interpolation_points_1D.push_back(2*sigma);
-
-        problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
-        std::cout << "solved problem with "
-                  << "(x, sigma): "
-                  << x << ", " << sigma << std::endl;
-
-        //construct enrichment function and push
-        EnrichmentFunction<dim> func(points_enrichments[i],
-                                     radii_enrichments[i],
-                                     interpolation_points_1D,
-                                     interpolation_values_1D);
-        vec_enrichments.push_back(func);
-      }
+    make_enrichment_function();
 
     //make a sparsity pattern based on connections between regions
     if (vec_predicates.size() != 0)
@@ -558,7 +545,6 @@ namespace Step1
     //q collections the same size as different material identities
     //TODO in parameter file
     q_collection.push_back(QGauss<dim>(4));
-
     for (unsigned int i=1; i!=fe_sets.size(); ++i)
       q_collection.push_back(QGauss<dim>(10));
 
@@ -577,8 +563,49 @@ namespace Step1
                                                  fe_enriched,
                                                  fe_nothing,
                                                  fe_collection);
-    pcout << "...finished constructor" << std::endl;
+
+    pcout << "...building fe space" << std::endl;
   }
+
+
+
+  template <int dim>
+  void LaplaceProblem<dim>::make_enrichment_function()
+  {
+    pcout << "!!! Parent make enrichment function called" << std::endl;
+
+    for (unsigned int i=0; i<vec_predicates.size(); ++i)
+      {
+        //formulate a 1d problem with x coordinate and radius (i.e sigma)
+        double x = points_enrichments[i][0];
+        double sigma = radii_enrichments[i];
+        EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
+                                                 sigma,
+                                                 50);
+        problem_1d.run();
+
+        //make points at which solution needs to interpolated
+        std::vector<double> interpolation_points_1D, interpolation_values_1D;
+        double factor = 2;
+        interpolation_points_1D.push_back(0);
+        for (double x = 0.25; x < 2*sigma; x*=factor)
+          interpolation_points_1D.push_back(x);
+        interpolation_points_1D.push_back(2*sigma);
+
+        problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+        std::cout << "solved problem with "
+                  << "(x, sigma): "
+                  << x << ", " << sigma << std::endl;
+
+        //construct enrichment function and push
+        EnrichmentFunction<dim> func(points_enrichments[i],
+                                     radii_enrichments[i],
+                                     interpolation_points_1D,
+                                     interpolation_values_1D);
+        vec_enrichments.push_back(func);
+      }
+  }
+
 
   template <int dim>
   void LaplaceProblem<dim>::build_tables ()
@@ -914,6 +941,8 @@ namespace Step1
   LaplaceProblem<dim>::run()
   {
     pcout << "...run problem" << std::endl;
+
+    build_fe_space();
 
     //TODO need cyles?
     for (unsigned int cycle = 0; cycle < 1; ++cycle)
