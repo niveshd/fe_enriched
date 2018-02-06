@@ -183,10 +183,14 @@ namespace Step1
     virtual ~LaplaceProblem();
     void run ();
 
-  private:
+  protected:
     void read_parameters();
     void build_tables ();
     void setup_system ();
+
+
+  private:
+
     void assemble_system ();
     unsigned int solve ();
     void estimate_error ();
@@ -829,21 +833,6 @@ namespace Step1
   {
     pcout << "...output results" << std::endl;
 
-    Vector<float> fe_index(triangulation.n_active_cells());
-    {
-      typename hp::DoFHandler<dim>::active_cell_iterator
-      cell = dof_handler.begin_active(),
-      endc = dof_handler.end();
-      n_enriched_cells = 0;
-      for (unsigned int index=0; cell!=endc; ++cell, ++index)
-        {
-          fe_index(index) = cell->active_fe_index();
-          if (fe_index(index) != 0)
-            ++n_enriched_cells;
-        }
-      pcout << "Number of enriched cells: " << n_enriched_cells << std::endl;
-    }
-
     Assert (cycle < 10, ExcNotImplemented());
     if (this_mpi_process==0)
       {
@@ -883,10 +872,14 @@ namespace Step1
     typename hp::DoFHandler<dim>::active_cell_iterator
     cell = dof_handler.begin_active(),
     endc = dof_handler.end();
+    n_enriched_cells = 0;
     for (unsigned int index=0; cell!=endc; ++cell, ++index)
       {
         active_fe_index[index] = cell->active_fe_index();
+        if (active_fe_index[index] != 0)
+          ++n_enriched_cells;
       }
+    pcout << "Number of enriched cells: " << n_enriched_cells << std::endl;
 
     // set the others correctly
 
@@ -929,10 +922,10 @@ namespace Step1
         pcout << "Cycle "<< cycle <<std::endl;
         setup_system ();
 
-        pcout << "   Number of active cells:       "
+        pcout << "Number of active cells:       "
               << triangulation.n_active_cells ()
               << std::endl
-              << "   Number of degrees of freedom: "
+              << "Number of degrees of freedom: "
               << dof_handler.n_dofs ()
               << std::endl;
 #ifdef DATA_OUT
