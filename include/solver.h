@@ -1,3 +1,6 @@
+#ifndef SOLVER_H
+#define SOLVER_H
+
 unsigned int patches = 10;
 #define DATA_OUT
 
@@ -187,17 +190,16 @@ namespace Step1
     void read_parameters();
     void build_tables ();
     void setup_system ();
-
+    void output_cell_attributes ();  //change to const later
 
   private:
-
     void assemble_system ();
     unsigned int solve ();
     void estimate_error ();
     void refine_grid ();
     void output_results (const unsigned int cycle);
-    void output_test ();  //change to const later
 
+  protected:
     int argc;
     char **argv;
     double size;
@@ -217,7 +219,6 @@ namespace Step1
     FE_Q<dim> fe_base;
     FE_Q<dim> fe_enriched;
     FE_Nothing<dim> fe_nothing;
-
 
     IndexSet locally_owned_dofs;
     IndexSet locally_relevant_dofs;
@@ -258,19 +259,15 @@ namespace Step1
     //different color combinations that a cell can contain
     std::vector <std::set<unsigned int>> fe_sets;
 
-    const FEValuesExtractors::Scalar fe_extractor;
-    const FEValuesExtractors::Scalar pou_extractor;
-
     //output vectors. size triangulation.n_active_cells()
     //change to Vector
     std::vector<Vector<float>> predicate_output;
     Vector<float> color_output;
-    Vector<float> active_fe_index;
+    Vector<float> vec_fe_index;
 
     //solver parameters
     unsigned int max_iterations;
     double tolerance;
-
   };
 
   template <int dim>
@@ -278,7 +275,7 @@ namespace Step1
   {
     pcout << "...reading parameters" << std::endl;
 
-    //declare parameters
+//declare parameters
     prm.enter_subsection("geometry");
     prm.declare_entry("size",
                       "1",
@@ -287,7 +284,6 @@ namespace Step1
                       "1",
                       Patterns::Integer(1));
     prm.leave_subsection();
-
     prm.enter_subsection("solver");
     prm.declare_entry("max iterations",
                       "1000",
@@ -297,11 +293,11 @@ namespace Step1
                       Patterns::Double(0));
     prm.leave_subsection();
 
-    //parse parameter file
+//parse parameter file
     AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
     prm.parse_input(argv[1], "#end-of-dealii parser");
 
-    //get parameters
+//get parameters
     prm.enter_subsection("geometry");
     size = prm.get_double("size");
     global_refinement = prm.get_integer("Global refinement");
@@ -317,8 +313,8 @@ namespace Step1
     pcout << "Max Iterations : " << max_iterations << std::endl;
     pcout << "Tolerance : " << tolerance << std::endl;
 
-    //manual parsing
-    //open parameter file
+//manual parsing
+//open parameter file
     AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
     std::ifstream prm_file(argv[1]);
 
@@ -331,7 +327,7 @@ namespace Step1
     AssertThrow(line == "#end-of-dealii parser",
                 ExcMessage("line missing in parameter file = \'#end-of-dealii parser\' "));
 
-    //function to read next line not starting with # or empty
+//function to read next line not starting with # or empty
     auto skiplines = [&] ()
     {
       while (getline(prm_file,line))
@@ -345,13 +341,13 @@ namespace Step1
 
     std::stringstream s_stream;
 
-    //read num of enrichement points
+//read num of enrichement points
     skiplines();
     s_stream.str(line);
     s_stream >> n_enrichments;
-    pcout << "Number of enrichments : " << n_enrichments << std::endl;
+    pcout << "Number of enrichments: " << n_enrichments << std::endl;
 
-    //note vector of points
+//note vector of points
     for (unsigned int i=0; i!=n_enrichments; ++i)
       {
         skiplines();
@@ -378,7 +374,7 @@ namespace Step1
     for (auto p:points_enrichments)
       pcout << p << std::endl;
 
-    //note vector of coefficients
+//note vector of coefficients
     for (unsigned int i=0; i!=n_enrichments; ++i)
       {
         skiplines();
@@ -404,7 +400,7 @@ namespace Step1
     argv(argv),
     n_enriched_cells(0),
     dof_handler (triangulation),
-    fe_base(2),
+    fe_base(1),
     fe_enriched(1),
     fe_nothing(1,true),
     mpi_communicator(MPI_COMM_WORLD),
@@ -416,12 +412,14 @@ namespace Step1
 
     read_parameters();
 
-    GridGenerator::hyper_cube (triangulation, -size/2, size/2);
+    //set up basic grid
+    GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
     triangulation.refine_global (global_refinement);
 
     Assert(points_enrichments.size()==n_enrichments &&
            radii_enrichments.size()==n_enrichments,
            ExcMessage("Incorrect number of enrichment points and radii"));
+
     //initialize vector of vec_predicates
     for (unsigned int i=0; i != n_enrichments; ++i)
       {
@@ -429,7 +427,7 @@ namespace Step1
                                                            radii_enrichments[i]) );
       }
 
-    //set right hand side function
+    //set right hand side function. TODO change to incorporate a sum of such funcs
     right_hand_side.set_points(Point<dim>());
     right_hand_side.set_sigmas(1);
 
@@ -442,6 +440,7 @@ namespace Step1
 //        vec_enrichments.push_back( func );
 //      }
 
+    //make enrichment functions
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
       {
         //formulate a 1d problem with x coordinate and radius (i.e sigma)
@@ -461,7 +460,9 @@ namespace Step1
         interpolation_points_1D.push_back(2*sigma);
 
         problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
-        std::cout << "solved problem with " << x << ":" << sigma << std::endl;
+        std::cout << "solved problem with "
+                  << "(x, sigma): "
+                  << x << ", " << sigma << std::endl;
 
         //construct enrichment function and push
         EnrichmentFunction<dim> func(points_enrichments[i],
@@ -470,24 +471,6 @@ namespace Step1
                                      interpolation_values_1D);
         vec_enrichments.push_back(func);
       }
-
-    {
-      //print predicates
-      predicate_output.resize(vec_predicates.size());
-      for (unsigned int i = 0; i < vec_predicates.size(); ++i)
-        {
-          predicate_output[i].reinit(triangulation.n_active_cells());
-        }
-
-      unsigned int index = 0;
-      for (typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active();
-           cell != dof_handler.end(); ++cell, ++index)
-        {
-          for (unsigned int i=0; i<vec_predicates.size(); ++i)
-            if ( vec_predicates[i](cell) )
-              predicate_output[i][index] = i+1;
-        }
-    }
 
     //make a sparsity pattern based on connections between regions
     if (vec_predicates.size() != 0)
@@ -518,7 +501,6 @@ namespace Step1
     build_tables();
 
 #ifdef DATA_OUT
-
     {
       pcout << "...start print fe indices" << std::endl;
 
@@ -608,7 +590,7 @@ namespace Step1
                                          cellwise_color_predicate_map,
                                          fe_sets);
 
-    output_test();
+    output_cell_attributes();
 
     {
       //print material table
@@ -853,7 +835,7 @@ namespace Step1
   }
 
   template <int dim>
-  void LaplaceProblem<dim>::output_test ()
+  void LaplaceProblem<dim>::output_cell_attributes ()
   {
     pcout << "...output pre-solution" << std::endl;
 
@@ -868,20 +850,37 @@ namespace Step1
 //       constraints.distribute(shape_funct[i]);
 //     }
 
-    active_fe_index.reinit(triangulation.n_active_cells());
+    //find number of enriched cells and set active fe index
+    vec_fe_index.reinit(triangulation.n_active_cells());
     typename hp::DoFHandler<dim>::active_cell_iterator
     cell = dof_handler.begin_active(),
     endc = dof_handler.end();
     n_enriched_cells = 0;
     for (unsigned int index=0; cell!=endc; ++cell, ++index)
       {
-        active_fe_index[index] = cell->active_fe_index();
-        if (active_fe_index[index] != 0)
+        vec_fe_index[index] = cell->active_fe_index();
+        if (vec_fe_index[index] != 0)
           ++n_enriched_cells;
       }
     pcout << "Number of enriched cells: " << n_enriched_cells << std::endl;
 
-    // set the others correctly
+    // set predicate vector
+    {
+      predicate_output.resize(vec_predicates.size());
+      for (unsigned int i = 0; i < vec_predicates.size(); ++i)
+        {
+          predicate_output[i].reinit(triangulation.n_active_cells());
+        }
+
+      unsigned int index = 0;
+      for (typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active();
+           cell != dof_handler.end(); ++cell, ++index)
+        {
+          for (unsigned int i=0; i<vec_predicates.size(); ++i)
+            if ( vec_predicates[i](cell) )
+              predicate_output[i][index] = i+1;
+        }
+    }
 
     // second output without making mesh finer
     if (this_mpi_process==0)
@@ -892,7 +891,7 @@ namespace Step1
 
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
-        data_out.add_data_vector (active_fe_index, "fe_index");
+        data_out.add_data_vector (vec_fe_index, "fe_index");
         data_out.add_data_vector (color_output, "colors");
         for (unsigned int i = 0; i < predicate_output.size(); ++i)
           data_out.add_data_vector (predicate_output[i], "predicate_" + std::to_string(i));
@@ -933,7 +932,7 @@ namespace Step1
 #endif
         assemble_system ();
         auto n_iterations = solve ();
-        pcout << "Number of iterations " << n_iterations << std::endl;
+        pcout << "Number of iterations: " << n_iterations << std::endl;
 
         //TODO Uncomment. correct function body
 //        estimate_error ();
@@ -948,3 +947,5 @@ namespace Step1
     pcout << "...finished run problem" << std::endl;
   }
 }
+
+#endif

@@ -1,3 +1,6 @@
+#ifndef SUPPORT_H
+#define SUPPORT_H
+
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -227,3 +230,5 @@ void make_fe_collection_from_colored_enrichments
  const FE_Q<dim> &fe_enriched,        //fe element multiplied by enrichment function
  const FE_Nothing<dim> &fe_nothing,
  hp::FECollection<dim> &fe_collection);
+
+#endif
