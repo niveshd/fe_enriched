@@ -100,10 +100,12 @@ void Problem<dim>::make_enrichment_function ()
     {
       //formulate a 1d problem with x coordinate and radius (i.e sigma)
       double x = this->points_enrichments[i][0];
-      double sigma = this->radii_enrichments[i];
+      double sigma = 0.05;
+      double coeff = 100;
       EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
+                                               100,
                                                sigma,
-                                               50);
+                                               coeff);
       problem_1d.run();
 
 
@@ -111,9 +113,10 @@ void Problem<dim>::make_enrichment_function ()
       std::vector<double> interpolation_points_1D, interpolation_values_1D;
       double factor = 2;
       interpolation_points_1D.push_back(0);
-      for (double x = 0.25; x < 2*sigma; x*=factor)
+      double right_bound = 2*this->radii_enrichments[i];
+      for (double x = 0.25; x < right_bound; x*=factor)
         interpolation_points_1D.push_back(x);
-      interpolation_points_1D.push_back(2*sigma);
+      interpolation_points_1D.push_back(right_bound);
 
       problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
       std::cout << "solved problem with "
@@ -134,7 +137,7 @@ void Problem<dim>::make_enrichment_function ()
         double max_error=0;
         std::ofstream file("spline_accuracy.data", std::ios::out);
         double h = sigma/100;
-        for (double x=0; x <= 2*sigma; x+=h)
+        for (double x=0; x < right_bound; x+=h)
           {
             double func_value = func.value(Point<2> (x,0));
             double prob_value = problem_1d.value(Point<1> (x));

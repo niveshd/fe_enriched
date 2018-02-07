@@ -47,6 +47,7 @@ private:
   void setup_system();
   void assemble_system ();
   void solve ();
+  void refine_grid();
   void output_results () const;
   Point<dim> center;
   double domain_size;
@@ -120,7 +121,7 @@ PoissonSolver<dim>::PoissonSolver
   domain_size(domain_size),
   sigma(sigma),
   coeff(coeff),
-  refinement(5),
+  refinement(7),
   fe (1),
   dof_handler (triangulation)
 {}
@@ -133,7 +134,7 @@ void PoissonSolver<dim>::make_grid ()
   static SphericalManifold<dim> spherical_manifold(center);
   triangulation.set_manifold(0,spherical_manifold);
 
-  triangulation.refine_global (5);
+  triangulation.refine_global (refinement);
 }
 
 template <int dim>
@@ -208,6 +209,21 @@ void PoissonSolver<dim>::solve ()
 }
 
 template <int dim>
+void PoissonSolver<dim>::refine_grid ()
+{
+  Vector<float> estimated_error_per_cell (triangulation.n_active_cells());
+  KellyErrorEstimator<dim>::estimate (dof_handler,
+                                      QGauss<dim-1>(3),
+                                      typename FunctionMap<dim>::type(),
+                                      solution,
+                                      estimated_error_per_cell);
+  GridRefinement::refine_and_coarsen_fixed_number (triangulation,
+                                                   estimated_error_per_cell,
+                                                   0.9, 0.01);
+  triangulation.execute_coarsening_and_refinement ();
+}
+
+template <int dim>
 void PoissonSolver<dim>::output_results () const
 {
   DataOut<dim> data_out;
@@ -221,7 +237,6 @@ void PoissonSolver<dim>::output_results () const
 template <int dim>
 void PoissonSolver<dim>::run ()
 {
-//  std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
   make_grid();
 
   double old_value=0, value=1, relative_change = 1;
@@ -229,8 +244,11 @@ void PoissonSolver<dim>::run ()
   bool start = true;
   do
     {
-      triangulation.refine_global (1);
-      ++refinement;
+      if (cycles!=0)
+        {
+          refine_grid ();
+          ++refinement;
+        }
       ++cycles;
       setup_system ();
       assemble_system ();
@@ -244,7 +262,7 @@ void PoissonSolver<dim>::run ()
       start = false;
       old_value = value;
     }
-  while (relative_change > 0.001);
+  while (relative_change > 0.005);
 
   std::cout << "2D solution at origin = "
             << value

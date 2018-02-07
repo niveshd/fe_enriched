@@ -516,10 +516,12 @@ namespace Step1
       {
         //formulate a 1d problem with x coordinate and radius (i.e sigma)
         double x = points_enrichments[i][0];
-        double sigma = radii_enrichments[i];
+        double sigma = 1;
+        double coeff = 1;
         EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
                                                  sigma,
-                                                 size);
+                                                 size,
+                                                 coeff);
         problem_1d.run();
 
         //make points at which solution needs to interpolated

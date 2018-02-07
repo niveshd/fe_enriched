@@ -1,4 +1,6 @@
 #include <estimate_enrichment.h>
+#include <deal.II/grid/grid_refinement.h>
+#include <deal.II/numerics/error_estimator.h>
 
 //unnamed namespace
 namespace EstimateEnrichment
@@ -58,7 +60,7 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
   domain_size(domain_size),
   sigma(sigma),
   coeff(coeff),
-  refinement(5),
+  refinement(7),
   fe (1),
   dof_handler (triangulation)
 {
@@ -165,7 +167,16 @@ void EstimateEnrichmentFunction<dim>::solve ()
 template <int dim>
 void EstimateEnrichmentFunction<dim>::refine_grid ()
 {
-
+  Vector<float> estimated_error_per_cell (triangulation.n_active_cells());
+  KellyErrorEstimator<dim>::estimate (dof_handler,
+                                      QGauss<dim-1>(3),
+                                      typename FunctionMap<dim>::type(),
+                                      solution,
+                                      estimated_error_per_cell);
+  GridRefinement::refine_and_coarsen_fixed_number (triangulation,
+                                                   estimated_error_per_cell,
+                                                   0.2, 0.01);
+  triangulation.execute_coarsening_and_refinement ();
 }
 
 template <int dim>
@@ -190,8 +201,11 @@ void EstimateEnrichmentFunction<dim>::run ()
   bool start = true;
   do
     {
-      refine_grid ();
-      ++refinement;
+      if (cycles!=0)
+        {
+          refine_grid ();
+          ++refinement;
+        }
       ++cycles;
       setup_system ();
       assemble_system ();
@@ -205,7 +219,7 @@ void EstimateEnrichmentFunction<dim>::run ()
       start = false;
       old_value = value;
     }
-  while (relative_change > 0.001);
+  while (relative_change > 0.005);
 
   std::cout << "1D solution at origin = "
             << value
