@@ -309,11 +309,15 @@ int main (int argc, char **argv)
       deallog << "error_ok::" << (error<1e-3) << std::endl;
     }
 
+
   //cspline function within enrichment function
   EnrichmentFunction<2> func(Point<2>(),
                              sigma,
                              interpolation_points,
                              interpolation_values_1D);
+
+
+  //check how well spline approximates function
   double max_error=0;
   std::ofstream file("spline_accuracy.data", std::ios::out);
   double h = sigma/100;
@@ -332,7 +336,6 @@ int main (int argc, char **argv)
                   relative_error :
                   max_error;
     }
-
   std::cout << "Max error due to spline approximation: " << max_error << std::endl;
   file.close();
 

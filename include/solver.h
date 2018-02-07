@@ -9,76 +9,10 @@ unsigned int patches = 10;
 
 
 template <int dim>
-class RightHandSide :  public Function<dim>
-{
-  Point<dim> center;
-  double sigma;
-public:
-  RightHandSide ();
-  void set_points(const Point<dim> &points);
-  void set_sigmas(const double &sigmas);
-  virtual void value (const Point<dim> &p,
-                      double   &values) const;
-  virtual void value_list (const std::vector<Point<dim> > &points,
-                           std::vector<double >           &value_list) const;
-};
-
-template <int dim>
-RightHandSide<dim>::RightHandSide ()
-  :
-  Function<dim> (),
-  center(Point<dim>()),
-  sigma(1)
-{}
-
-template <int dim>
-inline
-void RightHandSide<dim>::set_points(const Point<dim> &p)
-{
-  //TODO change to vector
-  center = p;
-}
-
-template <int dim>
-inline
-void RightHandSide<dim>::set_sigmas(const double &values)
-{
-  //TODO change to vector
-  sigma = values;
-}
-
-template <int dim>
-inline
-void RightHandSide<dim>::value (const Point<dim> &p,
-                                double           &value) const
-{
-  Assert (dim >= 2, ExcInternalError());
-  double r_squared = p.distance_square(center);
-  value = exp(-r_squared/(sigma*sigma));
-}
-
-template <int dim>
-void RightHandSide<dim>::value_list (const std::vector<Point<dim> > &points,
-                                     std::vector<double >           &value_list) const
-{
-  const unsigned int n_points = points.size();
-
-  AssertDimension(points.size(), value_list.size());
-
-  for (unsigned int p=0; p<n_points; ++p)
-    RightHandSide<dim>::value (points[p],
-                               value_list[p]);
-}
-
-
-
-template <int dim>
 void plot_shape_function
 (hp::DoFHandler<dim> &dof_handler)
 {
   std::cout << "...plotting shape function" << std::endl;
-
-  deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
   ConstraintMatrix constraints;
   constraints.clear();
@@ -106,9 +40,9 @@ void plot_shape_function
       shape_function[dof] = 1.0;
 
       // if the dof is constrained, first output unconstrained vector
-          names.push_back(std::string("C_") +
-                          dealii::Utilities::int_to_string(dof,2));
-          shape_functions.push_back(shape_function);
+      names.push_back(std::string("C_") +
+                      dealii::Utilities::int_to_string(dof,2));
+      shape_functions.push_back(shape_function);
 
 //      names.push_back(std::string("UC_") +
 //                      dealii::Utilities::int_to_string(s,2));
@@ -116,7 +50,7 @@ void plot_shape_function
 //      // make continuous/constraint:
 //      constraints.distribute(shape_function);
 //      shape_functions.push_back(shape_function);
-}
+    }
 
   {
     std::cout << "...printing support points" << std::endl;
@@ -200,6 +134,7 @@ namespace Step1
     void build_fe_space();
     virtual void make_enrichment_function();
     void setup_system ();
+    struct RightHandSide;
 
   private:
     void read_parameters();
@@ -247,7 +182,7 @@ namespace Step1
 
     ConditionalOStream pcout;
 
-    RightHandSide<dim> right_hand_side;
+    RightHandSide right_hand_side;
 
     using cell_function = std::function<const Function<dim>*
                           (const typename Triangulation<dim>::cell_iterator &)>;
@@ -781,7 +716,9 @@ namespace Step1
     pcout << "...solving" << std::endl;
 
     SolverControl           solver_control (max_iterations,
-                                            tolerance);
+                                            tolerance,
+                                            false,
+                                            false);
     PETScWrappers::SolverCG cg (solver_control,
                                 mpi_communicator);
 //    PETScWrappers::PreconditionBoomerAMG preconditioner(system_matrix);
@@ -975,6 +912,70 @@ namespace Step1
       }
     pcout << "...finished run problem" << std::endl;
   }
-}
 
+
+
+  template <int dim>
+  class LaplaceProblem<dim>::RightHandSide :  public Function<dim>
+  {
+    Point<dim> center;
+    double sigma;
+  public:
+    RightHandSide ();
+    void set_points(const Point<dim> &points);
+    void set_sigmas(const double &sigmas);
+    virtual void value (const Point<dim> &p,
+                        double   &values) const;
+    virtual void value_list (const std::vector<Point<dim> > &points,
+                             std::vector<double >           &value_list) const;
+  };
+
+  template <int dim>
+  LaplaceProblem<dim>::RightHandSide::RightHandSide ()
+    :
+    Function<dim> (),
+    center(Point<dim>()),
+    sigma(1)
+  {}
+
+  template <int dim>
+  inline
+  void LaplaceProblem<dim>::RightHandSide::set_points(const Point<dim> &p)
+  {
+    //TODO change to vector
+    center = p;
+  }
+
+  template <int dim>
+  inline
+  void LaplaceProblem<dim>::RightHandSide::set_sigmas(const double &values)
+  {
+    //TODO change to vector
+    sigma = values;
+  }
+
+  template <int dim>
+  inline
+  void LaplaceProblem<dim>::RightHandSide::value (const Point<dim> &p,
+                                                  double           &value) const
+  {
+    Assert (dim >= 2, ExcInternalError());
+    double r_squared = p.distance_square(center);
+    value = exp(-r_squared/(sigma*sigma));
+  }
+
+  template <int dim>
+  void LaplaceProblem<dim>::RightHandSide::value_list
+  (const std::vector<Point<dim> > &points,
+   std::vector<double >           &value_list) const
+  {
+    const unsigned int n_points = points.size();
+
+    AssertDimension(points.size(), value_list.size());
+
+    for (unsigned int p=0; p<n_points; ++p)
+      RightHandSide::value (points[p],
+                            value_list[p]);
+  }
+}
 #endif

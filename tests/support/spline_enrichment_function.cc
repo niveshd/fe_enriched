@@ -62,6 +62,9 @@
 
 const unsigned int dim = 2;
 
+
+
+//inherit from solver class to test just the pre-assembly steps
 template <int dim>
 class Problem : public Step1::LaplaceProblem<dim>
 {
@@ -84,10 +87,13 @@ private:
 };
 
 
+
+//modify enrichment function to be used!
 template <int dim>
 void Problem<dim>::make_enrichment_function ()
 {
   this->pcout << "!!! Inherited make enrichment function called" << std::endl;
+
 
   //1.original function
   for (unsigned int i=0; i<this->vec_predicates.size(); ++i)
@@ -99,6 +105,7 @@ void Problem<dim>::make_enrichment_function ()
                                                sigma,
                                                50);
       problem_1d.run();
+
 
       //make points at which solution needs to interpolated
       std::vector<double> interpolation_points_1D, interpolation_values_1D;
@@ -113,6 +120,7 @@ void Problem<dim>::make_enrichment_function ()
                 << "(x, sigma): "
                 << x << ", " << sigma << std::endl;
 
+
       //construct enrichment function and push
       EnrichmentFunction<dim> func(this->points_enrichments[i],
                                    this->radii_enrichments[i],
@@ -120,23 +128,50 @@ void Problem<dim>::make_enrichment_function ()
                                    interpolation_values_1D);
       this->vec_enrichments.push_back(func);
 
+
+      //check how well spline approximates function
+      {
+        double max_error=0;
+        std::ofstream file("spline_accuracy.data", std::ios::out);
+        double h = sigma/100;
+        for (double x=0; x <= 2*sigma; x+=h)
+          {
+            double func_value = func.value(Point<2> (x,0));
+            double prob_value = problem_1d.value(Point<1> (x));
+            double relative_error = (func_value != 0) ? (func_value-prob_value)/func_value :
+                                    0;
+            file << x
+                 << " " << func_value
+                 << " " << prob_value
+                 << " " << relative_error
+                 << std::endl;
+            max_error = (max_error < relative_error)?
+                        relative_error :
+                        max_error;
+          }
+        std::cout << "Max error due to spline approximation: " << max_error << std::endl;
+        file.close();
+      }
+
+
+      //print shape function values after enrichment
       double step = 0.1;
       AssertDimension (dim,2);
       for (double x=0; x <= 1; x+=step)
         {
           Point<dim> p(x,0);
-          std::cout << x << " "
-                    << func.value(p) << " "
-                    << func.value(p)*(1-x) << " "
-                    << 1-x << " "
-                    << func.value(p)*(x) << " "
-                    << x
-                    << std::endl;
+          deallog << x << ":"
+                  << func.value(p) << ":"
+                  << func.value(p)*(1-x) << ":"
+                  << 1-x << ":"
+                  << func.value(p)*(x) << ":"
+                  << x
+                  << std::endl;
         }
     }
 
 
-
+  //TODO push these out to separate tests
 //  //2.const enrichment functions!
 //  for (unsigned int i=0; i<this->vec_predicates.size(); ++i)
 //    {
@@ -176,10 +211,14 @@ void Problem<dim>::make_enrichment_function ()
 }
 
 
+//change right hand side value function
+
+//change what 1d problem solves
 
 int main (int argc,char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
+  MPILogInitAll all;
   {
     Problem<dim> step_test(argc,argv);
     step_test.run_pre_solution_steps();

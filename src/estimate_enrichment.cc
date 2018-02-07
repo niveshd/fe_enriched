@@ -153,7 +153,7 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
 template <int dim>
 void EstimateEnrichmentFunction<dim>::solve ()
 {
-  SolverControl           solver_control (10000, 1e-12);
+  SolverControl           solver_control (10000,1e-12,false,false);
   SolverCG<>              solver (solver_control);
   solver.solve (system_matrix, solution, system_rhs,
                 PreconditionIdentity());
