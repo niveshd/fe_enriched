@@ -12,7 +12,7 @@ template <int dim>
 void plot_shape_function
 (hp::DoFHandler<dim> &dof_handler)
 {
-  std::cout << "...plotting shape function" << std::endl;
+  std::cout << "...start plotting shape function" << std::endl;
 
   ConstraintMatrix constraints;
   constraints.clear();
@@ -52,8 +52,9 @@ void plot_shape_function
 //      shape_functions.push_back(shape_function);
     }
 
+  if (dof_handler.n_dofs() < 100)
   {
-    std::cout << "...printing support points" << std::endl;
+    std::cout << "...start printing support points" << std::endl;
 
     std::map<types::global_dof_index, Point<dim> > support_points;
     MappingQ1<dim> mapping;
@@ -423,6 +424,7 @@ namespace Step1
     build_tables();
 
 #ifdef DATA_OUT
+    if (triangulation.n_active_cells() < 100)
     {
       pcout << "...start print fe indices" << std::endl;
 
@@ -449,6 +451,7 @@ namespace Step1
       pcout << "...finished print fe indices" << std::endl;
     }
 
+    if (triangulation.n_active_cells() < 100)
     {
       pcout << "...start print cell indices" << std::endl;
 
@@ -516,7 +519,7 @@ namespace Step1
         double sigma = radii_enrichments[i];
         EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
                                                  sigma,
-                                                 50);
+                                                 size);
         problem_1d.run();
 
         //make points at which solution needs to interpolated

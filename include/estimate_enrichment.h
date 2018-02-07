@@ -33,8 +33,9 @@ class EstimateEnrichmentFunction
 {
 public:
   EstimateEnrichmentFunction (Point<dim> center,
+                              double domain_size,
                               double sigma,
-                              unsigned int domain_multiplier);
+                              double coeff);
   ~EstimateEnrichmentFunction();
   void run ();
   void evaluate_at_x_values
@@ -46,10 +47,12 @@ private:
   void setup_system();
   void assemble_system ();
   void solve ();
+  void refine_grid();
   void output_results () const;
   Point<dim> center;
+  double domain_size;
   double sigma;
-  unsigned int domain_multiplier;
+  double coeff;
   Triangulation<dim>   triangulation;
   unsigned int refinement;
   FE_Q<dim>            fe;

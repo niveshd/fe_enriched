@@ -1,6 +1,6 @@
 subsection geometry
-    set size = 100
-    set Global refinement = 7
+    set size = 4
+    set Global refinement = 2
 end
 
 #normal size, r = 100, 7

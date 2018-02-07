@@ -34,8 +34,9 @@ class PoissonSolver
 {
 public:
   PoissonSolver (Point<dim> center,
+                 double domain_size,
                  double sigma,
-                 unsigned int domain_multiplier);
+                 double coeff);
   void run ();
   void evaluate_at_x_values
   (std::vector< double >  &interpolation_points,
@@ -48,8 +49,9 @@ private:
   void solve ();
   void output_results () const;
   Point<dim> center;
+  double domain_size;
   double sigma;
-  unsigned int domain_multiplier;
+  double coeff;
   Triangulation<dim>   triangulation;
   unsigned int refinement;
   FE_Q<dim>            fe;
@@ -65,15 +67,17 @@ template <int dim>
 class RightHandSide : public Function<dim>
 {
 public:
-  RightHandSide (Point<dim> center, double sigma)
+  RightHandSide (Point<dim> center, double sigma, double coeff=1)
     : Function<dim>(),
       center(center),
-      sigma(sigma)
+      sigma(sigma),
+      coeff(coeff)
   {}
   virtual double value (const Point<dim>   &p,
                         const unsigned int  component = 0) const;
   Point<dim> center;
   double sigma;
+  double coeff;
 };
 
 template <int dim>
@@ -81,7 +85,7 @@ double RightHandSide<dim>::value (const Point<dim> &p,
                                   const unsigned int /*component*/) const
 {
   double return_value = 0.0;
-  return_value = exp(-p.distance_square(center)/(sigma*sigma));
+  return_value = coeff*exp(-p.distance_square(center)/(sigma*sigma));
   return return_value;
 }
 
@@ -108,12 +112,14 @@ double BoundaryValues<dim>::value (const Point<dim> &p,
 template <int dim>
 PoissonSolver<dim>::PoissonSolver
 (Point<dim> center,
+ double domain_size,
  double sigma,
- unsigned int domain_multiplier)
+ double coeff)
   :
   center(center),
+  domain_size(domain_size),
   sigma(sigma),
-  domain_multiplier(domain_multiplier),
+  coeff(coeff),
   refinement(5),
   fe (1),
   dof_handler (triangulation)
@@ -122,7 +128,7 @@ template <int dim>
 void PoissonSolver<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
-  GridGenerator::hyper_ball (triangulation, center, domain_multiplier*sigma);
+  GridGenerator::hyper_ball (triangulation, center, domain_size/2);
   triangulation.set_all_manifold_ids_on_boundary(0);
   static SphericalManifold<dim> spherical_manifold(center);
   triangulation.set_manifold(0,spherical_manifold);
@@ -146,7 +152,7 @@ template <int dim>
 void PoissonSolver<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const RightHandSide<dim> right_hand_side(center,sigma);
+  const RightHandSide<dim> right_hand_side(center,sigma,coeff);
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
@@ -276,10 +282,9 @@ double PoissonSolver<dim>::evaluate
 int main (int argc, char **argv)
 {
   //calculate vector of points at which solution needs to be interpolated
-  double sigma = 1;
-  double domain_multiplier = 50;
-  double left_bound = -domain_multiplier*sigma;
-  double right_bound = -left_bound;
+  double sigma = 0.5;
+  double domain_size = 100;
+  double coeff = 2;
   std::vector<double> interpolation_points, interpolation_values_2D;
   double factor = 2;
   interpolation_points.push_back(0);
@@ -291,12 +296,18 @@ int main (int argc, char **argv)
 //  interpolation_points.push_back(right_bound);
 
   //solve 2d problem
-  PoissonSolver<2> problem_2d(Point<2>(0,0), sigma, domain_multiplier);
+  PoissonSolver<2> problem_2d(Point<2>(0,0), //center and size
+                              domain_size,
+                              sigma,        //right hand side
+                              coeff);
   problem_2d.run ();
   problem_2d.evaluate_at_x_values(interpolation_points,interpolation_values_2D);
 
   //solve 1d problem
-  EstimateEnrichmentFunction<1> problem_1d(Point<1>(0), sigma, domain_multiplier);
+  EstimateEnrichmentFunction<1> problem_1d(Point<1>(0),
+                                           domain_size,
+                                           sigma,
+                                           coeff);
   problem_1d.run();
   std::vector<double> interpolation_values_1D;
   problem_1d.evaluate_at_x_values(interpolation_points,interpolation_values_1D);

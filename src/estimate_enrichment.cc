@@ -7,15 +7,17 @@ namespace EstimateEnrichment
   class RightHandSide : public Function<dim>
   {
   public:
-    RightHandSide (Point<dim> center, double sigma)
+    RightHandSide (Point<dim> center, double sigma, double coeff)
       : Function<dim>(),
         center(center),
-        sigma(sigma)
+        sigma(sigma),
+        coeff(coeff)
     {}
     virtual double value (const Point<dim>   &p,
                           const unsigned int  component = 0) const;
     Point<dim> center;
     double sigma;
+    double coeff;
   };
 
   template <int dim>
@@ -23,7 +25,7 @@ namespace EstimateEnrichment
                                     const unsigned int /*component*/) const
   {
     double return_value = 0.0;
-    return_value = exp(-p.distance_square(center)/(sigma*sigma));
+    return_value = coeff*exp(-p.distance_square(center)/(sigma*sigma));
 
     return return_value;
   }
@@ -50,11 +52,12 @@ namespace EstimateEnrichment
 
 template <int dim>
 EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
-(Point<dim> center, double sigma, unsigned int domain_multiplier)
+(Point<dim> center, double domain_size, double sigma, double coeff)
   :
   center(center),
+  domain_size(domain_size),
   sigma(sigma),
-  domain_multiplier(domain_multiplier),
+  coeff(coeff),
   refinement(5),
   fe (1),
   dof_handler (triangulation)
@@ -67,8 +70,8 @@ void EstimateEnrichmentFunction<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
   GridGenerator::hyper_cube (triangulation,
-                             center[0]-domain_multiplier*sigma,
-                             center[0]+domain_multiplier*sigma);
+                             center[0]-domain_size/2,
+                             center[0]+domain_size/2);
   triangulation.refine_global (refinement);
 }
 
@@ -88,7 +91,7 @@ template <int dim>
 void EstimateEnrichmentFunction<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const EstimateEnrichment::RightHandSide<dim> right_hand_side(center,sigma);
+  const EstimateEnrichment::RightHandSide<dim> right_hand_side(center,sigma,coeff);
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
@@ -157,6 +160,11 @@ void EstimateEnrichmentFunction<dim>::solve ()
   SolverCG<>              solver (solver_control);
   solver.solve (system_matrix, solution, system_rhs,
                 PreconditionIdentity());
+}
+
+template <int dim>
+void EstimateEnrichmentFunction<dim>::refine_grid ()
+{
 
 }
 
@@ -182,7 +190,7 @@ void EstimateEnrichmentFunction<dim>::run ()
   bool start = true;
   do
     {
-      triangulation.refine_global (1);
+      refine_grid ();
       ++refinement;
       ++cycles;
       setup_system ();
