@@ -7,6 +7,7 @@ unsigned int patches = 10;
 #define DATA_OUT
 
 
+
 template <int dim>
 class RightHandSide :  public Function<dim>
 {
@@ -184,7 +185,6 @@ void plot_shape_function
 
 namespace Step1
 {
-
   /**
    * Main class
    */

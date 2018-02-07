@@ -1,6 +1,6 @@
 subsection geometry
     set size = 100
-    set Global refinement = 7
+    set Global refinement = 5
 end
 
 #normal size, r = 100, 7
@@ -23,4 +23,4 @@ end
 
 #radii
 #1
-1
+3

@@ -58,6 +58,8 @@
 #include "support.h"
 #include "estimate_enrichment.h"
 #include "solver.h"
+#include "../tests.h"
+
 const unsigned int dim = 2;
 
 template <int dim>
@@ -117,6 +119,20 @@ void Problem<dim>::make_enrichment_function ()
                                    interpolation_points_1D,
                                    interpolation_values_1D);
       this->vec_enrichments.push_back(func);
+
+      double step = 0.1;
+      AssertDimension (dim,2);
+      for (double x=0; x <= 1; x+=step)
+        {
+          Point<dim> p(x,0);
+          std::cout << x << " "
+                    << func.value(p) << " "
+                    << func.value(p)*(1-x) << " "
+                    << 1-x << " "
+                    << func.value(p)*(x) << " "
+                    << x
+                    << std::endl;
+        }
     }
 
 
