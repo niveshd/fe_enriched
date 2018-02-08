@@ -16,11 +16,17 @@ end
 #num of enrichment predicates
 1
 
-#points for enrichment functions
+#points for enrichment functions/predicates
 #-1 0
 #0 1
 0 0
 
-#radii
-#1
+#radii for predicates
 1
+
+#sigma for enrichment functions
+#1
+0.05
+
+#coefficient for enrichment functions
+100

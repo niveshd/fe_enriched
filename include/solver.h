@@ -3,7 +3,7 @@
 
 #include <set>
 
-unsigned int patches = 10;
+unsigned int patches = 15;
 #define DATA_OUT
 
 
@@ -53,42 +53,42 @@ void plot_shape_function
     }
 
   if (dof_handler.n_dofs() < 100)
-  {
-    std::cout << "...start printing support points" << std::endl;
+    {
+      std::cout << "...start printing support points" << std::endl;
 
-    std::map<types::global_dof_index, Point<dim> > support_points;
-    MappingQ1<dim> mapping;
-    hp::MappingCollection<dim> hp_mapping;
-    for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
-      hp_mapping.push_back(mapping);
-    DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
+      std::map<types::global_dof_index, Point<dim> > support_points;
+      MappingQ1<dim> mapping;
+      hp::MappingCollection<dim> hp_mapping;
+      for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
+        hp_mapping.push_back(mapping);
+      DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
 
-    const std::string base_filename =
-      "DOFs" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+      const std::string base_filename =
+        "DOFs" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
 
-    const std::string filename = base_filename + ".gp";
-    std::ofstream f(filename.c_str());
+      const std::string filename = base_filename + ".gp";
+      std::ofstream f(filename.c_str());
 
-    f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-      << "set output \"" << base_filename << ".png\"" << std::endl
-      << "set size square" << std::endl
-      << "set view equal xy" << std::endl
-      << "unset xtics                                                                                   " << std::endl
-      << "unset ytics" << std::endl
-      << "unset grid" << std::endl
-      << "unset border" << std::endl
-      << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-    GridOut grid_out;
-    grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
-    f << "e" << std::endl;
+      f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+        << "set output \"" << base_filename << ".png\"" << std::endl
+        << "set size square" << std::endl
+        << "set view equal xy" << std::endl
+        << "unset xtics                                                                                   " << std::endl
+        << "unset ytics" << std::endl
+        << "unset grid" << std::endl
+        << "unset border" << std::endl
+        << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+      GridOut grid_out;
+      grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
+      f << "e" << std::endl;
 
-    DoFTools::write_gnuplot_dof_support_point_info(f,
-                                                   support_points);
+      DoFTools::write_gnuplot_dof_support_point_info(f,
+                                                     support_points);
 
-    f << "e" << std::endl;
+      f << "e" << std::endl;
 
-    std::cout << "...finished printing support points" << std::endl;
-  }
+      std::cout << "...finished printing support points" << std::endl;
+    }
 
   DataOut<dim,hp::DoFHandler<dim>> data_out;
   data_out.attach_dof_handler (dof_handler);
@@ -155,7 +155,10 @@ namespace Step1
     unsigned int n_enrichments;
     unsigned int n_enriched_cells;
     std::vector<Point<dim>> points_enrichments;
-    std::vector<unsigned int> radii_enrichments;
+    std::vector<double> radii_predicates;
+    std::vector<double> sigmas_rhs;
+    std::vector<double> coeffs_rhs;
+
     ParameterHandler prm;
 
     Triangulation<dim>  triangulation;
@@ -243,20 +246,23 @@ namespace Step1
     GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
     triangulation.refine_global (global_refinement);
 
+    pcout << "step size: " << size/std::pow(2.0,global_refinement) << std::endl;
+
     Assert(points_enrichments.size()==n_enrichments &&
-           radii_enrichments.size()==n_enrichments,
+           radii_predicates.size()==n_enrichments,
            ExcMessage("Incorrect number of enrichment points and radii"));
 
     //initialize vector of vec_predicates
     for (unsigned int i=0; i != n_enrichments; ++i)
       {
         vec_predicates.push_back( EnrichmentPredicate<dim>(points_enrichments[i],
-                                                           radii_enrichments[i]) );
+                                                           radii_predicates[i]) );
       }
 
     //set right hand side function. TODO change to incorporate a sum of such funcs
     right_hand_side.set_points(Point<dim>());
-    right_hand_side.set_sigmas(1);
+    right_hand_side.set_sigmas(sigmas_rhs[0]);
+    right_hand_side.set_coeffs(coeffs_rhs[0]);
 
     pcout << "...finished constructor" << std::endl;
   }
@@ -268,7 +274,7 @@ namespace Step1
   {
     pcout << "...reading parameters" << std::endl;
 
-//declare parameters
+    //declare parameters
     prm.enter_subsection("geometry");
     prm.declare_entry("size",
                       "1",
@@ -286,11 +292,11 @@ namespace Step1
                       Patterns::Double(0));
     prm.leave_subsection();
 
-//parse parameter file
+    //parse parameter file
     AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
     prm.parse_input(argv[1], "#end-of-dealii parser");
 
-//get parameters
+    //get parameters
     prm.enter_subsection("geometry");
     size = prm.get_double("size");
     global_refinement = prm.get_integer("Global refinement");
@@ -306,8 +312,8 @@ namespace Step1
     pcout << "Max Iterations : " << max_iterations << std::endl;
     pcout << "Tolerance : " << tolerance << std::endl;
 
-//manual parsing
-//open parameter file
+    //manual parsing
+    //open parameter file
     AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
     std::ifstream prm_file(argv[1]);
 
@@ -320,7 +326,7 @@ namespace Step1
     AssertThrow(line == "#end-of-dealii parser",
                 ExcMessage("line missing in parameter file = \'#end-of-dealii parser\' "));
 
-//function to read next line not starting with # or empty
+    //function to read next line not starting with # or empty
     auto skiplines = [&] ()
     {
       while (getline(prm_file,line))
@@ -334,13 +340,13 @@ namespace Step1
 
     std::stringstream s_stream;
 
-//read num of enrichement points
+    //read num of enrichement points
     skiplines();
     s_stream.str(line);
     s_stream >> n_enrichments;
     pcout << "Number of enrichments: " << n_enrichments << std::endl;
 
-//note vector of points
+    //note vector of points
     for (unsigned int i=0; i!=n_enrichments; ++i)
       {
         skiplines();
@@ -367,20 +373,52 @@ namespace Step1
     for (auto p:points_enrichments)
       pcout << p << std::endl;
 
-//note vector of coefficients
+    //note vector of radii for predicates
     for (unsigned int i=0; i!=n_enrichments; ++i)
       {
         skiplines();
         s_stream.clear();
         s_stream.str(line);
 
-        unsigned int r;
+        double r;
         s_stream >> r;
-        radii_enrichments.push_back(r);
+        radii_predicates.push_back(r);
       }
 
     pcout << "Enrichment radii : " << std::endl;
-    for (auto r:radii_enrichments)
+    for (auto r:radii_predicates)
+      pcout << r << std::endl;
+
+    //note vector of radii for predicates
+    for (unsigned int i=0; i!=n_enrichments; ++i)
+      {
+        skiplines();
+        s_stream.clear();
+        s_stream.str(line);
+
+        double r;
+        s_stream >> r;
+        sigmas_rhs.push_back(r);
+      }
+
+    pcout << "Sigma : " << std::endl;
+    for (auto r:sigmas_rhs)
+      pcout << r << std::endl;
+
+    //note vector of radii for predicates
+    for (unsigned int i=0; i!=n_enrichments; ++i)
+      {
+        skiplines();
+        s_stream.clear();
+        s_stream.str(line);
+
+        double r;
+        s_stream >> r;
+        coeffs_rhs.push_back(r);
+      }
+
+    pcout << "Coefficients : " << std::endl;
+    for (auto r:coeffs_rhs)
       pcout << r << std::endl;
 
     pcout << "...finished parameter reading." << std::endl;
@@ -425,59 +463,59 @@ namespace Step1
 
 #ifdef DATA_OUT
     if (triangulation.n_active_cells() < 100)
-    {
-      pcout << "...start print fe indices" << std::endl;
+      {
+        pcout << "...start print fe indices" << std::endl;
 
-      //print fe index
-      const std::string base_filename =
-        "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
-      const std::string filename =  base_filename + ".gp";
-      std::ofstream f(filename.c_str());
+        //print fe index
+        const std::string base_filename =
+          "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+        const std::string filename =  base_filename + ".gp";
+        std::ofstream f(filename.c_str());
 
-      f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-        << "set output \"" << base_filename << ".png\"" << std::endl
-        << "set size square" << std::endl
-        << "set view equal xy" << std::endl
-        << "unset xtics" << std::endl
-        << "unset ytics" << std::endl
-        << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-      GridOut().write_gnuplot (triangulation, f);
-      f << "e" << std::endl;
+        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+          << "set output \"" << base_filename << ".png\"" << std::endl
+          << "set size square" << std::endl
+          << "set view equal xy" << std::endl
+          << "unset xtics" << std::endl
+          << "unset ytics" << std::endl
+          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+        GridOut().write_gnuplot (triangulation, f);
+        f << "e" << std::endl;
 
-      for (auto it : dof_handler.active_cell_iterators())
-        f << it->center() << " \"" << it->active_fe_index() << "\"\n";
+        for (auto it : dof_handler.active_cell_iterators())
+          f << it->center() << " \"" << it->active_fe_index() << "\"\n";
 
-      f << std::flush << "e" << std::endl;
-      pcout << "...finished print fe indices" << std::endl;
-    }
+        f << std::flush << "e" << std::endl;
+        pcout << "...finished print fe indices" << std::endl;
+      }
 
     if (triangulation.n_active_cells() < 100)
-    {
-      pcout << "...start print cell indices" << std::endl;
+      {
+        pcout << "...start print cell indices" << std::endl;
 
-      //print cell ids
-      const std::string base_filename =
-        "cell_id" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
-      const std::string filename =  base_filename + ".gp";
-      std::ofstream f(filename.c_str());
+        //print cell ids
+        const std::string base_filename =
+          "cell_id" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+        const std::string filename =  base_filename + ".gp";
+        std::ofstream f(filename.c_str());
 
-      f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-        << "set output \"" << base_filename << ".png\"" << std::endl
-        << "set size square" << std::endl
-        << "set view equal xy" << std::endl
-        << "unset xtics" << std::endl
-        << "unset ytics" << std::endl
-        << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-      GridOut().write_gnuplot (triangulation, f);
-      f << "e" << std::endl;
+        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+          << "set output \"" << base_filename << ".png\"" << std::endl
+          << "set size square" << std::endl
+          << "set view equal xy" << std::endl
+          << "unset xtics" << std::endl
+          << "unset ytics" << std::endl
+          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+        GridOut().write_gnuplot (triangulation, f);
+        f << "e" << std::endl;
 
-      for (auto it : dof_handler.active_cell_iterators())
-        f << it->center() << " \"" << it->index() << "\"\n";
+        for (auto it : dof_handler.active_cell_iterators())
+          f << it->center() << " \"" << it->index() << "\"\n";
 
-      f << std::flush << "e" << std::endl;
+        f << std::flush << "e" << std::endl;
 
-      pcout << "...end print cell indices" << std::endl;
-    }
+        pcout << "...end print cell indices" << std::endl;
+      }
 #endif
 
     //q collections the same size as different material identities
@@ -539,7 +577,7 @@ namespace Step1
 
         //construct enrichment function and push
         EnrichmentFunction<dim> func(points_enrichments[i],
-                                     radii_enrichments[i],
+                                     radii_predicates[i],
                                      interpolation_points_1D,
                                      interpolation_values_1D);
         vec_enrichments.push_back(func);
@@ -795,7 +833,7 @@ namespace Step1
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
         data_out.add_data_vector (solution, "solution");
-        data_out.build_patches (6);
+        data_out.build_patches (patches);
         data_out.write_vtk (output);
         output.close();
       }
@@ -851,7 +889,7 @@ namespace Step1
         }
     }
 
-    // second output without making mesh finer
+    // print fe_index, colors and predicate
     if (this_mpi_process==0)
       {
         file_name += ".vtk";
@@ -924,11 +962,13 @@ namespace Step1
   class LaplaceProblem<dim>::RightHandSide :  public Function<dim>
   {
     Point<dim> center;
-    double sigma;
+    double sigmas;
+    double coeffs;
   public:
     RightHandSide ();
     void set_points(const Point<dim> &points);
     void set_sigmas(const double &sigmas);
+    void set_coeffs(const double &coeffs);
     virtual void value (const Point<dim> &p,
                         double   &values) const;
     virtual void value_list (const std::vector<Point<dim> > &points,
@@ -940,7 +980,8 @@ namespace Step1
     :
     Function<dim> (),
     center(Point<dim>()),
-    sigma(1)
+    sigmas(1),
+    coeffs(1)
   {}
 
   template <int dim>
@@ -956,7 +997,15 @@ namespace Step1
   void LaplaceProblem<dim>::RightHandSide::set_sigmas(const double &values)
   {
     //TODO change to vector
-    sigma = values;
+    sigmas = values;
+  }
+
+  template <int dim>
+  inline
+  void LaplaceProblem<dim>::RightHandSide::set_coeffs(const double &values)
+  {
+    //TODO change to vector
+    coeffs = values;
   }
 
   template <int dim>
@@ -966,7 +1015,7 @@ namespace Step1
   {
     Assert (dim >= 2, ExcInternalError());
     double r_squared = p.distance_square(center);
-    value = exp(-r_squared/(sigma*sigma));
+    value = coeffs*exp(-r_squared/(sigmas*sigmas));
   }
 
   template <int dim>

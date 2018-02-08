@@ -100,12 +100,10 @@ void Problem<dim>::make_enrichment_function ()
     {
       //formulate a 1d problem with x coordinate and radius (i.e sigma)
       double x = this->points_enrichments[i][0];
-      double sigma = 0.05;
-      double coeff = 100;
       EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
                                                100,
-                                               sigma,
-                                               coeff);
+                                               this->sigmas_rhs[0],
+                                               this->coeffs_rhs[0]);
       problem_1d.run();
 
 
@@ -113,20 +111,21 @@ void Problem<dim>::make_enrichment_function ()
       std::vector<double> interpolation_points_1D, interpolation_values_1D;
       double factor = 2;
       interpolation_points_1D.push_back(0);
-      double right_bound = 2*this->radii_enrichments[i];
+      double sigma = this->sigmas_rhs[0];
+      double right_bound = 2*this->radii_predicates[i];
       for (double x = 0.25; x < right_bound; x*=factor)
         interpolation_points_1D.push_back(x);
       interpolation_points_1D.push_back(right_bound);
 
       problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
-      std::cout << "solved problem with "
-                << "(x, sigma): "
-                << x << ", " << sigma << std::endl;
+      this->pcout << "solved problem with "
+                  << "(x, sigma): "
+                  << x << ", " << sigma << std::endl;
 
 
       //construct enrichment function and push
       EnrichmentFunction<dim> func(this->points_enrichments[i],
-                                   this->radii_enrichments[i],
+                                   this->radii_predicates[i],
                                    interpolation_points_1D,
                                    interpolation_values_1D);
       this->vec_enrichments.push_back(func);
@@ -152,7 +151,7 @@ void Problem<dim>::make_enrichment_function ()
                         relative_error :
                         max_error;
           }
-        std::cout << "Max error due to spline approximation: " << max_error << std::endl;
+        this->pcout << "Max error due to spline approximation: " << max_error << std::endl;
         file.close();
       }
 
