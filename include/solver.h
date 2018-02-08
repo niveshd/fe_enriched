@@ -4,7 +4,7 @@
 #include <set>
 
 unsigned int patches = 15;
-#define DATA_OUT
+//#define DATA_OUT
 
 
 
@@ -554,33 +554,46 @@ namespace Step1
       {
         //formulate a 1d problem with x coordinate and radius (i.e sigma)
         double x = points_enrichments[i][0];
-        double sigma = 1;
-        double coeff = 1;
+        double sigma = sigmas_rhs[i];
+        double coeff = coeffs_rhs[i];
         EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
-                                                 sigma,
                                                  size,
+                                                 sigma,
                                                  coeff);
         problem_1d.run();
-
-        //make points at which solution needs to interpolated
-        std::vector<double> interpolation_points_1D, interpolation_values_1D;
-        double factor = 2;
-        interpolation_points_1D.push_back(0);
-        for (double x = 0.25; x < 2*sigma; x*=factor)
-          interpolation_points_1D.push_back(x);
-        interpolation_points_1D.push_back(2*sigma);
-
-        problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
         std::cout << "solved problem with "
                   << "(x, sigma): "
                   << x << ", " << sigma << std::endl;
 
-        //construct enrichment function and push
-        EnrichmentFunction<dim> func(points_enrichments[i],
-                                     radii_predicates[i],
-                                     interpolation_points_1D,
-                                     interpolation_values_1D);
-        vec_enrichments.push_back(func);
+        //make points at which solution needs to interpolated
+        //use bisection like adapter for splines
+        std::vector<double> interpolation_points_1D, interpolation_values_1D;
+        double right_bound = x + 2*radii_predicates[i];
+        double step = 2*radii_predicates[i]/5.0;
+        for (double p = x; p < right_bound; p+=step)
+          interpolation_points_1D.push_back(p);
+        interpolation_points_1D.push_back(right_bound);
+
+        //add enrichment function only when predicate radius is non-zero
+        if (radii_predicates[i] != 0)
+          {
+            problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+
+
+            //construct enrichment function and push
+            EnrichmentFunction<dim> func(points_enrichments[i],
+                                         radii_predicates[i],
+                                         interpolation_points_1D,
+                                         interpolation_values_1D);
+            vec_enrichments.push_back(func);
+          }
+        else
+          {
+            pcout << "Empty function added at " << i << std::endl;
+            EnrichmentFunction<dim> func(Point<dim>(),1,0);
+            vec_enrichments.push_back(func);
+          }
+
       }
   }
 

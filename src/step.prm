@@ -1,6 +1,6 @@
 subsection geometry
-    set size = 4
-    set Global refinement = 2
+    set size = 100
+    set Global refinement = 8
 end
 
 #normal size, r = 100, 7
@@ -16,11 +16,18 @@ end
 #num of enrichment predicates
 1
 
-#points for enrichment functions
+#points for enrichment functions/predicates
 #-1 0
 #0 1
 0 0
 
-#radii
+#radii for predicates
+1 #for enrichment
+#0  #no enrichment
+
+#sigma for enrichment functions
 #1
-1
+0.05
+
+#coefficient for enrichment functions
+100
