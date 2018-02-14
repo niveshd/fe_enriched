@@ -202,7 +202,7 @@ void PoissonSolver<dim>::assemble_system ()
 template <int dim>
 void PoissonSolver<dim>::solve ()
 {
-  SolverControl           solver_control (10000, 1e-12);
+  SolverControl           solver_control (10000, 1e-12,false,false);
   SolverCG<>              solver (solver_control);
   solver.solve (system_matrix, solution, system_rhs,
                 PreconditionIdentity());
@@ -299,6 +299,9 @@ double PoissonSolver<dim>::evaluate
 
 int main (int argc, char **argv)
 {
+  Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
+  MPILogInitAll all;
+
   //calculate vector of points at which solution needs to be interpolated
   double sigma = 0.5;
   double domain_size = 100;
@@ -335,7 +338,8 @@ int main (int argc, char **argv)
   for (unsigned int i = 0; i != interpolation_points.size(); ++i)
     {
       double error = interpolation_values_1D[i] - interpolation_values_2D[i];
-      deallog << "error_ok::" << (error<1e-3) << std::endl;
+      deallog << "Error between 1D and 2D solution < 1e-3::"
+              << (error<1e-3) << std::endl;
     }
 
 
@@ -365,7 +369,8 @@ int main (int argc, char **argv)
                   relative_error :
                   max_error;
     }
-  std::cout << "Max error due to spline approximation: " << max_error << std::endl;
+
+  deallog << "Max error due to spline approximation: " << max_error << std::endl;
   file.close();
 
   return 0;

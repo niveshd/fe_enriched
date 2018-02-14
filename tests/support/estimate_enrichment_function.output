@@ -1,50 +1,6 @@
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
-DEAL::error_ok::1
+
+DEAL:0::Error between 1D and 2D solution < 1e-3::1
+DEAL:0::Error between 1D and 2D solution < 1e-3::1
+DEAL:0::Error between 1D and 2D solution < 1e-3::1
+DEAL:0::Error between 1D and 2D solution < 1e-3::1
+DEAL:0::Max error due to spline approximation: 0.00367387

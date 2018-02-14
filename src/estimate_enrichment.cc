@@ -235,14 +235,17 @@ void EstimateEnrichmentFunction<dim>::evaluate_at_x_values
 (std::vector< double >  &interpolation_points,
  std::vector< double >   &interpolation_values)
 {
-  AssertDimension(interpolation_values.size(),0);
+  if (interpolation_values.size() != interpolation_points.size())
+    interpolation_values.resize(interpolation_points.size());
+
   //x varies from 0 to 2*sigma.
   //factor 2 because once a cell is decided to be enriched based on its center,
   //its quadrature points can cause x to be twice!
-  for (auto x:interpolation_points)
+  for (int i=0; i!=interpolation_values.size(); ++i)
     {
-      double value = VectorTools::point_value(dof_handler, solution, Point<dim>(x));
-      interpolation_values.push_back(value);
+      double value = VectorTools::point_value(dof_handler, solution,
+                                              Point<dim>(interpolation_points[i]));
+      interpolation_values[i] = value;
     }
 }
 

@@ -101,7 +101,7 @@ void Problem<dim>::make_enrichment_function ()
       //formulate a 1d problem with x coordinate and radius (i.e sigma)
       double x = this->points_enrichments[i][0];
       EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
-                                               size,
+                                               this->size,
                                                this->sigmas_rhs[0],
                                                this->coeffs_rhs[0]);
       problem_1d.run();
