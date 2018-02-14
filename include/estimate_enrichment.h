@@ -36,6 +36,11 @@ public:
                               double domain_size,
                               double sigma,
                               double coeff);
+  EstimateEnrichmentFunction  (Point<dim> center,
+                               double left_bound,
+                               double right_bound,
+                               double sigma,
+                               double coeff);
   ~EstimateEnrichmentFunction();
   void run ();
   void evaluate_at_x_values
@@ -51,6 +56,7 @@ private:
   void output_results () const;
   Point<dim> center;
   double domain_size;
+  double left_bound, right_bound;
   double sigma;
   double coeff;
   Triangulation<dim>   triangulation;

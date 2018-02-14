@@ -65,6 +65,26 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
   dof_handler (triangulation)
 {
   AssertDimension(dim,1);
+  left_bound = center[0] - domain_size/2;
+  right_bound = center[0] + domain_size/2;
+}
+
+template <int dim>
+EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
+(Point<dim> center, double left_bound,
+ double right_bound, double sigma, double coeff)
+  :
+  center(center),
+  left_bound(left_bound),
+  right_bound(right_bound),
+  sigma(sigma),
+  coeff(coeff),
+  refinement(7),
+  fe (1),
+  dof_handler (triangulation)
+{
+  AssertDimension(dim,1);
+  domain_size = right_bound - left_bound;
 }
 
 template <int dim>
@@ -72,8 +92,8 @@ void EstimateEnrichmentFunction<dim>::make_grid ()
 {
   //TODO domain 50 times original radius enough?
   GridGenerator::hyper_cube (triangulation,
-                             center[0]-domain_size/2,
-                             center[0]+domain_size/2);
+                             left_bound,
+                             right_bound);
   triangulation.refine_global (refinement);
 }
 
@@ -211,7 +231,7 @@ void EstimateEnrichmentFunction<dim>::run ()
       assemble_system ();
       solve ();
 
-      value = VectorTools::point_value(dof_handler, solution, Point<dim>(0));
+      value = VectorTools::point_value(dof_handler, solution, center);
       if (!start)
         {
           relative_change = fabs((old_value - value)/old_value);
@@ -241,7 +261,7 @@ void EstimateEnrichmentFunction<dim>::evaluate_at_x_values
   //x varies from 0 to 2*sigma.
   //factor 2 because once a cell is decided to be enriched based on its center,
   //its quadrature points can cause x to be twice!
-  for (int i=0; i!=interpolation_values.size(); ++i)
+  for (unsigned int i=0; i!=interpolation_values.size(); ++i)
     {
       double value = VectorTools::point_value(dof_handler, solution,
                                               Point<dim>(interpolation_points[i]));
