@@ -60,6 +60,7 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
   domain_size(domain_size),
   sigma(sigma),
   coeff(coeff),
+  debug_level(0),
   refinement(7),
   fe (1),
   dof_handler (triangulation)
@@ -79,6 +80,7 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
   right_bound(right_bound),
   sigma(sigma),
   coeff(coeff),
+  debug_level(0),
   refinement(refinement),
   fe (1),
   dof_handler (triangulation)
@@ -247,7 +249,8 @@ void EstimateEnrichmentFunction<dim>::run ()
             << refinement
             << std::endl;
 
-  output_results ();
+  if (debug_level >= 1)
+    output_results ();
 }
 
 template <int dim>

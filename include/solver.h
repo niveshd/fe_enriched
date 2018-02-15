@@ -9,6 +9,7 @@ void plot_shape_function
  unsigned int patches=5)
 {
   std::cout << "...start plotting shape function" << std::endl;
+  std::cout << "Patches for output: " << patches << std::endl;
 
   ConstraintMatrix constraints;
   constraints.clear();
@@ -123,7 +124,7 @@ namespace Step1
   class LaplaceProblem
   {
   public:
-    LaplaceProblem (int argc,char **argv);
+    LaplaceProblem (int argc,char **argv,unsigned int patches=5);
     virtual ~LaplaceProblem();
     void run ();
 
@@ -148,6 +149,10 @@ namespace Step1
     char **argv;
     double size;
     unsigned int patches;
+    //debug level = 0(output nothing), 1(output solution)
+    //2 (+ output grid data as well)
+    //9 (+ shape functions as well)
+    unsigned int debug_level;
     unsigned int global_refinement;
     unsigned int n_enrichments;
     unsigned int n_enriched_cells;
@@ -223,11 +228,12 @@ namespace Step1
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem (int argc,
                                        char **argv,
-                                       unsigned int patches=5)
+                                       unsigned int patches)
     :
     argc(argc),
     argv(argv),
     patches(patches),
+    debug_level(1),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(1),
@@ -283,6 +289,7 @@ namespace Step1
                       "1",
                       Patterns::Integer(1));
     prm.leave_subsection();
+
     prm.enter_subsection("solver");
     prm.declare_entry("max iterations",
                       "1000",
@@ -292,9 +299,20 @@ namespace Step1
                       Patterns::Double(0));
     prm.leave_subsection();
 
+    prm.enter_subsection("output");
+    prm.declare_entry("patches",
+                      "5",
+                      Patterns::Integer(1));
+    prm.declare_entry("debug_level",
+                      "0",
+                      Patterns::Integer(0,9));
+    prm.leave_subsection();
+
+
     //parse parameter file
     AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
     prm.parse_input(argv[1], "#end-of-dealii parser");
+
 
     //get parameters
     prm.enter_subsection("geometry");
@@ -307,10 +325,18 @@ namespace Step1
     tolerance = prm.get_double("tolerance");
     prm.leave_subsection();
 
+    prm.enter_subsection("output");
+    patches = prm.get_integer("patches");
+    debug_level = prm.get_integer("debug_level");
+    prm.leave_subsection();
+
+
     pcout << "Size : "<< size << std::endl;
     pcout << "Global refinement : " << global_refinement << std::endl;
     pcout << "Max Iterations : " << max_iterations << std::endl;
     pcout << "Tolerance : " << tolerance << std::endl;
+    pcout << "Patches used for output: " << patches << std::endl;
+    pcout << "Debug level: " << debug_level << std::endl;
 
     //manual parsing
     //open parameter file
@@ -461,62 +487,63 @@ namespace Step1
     //build fe table. should be called everytime number of cells change!
     build_tables();
 
-#ifdef DATA_OUT
-    if (triangulation.n_active_cells() < 100)
+    if (debug_level == 9)
       {
-        pcout << "...start print fe indices" << std::endl;
+        if (triangulation.n_active_cells() < 100)
+          {
+            pcout << "...start print fe indices" << std::endl;
 
-        //print fe index
-        const std::string base_filename =
-          "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
-        const std::string filename =  base_filename + ".gp";
-        std::ofstream f(filename.c_str());
+            //print fe index
+            const std::string base_filename =
+              "fe_indices" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+            const std::string filename =  base_filename + ".gp";
+            std::ofstream f(filename.c_str());
 
-        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-          << "set output \"" << base_filename << ".png\"" << std::endl
-          << "set size square" << std::endl
-          << "set view equal xy" << std::endl
-          << "unset xtics" << std::endl
-          << "unset ytics" << std::endl
-          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-        GridOut().write_gnuplot (triangulation, f);
-        f << "e" << std::endl;
+            f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+              << "set output \"" << base_filename << ".png\"" << std::endl
+              << "set size square" << std::endl
+              << "set view equal xy" << std::endl
+              << "unset xtics" << std::endl
+              << "unset ytics" << std::endl
+              << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+            GridOut().write_gnuplot (triangulation, f);
+            f << "e" << std::endl;
 
-        for (auto it : dof_handler.active_cell_iterators())
-          f << it->center() << " \"" << it->active_fe_index() << "\"\n";
+            for (auto it : dof_handler.active_cell_iterators())
+              f << it->center() << " \"" << it->active_fe_index() << "\"\n";
 
-        f << std::flush << "e" << std::endl;
-        pcout << "...finished print fe indices" << std::endl;
+            f << std::flush << "e" << std::endl;
+            pcout << "...finished print fe indices" << std::endl;
+          }
+
+        if (triangulation.n_active_cells() < 100)
+          {
+            pcout << "...start print cell indices" << std::endl;
+
+            //print cell ids
+            const std::string base_filename =
+              "cell_id" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
+            const std::string filename =  base_filename + ".gp";
+            std::ofstream f(filename.c_str());
+
+            f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
+              << "set output \"" << base_filename << ".png\"" << std::endl
+              << "set size square" << std::endl
+              << "set view equal xy" << std::endl
+              << "unset xtics" << std::endl
+              << "unset ytics" << std::endl
+              << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
+            GridOut().write_gnuplot (triangulation, f);
+            f << "e" << std::endl;
+
+            for (auto it : dof_handler.active_cell_iterators())
+              f << it->center() << " \"" << it->index() << "\"\n";
+
+            f << std::flush << "e" << std::endl;
+
+            pcout << "...end print cell indices" << std::endl;
+          }
       }
-
-    if (triangulation.n_active_cells() < 100)
-      {
-        pcout << "...start print cell indices" << std::endl;
-
-        //print cell ids
-        const std::string base_filename =
-          "cell_id" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
-        const std::string filename =  base_filename + ".gp";
-        std::ofstream f(filename.c_str());
-
-        f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-          << "set output \"" << base_filename << ".png\"" << std::endl
-          << "set size square" << std::endl
-          << "set view equal xy" << std::endl
-          << "unset xtics" << std::endl
-          << "unset ytics" << std::endl
-          << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-        GridOut().write_gnuplot (triangulation, f);
-        f << "e" << std::endl;
-
-        for (auto it : dof_handler.active_cell_iterators())
-          f << it->center() << " \"" << it->index() << "\"\n";
-
-        f << std::flush << "e" << std::endl;
-
-        pcout << "...end print cell indices" << std::endl;
-      }
-#endif
 
     //q collections the same size as different material identities
     //TODO in parameter file
@@ -553,7 +580,7 @@ namespace Step1
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
       {
         //formulate a 1d problem with x coordinate and radius (i.e sigma)
-        double center = points_enrichments[i][0];
+        double center = 0;
         double sigma = sigmas_rhs[i];
         double coeff = coeffs_rhs[i];
         EstimateEnrichmentFunction<1> problem_1d(Point<1>(center),
@@ -609,8 +636,8 @@ namespace Step1
                                          predicate_colors,
                                          cellwise_color_predicate_map,
                                          fe_sets);
-
-    output_cell_attributes();
+    if (debug_level >= 2)
+      output_cell_attributes();
 
     {
       //print material table
@@ -836,6 +863,7 @@ namespace Step1
   void LaplaceProblem<dim>::output_results (const unsigned int cycle)
   {
     pcout << "...output results" << std::endl;
+    pcout << "Patches used: " << patches << std::endl;
 
     Assert (cycle < 10, ExcNotImplemented());
     if (this_mpi_process==0)
@@ -951,9 +979,10 @@ namespace Step1
               << "Number of degrees of freedom: "
               << dof_handler.n_dofs ()
               << std::endl;
-#ifdef DATA_OUT
-        plot_shape_function<dim>(dof_handler);
-#endif
+
+        if (debug_level == 9)
+          plot_shape_function<dim>(dof_handler);
+
         assemble_system ();
         auto n_iterations = solve ();
         pcout << "Number of iterations: " << n_iterations << std::endl;
@@ -961,7 +990,8 @@ namespace Step1
         //TODO Uncomment. correct function body
 //        estimate_error ();
 
-        output_results(cycle);
+        if (debug_level >= 1)
+          output_results(cycle);
 
         //TODO UNCOMMENT. correct function body
 //        refine_grid ();

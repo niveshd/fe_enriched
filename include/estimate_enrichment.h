@@ -60,6 +60,9 @@ private:
   double left_bound, right_bound;
   double sigma;
   double coeff;
+public:
+  unsigned int debug_level;
+private:
   Triangulation<dim>   triangulation;
   unsigned int refinement;
   FE_Q<dim>            fe;

@@ -67,7 +67,7 @@ int main (int argc,char **argv)
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        Step1::LaplaceProblem<dim> step1(argc,argv);
+        Step1::LaplaceProblem<dim> step1(argc,argv,6);
         //TODO options not needed?
         PETScWrappers::set_option_value("-eps_target","-1.0");
         PETScWrappers::set_option_value("-st_type","sinvert");
