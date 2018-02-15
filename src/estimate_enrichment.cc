@@ -72,14 +72,14 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
 template <int dim>
 EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
 (Point<dim> center, double left_bound,
- double right_bound, double sigma, double coeff)
+ double right_bound, double sigma, double coeff, double refinement)
   :
   center(center),
   left_bound(left_bound),
   right_bound(right_bound),
   sigma(sigma),
   coeff(coeff),
-  refinement(7),
+  refinement(refinement),
   fe (1),
   dof_handler (triangulation)
 {

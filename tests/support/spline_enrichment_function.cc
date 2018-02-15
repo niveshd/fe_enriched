@@ -99,28 +99,36 @@ void Problem<dim>::make_enrichment_function ()
   for (unsigned int i=0; i<this->vec_predicates.size(); ++i)
     {
       //formulate a 1d problem with x coordinate and radius (i.e sigma)
-      double x = this->points_enrichments[i][0];
-      EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
-                                               this->size,
-                                               this->sigmas_rhs[0],
-                                               this->coeffs_rhs[0]);
+      //always solve problem with
+      //center = 0, domain size = 100, sigma = 0.05, coefficient 100, refinement 7
+      double center = 0;
+      double domain_size = 100;
+      double sigma = 0.05;
+      double coefficient = 100;
+      EstimateEnrichmentFunction<1> problem_1d(Point<1>(center),
+                                               domain_size,
+                                               sigma,
+                                               coefficient);
       problem_1d.run();
 
 
       //make points at which solution needs to interpolated
       std::vector<double> interpolation_points_1D, interpolation_values_1D;
-      double factor = 2;
-      interpolation_points_1D.push_back(0);
-      double sigma = this->sigmas_rhs[0];
-      double right_bound = 2*this->radii_predicates[i];
-      for (double x = 0.25; x < right_bound; x*=factor)
-        interpolation_points_1D.push_back(x);
+      double range = 2;
+      double cut_point = 0.6;
+      unsigned int n1 = 3, n2 = 3;
+      double right_bound = center + range;
+      double h1 = cut_point/n1, h2 = (range-cut_point)/n2;
+      for (double p = center; p < cut_point; p+=h1)
+        interpolation_points_1D.push_back(p);
+      for (double p = cut_point; p < right_bound; p+=h2)
+        interpolation_points_1D.push_back(p);
       interpolation_points_1D.push_back(right_bound);
 
       problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
       this->pcout << "solved problem with "
                   << "(x, sigma): "
-                  << x << ", " << sigma << std::endl;
+                  << center << ", " << sigma << std::endl;
 
 
       //construct enrichment function and push
@@ -134,17 +142,18 @@ void Problem<dim>::make_enrichment_function ()
       //check how well spline approximates function
       {
         double max_error=0;
-        std::ofstream file("spline_accuracy.data", std::ios::out);
+        std::ofstream file("spline_accuracy.csv", std::ios::out);
         double h = sigma/100;
+        file << "x spline_value solution_value relative_error" << std::endl;
         for (double x=0; x < right_bound; x+=h)
           {
-            double func_value = func.value(Point<2> (x,0));
-            double prob_value = problem_1d.value(Point<1> (x));
-            double relative_error = (func_value != 0) ? (func_value-prob_value)/func_value :
+            double spline_value = func.value(Point<2> (x,0));
+            double solution_value = problem_1d.value(Point<1> (x));
+            double relative_error = (spline_value != 0) ? (spline_value-solution_value)/spline_value :
                                     0;
             file << x
-                 << " " << func_value
-                 << " " << prob_value
+                 << " " << spline_value
+                 << " " << solution_value
                  << " " << relative_error
                  << std::endl;
             max_error = (max_error < relative_error)?
@@ -159,7 +168,7 @@ void Problem<dim>::make_enrichment_function ()
       //print shape function values after enrichment
       double step = 0.1;
       AssertDimension (dim,2);
-      for (double x=0; x <= 1; x+=step)
+      for (double x=0; x <= 2; x+=step)
         {
           Point<dim> p(x,0);
           deallog << x << ":"

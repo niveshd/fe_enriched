@@ -40,7 +40,8 @@ public:
                                double left_bound,
                                double right_bound,
                                double sigma,
-                               double coeff);
+                               double coeff,
+                               double refinement=7);
   ~EstimateEnrichmentFunction();
   void run ();
   void evaluate_at_x_values

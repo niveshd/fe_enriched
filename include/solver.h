@@ -3,14 +3,10 @@
 
 #include <set>
 
-unsigned int patches = 15;
-//#define DATA_OUT
-
-
-
 template <int dim>
 void plot_shape_function
-(hp::DoFHandler<dim> &dof_handler)
+(hp::DoFHandler<dim> &dof_handler,
+ unsigned int patches=5)
 {
   std::cout << "...start plotting shape function" << std::endl;
 
@@ -151,6 +147,7 @@ namespace Step1
     int argc;
     char **argv;
     double size;
+    unsigned int patches;
     unsigned int global_refinement;
     unsigned int n_enrichments;
     unsigned int n_enriched_cells;
@@ -224,10 +221,13 @@ namespace Step1
 
 
   template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem (int argc,char **argv)
+  LaplaceProblem<dim>::LaplaceProblem (int argc,
+                                       char **argv,
+                                       unsigned int patches=5)
     :
     argc(argc),
     argv(argv),
+    patches(patches),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(1),
@@ -553,24 +553,26 @@ namespace Step1
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
       {
         //formulate a 1d problem with x coordinate and radius (i.e sigma)
-        double x = points_enrichments[i][0];
+        double center = points_enrichments[i][0];
         double sigma = sigmas_rhs[i];
         double coeff = coeffs_rhs[i];
-        EstimateEnrichmentFunction<1> problem_1d(Point<1>(x),
+        EstimateEnrichmentFunction<1> problem_1d(Point<1>(center),
                                                  size,
                                                  sigma,
                                                  coeff);
         problem_1d.run();
         std::cout << "solved problem with "
                   << "(x, sigma): "
-                  << x << ", " << sigma << std::endl;
+                  << center << ", " << sigma << std::endl;
 
         //make points at which solution needs to interpolated
         //use bisection like adapter for splines
         std::vector<double> interpolation_points_1D, interpolation_values_1D;
-        double right_bound = x + 2*radii_predicates[i];
-        double step = 2*radii_predicates[i]/5.0;
-        for (double p = x; p < right_bound; p+=step)
+        double radius = radii_predicates[i];
+        unsigned int n = 5;
+        double right_bound = center + 2*radius;
+        double h = 2.0*radius/n;
+        for (double p = center; p < right_bound; p+=h)
           interpolation_points_1D.push_back(p);
         interpolation_points_1D.push_back(right_bound);
 

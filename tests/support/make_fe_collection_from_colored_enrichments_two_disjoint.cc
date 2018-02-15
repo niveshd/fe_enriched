@@ -58,11 +58,10 @@ const unsigned int dim = 2;
 //uncomment when debugging
 // #define DATA_OUT_FE_ENRICHED
 
-unsigned int patches = 10;
-
 template <int dim>
 void plot_shape_function
-(hp::DoFHandler<dim> &dof_handler)
+(hp::DoFHandler<dim> &dof_handler,
+ unsigned int patches = 5)
 {
   deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
@@ -214,7 +213,7 @@ int main(int argc, char **argv)
   dof_handler.distribute_dofs(fe_collection);
 
 #ifdef DATA_OUT_FE_ENRICHED
-  plot_shape_function<dim>(dof_handler);
+  plot_shape_function<dim>(dof_handler,5);
 #endif
 
   dof_handler.clear();
