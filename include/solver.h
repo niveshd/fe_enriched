@@ -986,6 +986,11 @@ namespace Step1
         assemble_system ();
         auto n_iterations = solve ();
         pcout << "Number of iterations: " << n_iterations << std::endl;
+        pcout << "Solution at origin:   "
+              << VectorTools::point_value(dof_handler,
+                                          solution,
+                                          Point<dim>())
+              << std::endl;
 
         //TODO Uncomment. correct function body
 //        estimate_error ();

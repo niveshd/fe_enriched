@@ -1,6 +1,6 @@
 subsection geometry
     set size = 100
-    set Global refinement = 9
+    set Global refinement = 10
 end
 
 #normal size, r = 100, 7
@@ -12,7 +12,7 @@ subsection solver
 end
 
 subsection output
-    set patches = 2
+    set patches = 1
     set debug_level = 0
 end
 
@@ -27,7 +27,7 @@ end
 0 0
 
 #radii for predicates
-1 #for enrichment
+0  #no enrichment
 
 #sigma for enrichment functions
 #1
