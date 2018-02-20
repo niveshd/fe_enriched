@@ -69,17 +69,17 @@ template <int dim>
 class Problem : public Step1::LaplaceProblem<dim>
 {
 public:
-  Problem (int argc,char **argv):
-    Step1::LaplaceProblem<dim>(argc, argv) {}
+  Problem ():
+    Step1::LaplaceProblem<dim>() {}
 
   void run_pre_solution_steps()
   {
+    this->initialize();
     this->build_fe_space();
     this->setup_system();
 
-#ifdef DATA_OUT
-    plot_shape_function<dim>(this->dof_handler);
-#endif
+    if (this->debug_level == 9)
+      plot_shape_function<dim>(this->dof_handler);
   }
 
 private:
@@ -104,11 +104,9 @@ void Problem<dim>::make_enrichment_function ()
       double center = 0;
       double domain_size = 100;
       double sigma = 0.05;
-      double coefficient = 100;
       EstimateEnrichmentFunction<1> problem_1d(Point<1>(center),
                                                domain_size,
-                                               sigma,
-                                               coefficient);
+                                               sigma);
       problem_1d.run();
 
 
@@ -228,10 +226,28 @@ void Problem<dim>::make_enrichment_function ()
 
 int main (int argc,char **argv)
 {
+  /**
+   * Run initial steps of Laplace problem with enrichment.
+   * A simple enrichment function is chosen and shape function
+   * values are checked.
+   */
+
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPILogInitAll all;
   {
-    Problem<dim> step_test(argc,argv);
+    Problem<dim> step_test;
+    step_test.read_parameters
+    (4,   //domain size
+     2,   //global refinement
+     10000, //max iterations
+     1e-8,  //tolerance
+     15,   //patches
+     9,   //debug level
+     1,   //num enrichments
+    {Point<dim>()}, //enrichment points
+    {1},    //predicate radii
+    {0.05}); //sigmas
+
     step_test.run_pre_solution_steps();
   }
 }

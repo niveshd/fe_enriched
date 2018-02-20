@@ -60,8 +60,7 @@ int main (int argc, char **argv)
       //solve 1d problem
       EstimateEnrichmentFunction<1> problem_1d(Point<1>(0),
                                                domain_size,
-                                               sigma,
-                                               coeff);
+                                               sigma);
       std::cout << "Solving with sigma,coeff: " << sigma << "," << coeff << std::endl;
       problem_1d.run();
 
@@ -72,7 +71,7 @@ int main (int argc, char **argv)
 
       //print points as output with sigma and coefficient
       std::stringstream name;
-      name << "sigma" << sigma << "coeff" << coeff << ".csv";
+      name << "sigma" << sigma << ".csv";
       std::ofstream file(name.str(), std::ios::out);
       file << "x value" << std::endl;
       for (unsigned int i=0; i!=interpolation_points.size(); ++i)

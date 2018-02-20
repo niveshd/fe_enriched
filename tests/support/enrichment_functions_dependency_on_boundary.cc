@@ -66,8 +66,7 @@ int main (int argc, char **argv)
       EstimateEnrichmentFunction<1> problem_1d(Point<1>(center[i]),
                                                left_bound[i],
                                                right_bound[i],
-                                               sigma,
-                                               coeff);
+                                               sigma);
       std::cout << "Solving with size,origin: " << left_bound[i]
                 << "," << right_bound[i]
                 << "," << center[i] << std::endl;

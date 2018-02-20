@@ -25,6 +25,7 @@
 
 #include "estimate_enrichment.h"
 #include "support.h"
+#include "functions.h"
 #include "../tests.h"
 
 using namespace dealii;
@@ -35,8 +36,7 @@ class PoissonSolver
 public:
   PoissonSolver (Point<dim> center,
                  double domain_size,
-                 double sigma,
-                 double coeff);
+                 double sigma);
   void run ();
   void evaluate_at_x_values
   (std::vector< double >  &interpolation_points,
@@ -52,7 +52,7 @@ private:
   Point<dim> center;
   double domain_size;
   double sigma;
-  double coeff;
+  std::vector<double> rhs_values;
   Triangulation<dim>   triangulation;
   unsigned int refinement;
   FE_Q<dim>            fe;
@@ -62,33 +62,6 @@ private:
   Vector<double>       solution;
   Vector<double>       system_rhs;
 };
-
-
-template <int dim>
-class RightHandSide : public Function<dim>
-{
-public:
-  RightHandSide (Point<dim> center, double sigma, double coeff=1)
-    : Function<dim>(),
-      center(center),
-      sigma(sigma),
-      coeff(coeff)
-  {}
-  virtual double value (const Point<dim>   &p,
-                        const unsigned int  component = 0) const;
-  Point<dim> center;
-  double sigma;
-  double coeff;
-};
-
-template <int dim>
-double RightHandSide<dim>::value (const Point<dim> &p,
-                                  const unsigned int /*component*/) const
-{
-  double return_value = 0.0;
-  return_value = coeff*exp(-p.distance_square(center)/(sigma*sigma));
-  return return_value;
-}
 
 
 
@@ -114,14 +87,12 @@ template <int dim>
 PoissonSolver<dim>::PoissonSolver
 (Point<dim> center,
  double domain_size,
- double sigma,
- double coeff)
+ double sigma)
   :
   center(center),
   domain_size(domain_size),
   sigma(sigma),
-  coeff(coeff),
-  refinement(7),
+  refinement(8),
   fe (1),
   dof_handler (triangulation)
 {}
@@ -153,7 +124,7 @@ template <int dim>
 void PoissonSolver<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const RightHandSide<dim> right_hand_side(center,sigma,coeff);
+  const GaussianFunction<dim> rhs(center,sigma);
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
@@ -167,6 +138,9 @@ void PoissonSolver<dim>::assemble_system ()
       fe_values.reinit (cell);
       cell_matrix = 0;
       cell_rhs = 0;
+      rhs_values.resize(n_q_points);
+      rhs.value_list (fe_values.get_quadrature_points(),
+                      rhs_values);
 
       for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
         for (unsigned int i=0; i<dofs_per_cell; ++i)
@@ -176,7 +150,7 @@ void PoissonSolver<dim>::assemble_system ()
                                    fe_values.shape_grad (j, q_index) *
                                    fe_values.JxW (q_index));
             cell_rhs(i) += (fe_values.shape_value (i, q_index) *
-                            right_hand_side.value (fe_values.quadrature_point (q_index)) *
+                            rhs_values[q_index] *
                             fe_values.JxW (q_index));
           }
       cell->get_dof_indices (local_dof_indices);
@@ -244,6 +218,8 @@ void PoissonSolver<dim>::run ()
   bool start = true;
   do
     {
+      std::cout << "2D - Refinement level: " << refinement << std::endl;
+
       if (cycles!=0)
         {
           refine_grid ();
@@ -305,7 +281,6 @@ int main (int argc, char **argv)
   //calculate vector of points at which solution needs to be interpolated
   double sigma = 0.5;
   double domain_size = 100;
-  double coeff = 2;
   std::vector<double> interpolation_points, interpolation_values_2D;
   double factor = 2;
   interpolation_points.push_back(0);
@@ -319,16 +294,14 @@ int main (int argc, char **argv)
   //solve 2d problem
   PoissonSolver<2> problem_2d(Point<2>(0,0), //center and size
                               domain_size,
-                              sigma,        //right hand side
-                              coeff);
+                              sigma);
   problem_2d.run ();
   problem_2d.evaluate_at_x_values(interpolation_points,interpolation_values_2D);
 
   //solve 1d problem
   EstimateEnrichmentFunction<1> problem_1d(Point<1>(0),
                                            domain_size,
-                                           sigma,
-                                           coeff);
+                                           sigma);
   problem_1d.run();
   std::vector<double> interpolation_values_1D;
   problem_1d.evaluate_at_x_values(interpolation_points,interpolation_values_1D);
@@ -370,7 +343,8 @@ int main (int argc, char **argv)
                   max_error;
     }
 
-  deallog << "Max error due to spline approximation: " << max_error << std::endl;
+  deallog << "Max spline approx. error < 1e-2 : "
+          << (max_error < 1e-2) << std::endl;
   file.close();
 
   return 0;
