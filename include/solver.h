@@ -2,6 +2,8 @@
 #define SOLVER_H
 
 #include <set>
+#include <math.h>
+#include <functions.h>
 
 template <int dim>
 void plot_shape_function
@@ -124,18 +126,33 @@ namespace Step1
   class LaplaceProblem
   {
   public:
-    LaplaceProblem (int argc,char **argv,unsigned int patches=5);
+    LaplaceProblem ();
     virtual ~LaplaceProblem();
+
+    void read_parameters_from_file
+    (const std::string &file_name);
+
+    void read_parameters
+    (const double &_size,
+     const unsigned int &_global_refinement,
+     const unsigned int &_max_iterations,
+     const double &_tolerance,
+     const unsigned int &_patches,
+     const unsigned int &_debug_level,
+     const unsigned int &_n_enrichments,
+     const std::vector<Point<dim>> &_points_enrichments,
+     const std::vector<double> &_radii_predicates,
+     const std::vector<double> &_sigmas_rhs);
+
     void run ();
 
   protected:
+    void initialize();
     void build_fe_space();
     virtual void make_enrichment_function();
     void setup_system ();
-    struct RightHandSide;
 
   private:
-    void read_parameters();
     void build_tables ();
     void output_cell_attributes ();  //change to const later
     void assemble_system ();
@@ -145,8 +162,6 @@ namespace Step1
     void output_results (const unsigned int cycle);
 
   protected:
-    int argc;
-    char **argv;
     double size;
     unsigned int patches;
     //debug level = 0(output nothing), 1(output solution)
@@ -159,7 +174,6 @@ namespace Step1
     std::vector<Point<dim>> points_enrichments;
     std::vector<double> radii_predicates;
     std::vector<double> sigmas_rhs;
-    std::vector<double> coeffs_rhs;
 
     ParameterHandler prm;
 
@@ -188,7 +202,7 @@ namespace Step1
 
     ConditionalOStream pcout;
 
-    RightHandSide right_hand_side;
+    std::vector<GaussianFunction<dim>> vec_rhs;
 
     using cell_function = std::function<const Function<dim>*
                           (const typename Triangulation<dim>::cell_iterator &)>;
@@ -226,13 +240,9 @@ namespace Step1
 
 
   template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem (int argc,
-                                       char **argv,
-                                       unsigned int patches)
+  LaplaceProblem<dim>::LaplaceProblem ()
     :
-    argc(argc),
-    argv(argv),
-    patches(patches),
+    patches(5),
     debug_level(1),
     n_enriched_cells(0),
     dof_handler (triangulation),
@@ -244,39 +254,13 @@ namespace Step1
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0))
   {
-    std::cout << "...start constructor" << std::endl;
-
-    read_parameters();
-
-    //set up basic grid
-    GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
-    triangulation.refine_global (global_refinement);
-
-    pcout << "step size: " << size/std::pow(2.0,global_refinement) << std::endl;
-
-    Assert(points_enrichments.size()==n_enrichments &&
-           radii_predicates.size()==n_enrichments,
-           ExcMessage("Incorrect number of enrichment points and radii"));
-
-    //initialize vector of vec_predicates
-    for (unsigned int i=0; i != n_enrichments; ++i)
-      {
-        vec_predicates.push_back( EnrichmentPredicate<dim>(points_enrichments[i],
-                                                           radii_predicates[i]) );
-      }
-
-    //set right hand side function. TODO change to incorporate a sum of such funcs
-    right_hand_side.set_points(Point<dim>());
-    right_hand_side.set_sigmas(sigmas_rhs[0]);
-    right_hand_side.set_coeffs(coeffs_rhs[0]);
-
-    pcout << "...finished constructor" << std::endl;
   }
 
 
 
   template <int dim>
-  void LaplaceProblem<dim>::read_parameters()
+  void LaplaceProblem<dim>::read_parameters_from_file
+  (const std::string &file_name)
   {
     pcout << "...reading parameters" << std::endl;
 
@@ -303,15 +287,14 @@ namespace Step1
     prm.declare_entry("patches",
                       "5",
                       Patterns::Integer(1));
-    prm.declare_entry("debug_level",
+    prm.declare_entry("debug level",
                       "0",
                       Patterns::Integer(0,9));
     prm.leave_subsection();
 
 
     //parse parameter file
-    AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
-    prm.parse_input(argv[1], "#end-of-dealii parser");
+    prm.parse_input(file_name, "#end-of-dealii parser");
 
 
     //get parameters
@@ -327,7 +310,7 @@ namespace Step1
 
     prm.enter_subsection("output");
     patches = prm.get_integer("patches");
-    debug_level = prm.get_integer("debug_level");
+    debug_level = prm.get_integer("debug level");
     prm.leave_subsection();
 
 
@@ -340,8 +323,7 @@ namespace Step1
 
     //manual parsing
     //open parameter file
-    AssertThrow(argc >= 2, ExcMessage("Parameter file not given"));
-    std::ifstream prm_file(argv[1]);
+    std::ifstream prm_file(file_name);
 
     //read lines until "#end-of-dealii parser" is reached
     std::string line;
@@ -431,26 +413,89 @@ namespace Step1
     for (auto r:sigmas_rhs)
       pcout << r << std::endl;
 
-    //note vector of radii for predicates
-    for (unsigned int i=0; i!=n_enrichments; ++i)
-      {
-        skiplines();
-        s_stream.clear();
-        s_stream.str(line);
+    pcout << "...finished parameter reading from file." << std::endl;
+  }
 
-        double r;
-        s_stream >> r;
-        coeffs_rhs.push_back(r);
-      }
+  template <int dim>
+  void LaplaceProblem<dim>::read_parameters
+  (const double &_size,
+   const unsigned int &_global_refinement,
+   const unsigned int &_max_iterations,
+   const double &_tolerance,
+   const unsigned int &_patches,
+   const unsigned int &_debug_level,
+   const unsigned int &_n_enrichments,
+   const std::vector<Point<dim>> &_points_enrichments,
+   const std::vector<double> &_radii_predicates,
+   const std::vector<double> &_sigmas_rhs)
+  {
+    size = _size;
+    global_refinement = _global_refinement;
+    max_iterations = _max_iterations;
+    tolerance = _tolerance;
+    patches = _patches;
+    debug_level = _debug_level;
+    n_enrichments = _n_enrichments;
+    points_enrichments = _points_enrichments;
+    radii_predicates = _radii_predicates;
+    sigmas_rhs = _sigmas_rhs;
 
-    pcout << "Coefficients : " << std::endl;
-    for (auto r:coeffs_rhs)
+    pcout << "Size : "<< size << std::endl;
+    pcout << "Global refinement : " << global_refinement << std::endl;
+    pcout << "Max Iterations : " << max_iterations << std::endl;
+    pcout << "Tolerance : " << tolerance << std::endl;
+    pcout << "Patches used for output: " << patches << std::endl;
+    pcout << "Debug level: " << debug_level << std::endl;
+    pcout << "Number of enrichments: " << n_enrichments << std::endl;
+    pcout << "Enrichment points : " << std::endl;
+    for (auto p:points_enrichments)
+      pcout << p << std::endl;
+
+    pcout << "Enrichment radii : " << std::endl;
+    for (auto r:radii_predicates)
+      pcout << r << std::endl;
+
+    pcout << "Sigma : " << std::endl;
+    for (auto r:sigmas_rhs)
       pcout << r << std::endl;
 
     pcout << "...finished parameter reading." << std::endl;
   }
 
+  template <int dim>
+  void LaplaceProblem<dim>::initialize()
+  {
+    pcout << "...Start initializing" << std::endl;
+    //set up basic grid
+    GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
+    triangulation.refine_global (global_refinement);
 
+    pcout << "step size: " << size/std::pow(2.0,global_refinement) << std::endl;
+
+    Assert(points_enrichments.size()==n_enrichments &&
+           radii_predicates.size()==n_enrichments &&
+           sigmas_rhs.size()==n_enrichments,
+           ExcMessage
+           ("Incorrect parameters: enrichment points, predicate radii and sigmas should be of same size"));
+
+    //initialize vector of predicate functions, f: assign cell --> 1 or 0
+    for (unsigned int i=0; i != n_enrichments; ++i)
+      {
+        vec_predicates.push_back( EnrichmentPredicate<dim>(points_enrichments[i],
+                                                           radii_predicates[i]) );
+      }
+
+    //set a vector of right hand side functions
+    for (unsigned int i=0; i != n_enrichments; ++i)
+      {
+        GaussianFunction<dim> rhs;
+        rhs.set_point(points_enrichments[i]);
+        rhs.set_sigma(sigmas_rhs[i]);
+        vec_rhs.push_back(rhs);
+      }
+
+    pcout << "...finish initializing" << std::endl;
+  }
 
   template <int dim>
   void LaplaceProblem<dim>::build_fe_space()
@@ -582,11 +627,9 @@ namespace Step1
         //formulate a 1d problem with x coordinate and radius (i.e sigma)
         double center = 0;
         double sigma = sigmas_rhs[i];
-        double coeff = coeffs_rhs[i];
         EstimateEnrichmentFunction<1> problem_1d(Point<1>(center),
                                                  size,
-                                                 sigma,
-                                                 coeff);
+                                                 sigma);
         problem_1d.run();
         std::cout << "solved problem with "
                   << "(x, sigma): "
@@ -618,7 +661,7 @@ namespace Step1
           }
         else
           {
-            pcout << "Empty function added at " << i << std::endl;
+            pcout << "Dummy function added at " << i << std::endl;
             EnrichmentFunction<dim> func(Point<dim>(),1,0);
             vec_enrichments.push_back(func);
           }
@@ -728,7 +771,8 @@ namespace Step1
 
     std::vector<types::global_dof_index> local_dof_indices;
 
-    std::vector<double> rhs_values;
+    std::vector<std::vector<double>> rhs_values;
+    rhs_values.resize(vec_rhs.size());
 
     hp::FEValues<dim> fe_values_hp(fe_collection, q_collection,
                                    update_values | update_gradients |
@@ -747,7 +791,19 @@ namespace Step1
           const unsigned int &dofs_per_cell = cell->get_fe().dofs_per_cell;
           const unsigned int &n_q_points    = fe_values.n_quadrature_points;
 
-          rhs_values.resize(n_q_points);
+          /*
+           * Initialize rhs values vector. Each element is a vector associated
+           * with each rhs function since now we have multiple rhs functions.
+           * Each element is of size equal to number of quadrature points.
+           *
+           * Use the correct right hand side to intialize the corresponding
+           * rhs_value vector.
+           */
+          for (unsigned int i=0; i!=rhs_values.size(); ++i){
+              rhs_values[i].resize(n_q_points);
+              vec_rhs[i].value_list (fe_values.get_quadrature_points(),
+                                  rhs_values[i]);
+            }
 
           local_dof_indices.resize     (dofs_per_cell);
           cell_system_matrix.reinit (dofs_per_cell,dofs_per_cell);
@@ -756,8 +812,7 @@ namespace Step1
           cell_system_matrix = 0;
           cell_rhs = 0;
 
-          right_hand_side.value_list (fe_values.get_quadrature_points(),
-                                      rhs_values);
+
 
           for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
             for (unsigned int i=0; i<dofs_per_cell; ++i)
@@ -766,7 +821,13 @@ namespace Step1
                   cell_system_matrix(i,j) += (fe_values.shape_grad(i,q_point) *
                                               fe_values.shape_grad(j,q_point) *
                                               fe_values.JxW(q_point));
-                  cell_rhs(i) += (rhs_values[q_point] *
+
+                  //Accumulate rhs values at a quadrature point
+                  double rhs_values_sum = 0;
+                  for (unsigned int i=0; i!=rhs_values.size(); ++i)
+                    rhs_values_sum += rhs_values[i][q_point];
+
+                  cell_rhs(i) += (rhs_values_sum *
                                   fe_values.shape_value(i,q_point) *
                                   fe_values.JxW(q_point));
                 }
@@ -965,6 +1026,8 @@ namespace Step1
   {
     pcout << "...run problem" << std::endl;
 
+    //Run making grids and building fe space only once.
+    initialize();
     build_fe_space();
 
     //TODO need cyles?
@@ -1004,82 +1067,6 @@ namespace Step1
         pcout << "...step run complete" << std::endl;
       }
     pcout << "...finished run problem" << std::endl;
-  }
-
-
-
-  template <int dim>
-  class LaplaceProblem<dim>::RightHandSide :  public Function<dim>
-  {
-    Point<dim> center;
-    double sigmas;
-    double coeffs;
-  public:
-    RightHandSide ();
-    void set_points(const Point<dim> &points);
-    void set_sigmas(const double &sigmas);
-    void set_coeffs(const double &coeffs);
-    virtual void value (const Point<dim> &p,
-                        double   &values) const;
-    virtual void value_list (const std::vector<Point<dim> > &points,
-                             std::vector<double >           &value_list) const;
-  };
-
-  template <int dim>
-  LaplaceProblem<dim>::RightHandSide::RightHandSide ()
-    :
-    Function<dim> (),
-    center(Point<dim>()),
-    sigmas(1),
-    coeffs(1)
-  {}
-
-  template <int dim>
-  inline
-  void LaplaceProblem<dim>::RightHandSide::set_points(const Point<dim> &p)
-  {
-    //TODO change to vector
-    center = p;
-  }
-
-  template <int dim>
-  inline
-  void LaplaceProblem<dim>::RightHandSide::set_sigmas(const double &values)
-  {
-    //TODO change to vector
-    sigmas = values;
-  }
-
-  template <int dim>
-  inline
-  void LaplaceProblem<dim>::RightHandSide::set_coeffs(const double &values)
-  {
-    //TODO change to vector
-    coeffs = values;
-  }
-
-  template <int dim>
-  inline
-  void LaplaceProblem<dim>::RightHandSide::value (const Point<dim> &p,
-                                                  double           &value) const
-  {
-    Assert (dim >= 2, ExcInternalError());
-    double r_squared = p.distance_square(center);
-    value = coeffs*exp(-r_squared/(sigmas*sigmas));
-  }
-
-  template <int dim>
-  void LaplaceProblem<dim>::RightHandSide::value_list
-  (const std::vector<Point<dim> > &points,
-   std::vector<double >           &value_list) const
-  {
-    const unsigned int n_points = points.size();
-
-    AssertDimension(points.size(), value_list.size());
-
-    for (unsigned int p=0; p<n_points; ++p)
-      RightHandSide::value (points[p],
-                            value_list[p]);
   }
 }
 #endif
