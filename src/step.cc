@@ -67,7 +67,11 @@ int main (int argc,char **argv)
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        Step1::LaplaceProblem<dim> step1(argc,argv,6);
+        Step1::LaplaceProblem<dim> step1;
+
+        AssertThrow(argc>=2, ExcMessage("Parameter file not given."));
+        step1.read_parameters_from_file(argv[1]);
+
         //TODO options not needed?
         PETScWrappers::set_option_value("-eps_target","-1.0");
         PETScWrappers::set_option_value("-st_type","sinvert");

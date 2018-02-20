@@ -1,39 +1,11 @@
 #include <estimate_enrichment.h>
 #include <deal.II/grid/grid_refinement.h>
 #include <deal.II/numerics/error_estimator.h>
+#include <functions.h>
 
 //unnamed namespace
 namespace EstimateEnrichment
 {
-  template <int dim>
-  class RightHandSide : public Function<dim>
-  {
-  public:
-    RightHandSide (Point<dim> center, double sigma, double coeff)
-      : Function<dim>(),
-        center(center),
-        sigma(sigma),
-        coeff(coeff)
-    {}
-    virtual double value (const Point<dim>   &p,
-                          const unsigned int  component = 0) const;
-    Point<dim> center;
-    double sigma;
-    double coeff;
-  };
-
-  template <int dim>
-  double RightHandSide<dim>::value (const Point<dim> &p,
-                                    const unsigned int /*component*/) const
-  {
-    double return_value = 0.0;
-    return_value = coeff*exp(-p.distance_square(center)/(sigma*sigma));
-
-    return return_value;
-  }
-
-
-
   template <int dim>
   class BoundaryValues: public Function<dim>
   {
@@ -54,14 +26,13 @@ namespace EstimateEnrichment
 
 template <int dim>
 EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
-(Point<dim> center, double domain_size, double sigma, double coeff)
+(Point<dim> center, double domain_size, double sigma)
   :
   center(center),
   domain_size(domain_size),
   sigma(sigma),
-  coeff(coeff),
   debug_level(0),
-  refinement(7),
+  refinement(11),
   fe (1),
   dof_handler (triangulation)
 {
@@ -73,13 +44,12 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
 template <int dim>
 EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
 (Point<dim> center, double left_bound,
- double right_bound, double sigma, double coeff, double refinement)
+ double right_bound, double sigma, double refinement)
   :
   center(center),
   left_bound(left_bound),
   right_bound(right_bound),
   sigma(sigma),
-  coeff(coeff),
   debug_level(0),
   refinement(refinement),
   fe (1),
@@ -115,7 +85,7 @@ template <int dim>
 void EstimateEnrichmentFunction<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const EstimateEnrichment::RightHandSide<dim> right_hand_side(center,sigma,coeff);
+  const GaussianFunction<dim> rhs(center,sigma);
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
@@ -129,6 +99,9 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
       fe_values.reinit (cell);
       cell_matrix = 0;
       cell_rhs = 0;
+      rhs_values.resize(n_q_points);
+      rhs.value_list (fe_values.get_quadrature_points(),
+                      rhs_values);
 
       AssertDimension(dim,1);
       for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
@@ -145,7 +118,7 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
                                      fe_values.shape_grad (j, q_index)
                                     )*fe_values.JxW (q_index);
               cell_rhs(i) += radius*(fe_values.shape_value (i, q_index) *
-                                     right_hand_side.value (fe_values.quadrature_point (q_index)) *
+                                     rhs_values[q_index] *
                                      fe_values.JxW (q_index));
             }
         }
@@ -180,7 +153,7 @@ void EstimateEnrichmentFunction<dim>::assemble_system ()
 template <int dim>
 void EstimateEnrichmentFunction<dim>::solve ()
 {
-  SolverControl           solver_control (10000,1e-12,false,false);
+  SolverControl           solver_control (50000,1e-12,false,false);
   SolverCG<>              solver (solver_control);
   solver.solve (system_matrix, solution, system_rhs,
                 PreconditionIdentity());
@@ -223,6 +196,8 @@ void EstimateEnrichmentFunction<dim>::run ()
   bool start = true;
   do
     {
+      std::cout << "Refinement level: " << refinement << std::endl;
+
       if (cycles!=0)
         {
           refine_grid ();

@@ -34,13 +34,11 @@ class EstimateEnrichmentFunction
 public:
   EstimateEnrichmentFunction (Point<dim> center,
                               double domain_size,
-                              double sigma,
-                              double coeff);
+                              double sigma);
   EstimateEnrichmentFunction  (Point<dim> center,
                                double left_bound,
                                double right_bound,
                                double sigma,
-                               double coeff,
                                double refinement=7);
   ~EstimateEnrichmentFunction();
   void run ();
@@ -59,7 +57,7 @@ private:
   double domain_size;
   double left_bound, right_bound;
   double sigma;
-  double coeff;
+  std::vector<double> rhs_values;
 public:
   unsigned int debug_level;
 private:
