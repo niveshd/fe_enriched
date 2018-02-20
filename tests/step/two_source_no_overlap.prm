@@ -11,10 +11,10 @@ subsection solver
     set tolerance = 1e-8
 end
 
-#subsection output
-#    set patches = 6
-#    set debug = 1
-#end
+subsection output
+    set patches = 6
+    set debug level = 1
+end
 
 #end-of-dealii parser
 
