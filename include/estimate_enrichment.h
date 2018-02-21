@@ -1,3 +1,6 @@
+#ifndef ESTIMATE_ENRICHMENT_H
+#define ESTIMATE_ENRICHMENT_H
+
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/grid_generator.h>
@@ -70,3 +73,5 @@ private:
   Vector<double>       solution;
   Vector<double>       system_rhs;
 };
+
+#endif

@@ -238,6 +238,7 @@ int main (int argc,char **argv)
     Problem<dim> step_test;
     step_test.read_parameters
     (4,   //domain size
+     1,   //cube shape
      2,   //global refinement
      10000, //max iterations
      1e-8,  //tolerance

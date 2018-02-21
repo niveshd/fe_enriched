@@ -3,7 +3,8 @@
 
 #include <set>
 #include <math.h>
-#include <functions.h>
+#include "functions.h"
+#include "estimate_enrichment.h"
 
 template <int dim>
 void plot_shape_function
@@ -134,6 +135,7 @@ namespace Step1
 
     void read_parameters
     (const double &_size,
+     const unsigned int &_shape,
      const unsigned int &_global_refinement,
      const unsigned int &_max_iterations,
      const double &_tolerance,
@@ -163,6 +165,7 @@ namespace Step1
 
   protected:
     double size;
+    unsigned int shape; //0 = ball, 1 = cube
     unsigned int patches;
     //debug level = 0(output nothing), 1(output solution)
     //2 (+ output grid data as well)
@@ -269,6 +272,9 @@ namespace Step1
     prm.declare_entry("size",
                       "1",
                       Patterns::Double(0));
+    prm.declare_entry("shape",
+                      "1",
+                      Patterns::Integer(0));
     prm.declare_entry("Global refinement",
                       "1",
                       Patterns::Integer(1));
@@ -300,6 +306,7 @@ namespace Step1
     //get parameters
     prm.enter_subsection("geometry");
     size = prm.get_double("size");
+    shape = prm.get_integer("shape");
     global_refinement = prm.get_integer("Global refinement");
     prm.leave_subsection();
 
@@ -419,6 +426,7 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::read_parameters
   (const double &_size,
+   const unsigned int &_shape,
    const unsigned int &_global_refinement,
    const unsigned int &_max_iterations,
    const double &_tolerance,
@@ -430,6 +438,7 @@ namespace Step1
    const std::vector<double> &_sigmas_rhs)
   {
     size = _size;
+    shape = _shape;
     global_refinement = _global_refinement;
     max_iterations = _max_iterations;
     tolerance = _tolerance;
@@ -467,7 +476,20 @@ namespace Step1
   {
     pcout << "...Start initializing" << std::endl;
     //set up basic grid
-    GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
+    if (shape == 1)
+      GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
+    else if (shape == 0)
+      {
+        Point<dim> center = Point<dim>();
+        GridGenerator::hyper_ball (triangulation, center, size/2.0);
+        triangulation.set_all_manifold_ids_on_boundary(0);
+        static SphericalManifold<dim> spherical_manifold(center);
+        triangulation.set_manifold(0,spherical_manifold);
+      }
+    else
+      AssertThrow(false,ExcMessage("Shape not implemented."));
+
+
     triangulation.refine_global (global_refinement);
 
     pcout << "step size: " << size/std::pow(2.0,global_refinement) << std::endl;
@@ -620,17 +642,18 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::make_enrichment_function()
   {
-    pcout << "!!! Parent make enrichment function called" << std::endl;
+    pcout << "!!! Make enrichment function called" << std::endl;
 
     for (unsigned int i=0; i<vec_predicates.size(); ++i)
       {
-        //formulate a 1d problem with x coordinate and radius (i.e sigma)
+        //formulate a 1d/radial problem with x coordinate and radius (i.e sigma)
         double center = 0;
         double sigma = sigmas_rhs[i];
-        EstimateEnrichmentFunction<1> problem_1d(Point<1>(center),
+        EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
                                                  size,
                                                  sigma);
-        problem_1d.run();
+        radial_problem.debug_level = debug_level; //print output
+        radial_problem.run();
         std::cout << "solved problem with "
                   << "(x, sigma): "
                   << center << ", " << sigma << std::endl;
@@ -649,7 +672,7 @@ namespace Step1
         //add enrichment function only when predicate radius is non-zero
         if (radii_predicates[i] != 0)
           {
-            problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+            radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
 
 
             //construct enrichment function and push
@@ -799,10 +822,11 @@ namespace Step1
            * Use the correct right hand side to intialize the corresponding
            * rhs_value vector.
            */
-          for (unsigned int i=0; i!=rhs_values.size(); ++i){
+          for (unsigned int i=0; i!=rhs_values.size(); ++i)
+            {
               rhs_values[i].resize(n_q_points);
               vec_rhs[i].value_list (fe_values.get_quadrature_points(),
-                                  rhs_values[i]);
+                                     rhs_values[i]);
             }
 
           local_dof_indices.resize     (dofs_per_cell);

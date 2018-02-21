@@ -1,5 +1,6 @@
 subsection geometry
     set size = 100
+    set shape = 0
     set Global refinement = 8
 end
 

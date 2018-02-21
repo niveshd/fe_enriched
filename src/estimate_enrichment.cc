@@ -181,7 +181,7 @@ void EstimateEnrichmentFunction<dim>::output_results () const
   data_out.attach_dof_handler (dof_handler);
   data_out.add_data_vector (solution, "solution");
   data_out.build_patches ();
-  std::ofstream output ("solution-1d-estimate.vtk");
+  std::ofstream output ("radial_solution.vtk");
   data_out.write_vtk (output);
 }
 
@@ -189,6 +189,13 @@ template <int dim>
 void EstimateEnrichmentFunction<dim>::run ()
 {
 //  std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
+
+  std::cout << "Solving problem in dim.: " << dim
+            << " with center: " << center
+            << ", size: " << domain_size
+            << ", sigma: " << sigma
+            << std::endl;
+
   make_grid();
 
   double old_value=0, value=1, relative_change = 1;
@@ -196,7 +203,7 @@ void EstimateEnrichmentFunction<dim>::run ()
   bool start = true;
   do
     {
-      std::cout << "Refinement level: " << refinement << std::endl;
+//      std::cout << "Refinement level: " << refinement << std::endl;
 
       if (cycles!=0)
         {
@@ -218,7 +225,7 @@ void EstimateEnrichmentFunction<dim>::run ()
     }
   while (relative_change > 0.005);
 
-  std::cout << "1D solution at origin = "
+  std::cout << "Radial solution at origin = "
             << value
             << " after global refinement "
             << refinement
