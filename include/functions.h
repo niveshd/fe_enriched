@@ -12,8 +12,6 @@ class GaussianFunction :  public Function<dim>
 public:
   GaussianFunction ();
   GaussianFunction (const Point<dim> &center, const double &sigma);
-  void set_point(const Point<dim> &points);
-  void set_sigma(const double &sigma);
   virtual void value (const Point<dim> &p,
                       double   &value) const;
   virtual void value_list (const std::vector<Point<dim> > &points,
@@ -39,22 +37,6 @@ GaussianFunction<dim>::GaussianFunction (const Point<dim> &center,
   sigma(sigma)
 {
   coeff = 1.0/(2*M_PI*sigma*sigma);   //2D gaussian
-}
-
-template <int dim>
-inline
-void GaussianFunction<dim>::set_point(const Point<dim> &p)
-{
-  //TODO change to vector
-  center = p;
-}
-
-template <int dim>
-inline
-void GaussianFunction<dim>::set_sigma(const double &value)
-{
-  //TODO change to vector
-  sigma = value;
 }
 
 template <int dim>

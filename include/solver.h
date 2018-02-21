@@ -510,9 +510,8 @@ namespace Step1
     //set a vector of right hand side functions
     for (unsigned int i=0; i != n_enrichments; ++i)
       {
-        GaussianFunction<dim> rhs;
-        rhs.set_point(points_enrichments[i]);
-        rhs.set_sigma(sigmas_rhs[i]);
+        GaussianFunction<dim> rhs(points_enrichments[i],
+                                  sigmas_rhs[i]);
         vec_rhs.push_back(rhs);
       }
 
@@ -818,7 +817,7 @@ namespace Step1
            * from each of different rhs functions (vec_rhs).
            */
           rhs_value.assign(n_q_points,0);
-          tmp_rhs_value.resize(n_q_points);
+          tmp_rhs_value.assign(n_q_points,0);
           for (unsigned int i=0; i<vec_rhs.size(); ++i)
             {
               vec_rhs[i].value_list (fe_values.get_quadrature_points(),
