@@ -650,8 +650,8 @@ namespace Step1
         double center = 0;
         double sigma = sigmas_rhs[i];
         EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                 size,
-                                                 sigma);
+                                                     size,
+                                                     sigma);
         radial_problem.debug_level = debug_level; //print output
         radial_problem.run();
         std::cout << "solved problem with "
@@ -794,8 +794,7 @@ namespace Step1
 
     std::vector<types::global_dof_index> local_dof_indices;
 
-    std::vector<std::vector<double>> rhs_values;
-    rhs_values.resize(vec_rhs.size());
+    std::vector<double> rhs_value, tmp_rhs_value;
 
     hp::FEValues<dim> fe_values_hp(fe_collection, q_collection,
                                    update_values | update_gradients |
@@ -815,18 +814,21 @@ namespace Step1
           const unsigned int &n_q_points    = fe_values.n_quadrature_points;
 
           /*
-           * Initialize rhs values vector. Each element is a vector associated
-           * with each rhs function since now we have multiple rhs functions.
-           * Each element is of size equal to number of quadrature points.
-           *
-           * Use the correct right hand side to intialize the corresponding
-           * rhs_value vector.
+           * Initialize rhs values vector to zero. Add values calculated
+           * from each of different rhs functions (vec_rhs).
            */
-          for (unsigned int i=0; i!=rhs_values.size(); ++i)
+          rhs_value.assign(n_q_points,0);
+          tmp_rhs_value.resize(n_q_points);
+          for (unsigned int i=0; i<vec_rhs.size(); ++i)
             {
-              rhs_values[i].resize(n_q_points);
               vec_rhs[i].value_list (fe_values.get_quadrature_points(),
-                                     rhs_values[i]);
+                                     tmp_rhs_value);
+
+              // add tmp to the total one at quadrature points
+              for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
+                {
+                  rhs_value[q_point] += tmp_rhs_value[q_point];
+                }
             }
 
           local_dof_indices.resize     (dofs_per_cell);
@@ -836,41 +838,32 @@ namespace Step1
           cell_system_matrix = 0;
           cell_rhs = 0;
 
-
-
           for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
             for (unsigned int i=0; i<dofs_per_cell; ++i)
-              for (unsigned int j=i; j<dofs_per_cell; ++j)
-                {
+              {
+                for (unsigned int j=i; j<dofs_per_cell; ++j)
                   cell_system_matrix(i,j) += (fe_values.shape_grad(i,q_point) *
                                               fe_values.shape_grad(j,q_point) *
                                               fe_values.JxW(q_point));
 
-                  //Accumulate rhs values at a quadrature point
-                  double rhs_values_sum = 0;
-                  for (unsigned int i=0; i!=rhs_values.size(); ++i)
-                    rhs_values_sum += rhs_values[i][q_point];
+                cell_rhs(i) += (rhs_value[q_point] *
+                                fe_values.shape_value(i,q_point) *
+                                fe_values.JxW(q_point));
 
-                  cell_rhs(i) += (rhs_values_sum *
-                                  fe_values.shape_value(i,q_point) *
-                                  fe_values.JxW(q_point));
-                }
+              }
 
           // exploit symmetry
           for (unsigned int i=0; i<dofs_per_cell; ++i)
             for (unsigned int j=i; j<dofs_per_cell; ++j)
-              {
-                cell_system_matrix (j, i) = cell_system_matrix (i, j);
-              }
+              cell_system_matrix (j, i) = cell_system_matrix (i, j);
 
           cell->get_dof_indices (local_dof_indices);
 
-          constraints
-          .distribute_local_to_global (cell_system_matrix,
-                                       cell_rhs,
-                                       local_dof_indices,
-                                       system_matrix,
-                                       system_rhs);
+          constraints.distribute_local_to_global (cell_system_matrix,
+                                                  cell_rhs,
+                                                  local_dof_indices,
+                                                  system_matrix,
+                                                  system_rhs);
         }
 
     system_matrix.compress (VectorOperation::add);
@@ -902,9 +895,9 @@ namespace Step1
     constraints.distribute (localized_solution);
     solution = localized_solution;
 
-    return solver_control.last_step();
-
     pcout << "...finished solving" << std::endl;
+
+    return solver_control.last_step();
   }
 
   template <int dim>

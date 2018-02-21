@@ -259,7 +259,7 @@ void EstimateEnrichmentFunction<dim>::evaluate_at_x_values
 template <int dim>
 double EstimateEnrichmentFunction<dim>::value
 (const Point<dim> &p,
- const unsigned int & component)
+ const unsigned int &component)
 {
   return VectorTools::point_value(dof_handler, solution, p);
 }

@@ -1,7 +1,7 @@
 subsection geometry
     set size = 100
     set shape = 0
-    set Global refinement = 8
+    set Global refinement = 7
 end
 
 #normal size, r = 100, 7
@@ -13,8 +13,8 @@ subsection solver
 end
 
 subsection output
-    set patches = 2
-    set debug level = 0
+    set patches = 1
+    set debug level = 1
 end
 
 #end-of-dealii parser

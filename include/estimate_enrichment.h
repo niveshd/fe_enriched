@@ -49,7 +49,7 @@ public:
   (std::vector< double >  &interpolation_points,
    std::vector< double >   &interpolation_values);
   double value (const Point<dim> &p,
-                const unsigned int & component = 0);
+                const unsigned int &component = 0);
 private:
   void make_grid ();
   void setup_system();
