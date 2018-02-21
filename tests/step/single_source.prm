@@ -14,7 +14,7 @@ end
 
 subsection output
     set patches = 2
-    set debug level = 2
+    set debug level = 0
 end
 
 #end-of-dealii parser

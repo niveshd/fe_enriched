@@ -32,7 +32,7 @@ using namespace dealii;
 
 //TODO remove template and make it for 1d
 template <int dim>
-class EstimateEnrichmentFunction
+class EstimateEnrichmentFunction : public Function<dim>
 {
 public:
   EstimateEnrichmentFunction (Point<dim> center,
@@ -48,7 +48,8 @@ public:
   void evaluate_at_x_values
   (std::vector< double >  &interpolation_points,
    std::vector< double >   &interpolation_values);
-  double value (const Point<dim> &p);
+  double value (const Point<dim> &p,
+                const unsigned int & component = 0);
 private:
   void make_grid ();
   void setup_system();

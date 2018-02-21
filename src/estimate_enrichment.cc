@@ -28,6 +28,7 @@ template <int dim>
 EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
 (Point<dim> center, double domain_size, double sigma)
   :
+  Function<dim>(1),
   center(center),
   domain_size(domain_size),
   sigma(sigma),
@@ -46,6 +47,7 @@ EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
 (Point<dim> center, double left_bound,
  double right_bound, double sigma, double refinement)
   :
+  Function<dim>(1),
   center(center),
   left_bound(left_bound),
   right_bound(right_bound),
@@ -256,7 +258,8 @@ void EstimateEnrichmentFunction<dim>::evaluate_at_x_values
 
 template <int dim>
 double EstimateEnrichmentFunction<dim>::value
-(const Point<dim> &p)
+(const Point<dim> &p,
+ const unsigned int & component)
 {
   return VectorTools::point_value(dof_handler, solution, p);
 }
@@ -268,3 +271,4 @@ EstimateEnrichmentFunction<dim>::~EstimateEnrichmentFunction()
 }
 //instantiations
 template struct EstimateEnrichmentFunction<1>;
+template struct EstimateEnrichmentFunction<2>;
