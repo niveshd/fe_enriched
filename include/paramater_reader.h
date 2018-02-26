@@ -16,6 +16,8 @@ struct ParameterCollection
   unsigned int shape; //0 = ball, 1 = cube
   unsigned int global_refinement;
   unsigned int max_iterations;
+  unsigned int fe_base_degree;
+  unsigned int fe_enriched_degree;
   double tolerance;
   unsigned int patches;
   //debug level = 0(output nothing), 1(output solution)
@@ -35,7 +37,7 @@ init
 (const std::string &file_name)
 {
 
-  std::cout << "...reading parameters" << std::endl;
+  //std::cout << "...reading parameters" << std::endl;
 
   ParameterHandler prm;
 
@@ -53,6 +55,12 @@ init
   prm.leave_subsection();
 
   prm.enter_subsection("solver");
+  prm.declare_entry("fe base degree",
+                    "1",
+                    Patterns::Integer(1));
+  prm.declare_entry("fe enriched degree",
+                    "1",
+                    Patterns::Integer(1));
   prm.declare_entry("max iterations",
                     "1000",
                     Patterns::Integer(1));
@@ -63,7 +71,7 @@ init
 
   prm.enter_subsection("output");
   prm.declare_entry("patches",
-                    "5",
+                    "1",
                     Patterns::Integer(1));
   prm.declare_entry("debug level",
                     "0",
@@ -83,6 +91,8 @@ init
   prm.leave_subsection();
 
   prm.enter_subsection("solver");
+  fe_base_degree = prm.get_integer("fe base degree");
+  fe_enriched_degree = prm.get_integer("fe enriched degree");
   max_iterations = prm.get_integer("max iterations");
   tolerance = prm.get_double("tolerance");
   prm.leave_subsection();
@@ -93,12 +103,12 @@ init
   prm.leave_subsection();
 
 
-  std::cout << "Size : "<< size << std::endl;
-  std::cout << "Global refinement : " << global_refinement << std::endl;
-  std::cout << "Max Iterations : " << max_iterations << std::endl;
-  std::cout << "Tolerance : " << tolerance << std::endl;
-  std::cout << "Patches used for output: " << patches << std::endl;
-  std::cout << "Debug level: " << debug_level << std::endl;
+  //std::cout << "Size : "<< size << std::endl;
+  //std::cout << "Global refinement : " << global_refinement << std::endl;
+  //std::cout << "Max Iterations : " << max_iterations << std::endl;
+  //std::cout << "Tolerance : " << tolerance << std::endl;
+  //std::cout << "Patches used for output: " << patches << std::endl;
+  //std::cout << "Debug level: " << debug_level << std::endl;
 
   //manual parsing
   //open parameter file
@@ -131,7 +141,7 @@ init
   skiplines();
   s_stream.str(line);
   s_stream >> n_enrichments;
-  std::cout << "Number of enrichments: " << n_enrichments << std::endl;
+  //std::cout << "Number of enrichments: " << n_enrichments << std::endl;
 
   //note vector of points
   for (unsigned int i=0; i!=n_enrichments; ++i)
@@ -156,9 +166,9 @@ init
         AssertThrow(false, ExcMessage("Dimension not implemented"));
     }
 
-  std::cout << "Enrichment points : " << std::endl;
-  for (auto p:points_enrichments)
-    std::cout << p << std::endl;
+  //std::cout << "Enrichment points : " << std::endl;
+//  for (auto p:points_enrichments)
+    //std::cout << p << std::endl;
 
   //note vector of radii for predicates
   for (unsigned int i=0; i!=n_enrichments; ++i)
@@ -172,9 +182,9 @@ init
       radii_predicates.push_back(r);
     }
 
-  std::cout << "Enrichment radii : " << std::endl;
-  for (auto r:radii_predicates)
-    std::cout << r << std::endl;
+  //std::cout << "Enrichment radii : " << std::endl;
+//  for (auto r:radii_predicates)
+    //std::cout << r << std::endl;
 
   //note vector of radii for predicates
   for (unsigned int i=0; i!=n_enrichments; ++i)
@@ -188,11 +198,11 @@ init
       sigmas_rhs.push_back(r);
     }
 
-  std::cout << "Sigma : " << std::endl;
-  for (auto r:sigmas_rhs)
-    std::cout << r << std::endl;
+  //std::cout << "Sigma : " << std::endl;
+//  for (auto r:sigmas_rhs)
+    //std::cout << r << std::endl;
 
-  std::cout << "...finished parameter reading from file." << std::endl;
+  //std::cout << "...finished parameter reading from file." << std::endl;
 }
 
 #endif

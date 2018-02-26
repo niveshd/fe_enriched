@@ -4,10 +4,9 @@ subsection geometry
     set Global refinement = 7
 end
 
-#normal size, r = 100, 7
-#test   4,2
-
 subsection solver
+    set fe base degree = 1
+    set fe enriched degree = 1
     set max iterations = 10000
     set tolerance = 1e-9
 end

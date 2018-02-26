@@ -284,8 +284,8 @@ namespace Step1
     radii_predicates(prm.radii_predicates),
     sigmas_rhs(prm.sigmas_rhs),
     dof_handler (triangulation),
-    fe_base(1),
-    fe_enriched(1),
+    fe_base(prm.fe_base_degree),
+    fe_enriched(prm.fe_enriched_degree),
     fe_nothing(1,true),
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
@@ -296,6 +296,8 @@ namespace Step1
   {
     pcout << "Size : "<< size << std::endl;
     pcout << "Global refinement : " << global_refinement << std::endl;
+    pcout << "Fe base: " << fe_base.get_name() << std::endl;
+    pcout << "Fe enriched: " << fe_enriched.get_name() << std::endl;
     pcout << "Max Iterations : " << max_iterations << std::endl;
     pcout << "Tolerance : " << tolerance << std::endl;
     pcout << "Patches used for output: " << patches << std::endl;
@@ -313,7 +315,7 @@ namespace Step1
     for (auto r:sigmas_rhs)
       pcout << r << std::endl;
 
-    pcout << "...finished parameter reading." << std::endl;
+    pcout << "...parameters set" << std::endl;
   }
 
 
