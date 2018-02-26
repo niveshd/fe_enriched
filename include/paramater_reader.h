@@ -168,7 +168,7 @@ init
 
   //std::cout << "Enrichment points : " << std::endl;
 //  for (auto p:points_enrichments)
-    //std::cout << p << std::endl;
+  //std::cout << p << std::endl;
 
   //note vector of radii for predicates
   for (unsigned int i=0; i!=n_enrichments; ++i)
@@ -184,7 +184,7 @@ init
 
   //std::cout << "Enrichment radii : " << std::endl;
 //  for (auto r:radii_predicates)
-    //std::cout << r << std::endl;
+  //std::cout << r << std::endl;
 
   //note vector of radii for predicates
   for (unsigned int i=0; i!=n_enrichments; ++i)
@@ -200,7 +200,7 @@ init
 
   //std::cout << "Sigma : " << std::endl;
 //  for (auto r:sigmas_rhs)
-    //std::cout << r << std::endl;
+  //std::cout << r << std::endl;
 
   //std::cout << "...finished parameter reading from file." << std::endl;
 }

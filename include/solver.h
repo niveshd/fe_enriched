@@ -1,12 +1,15 @@
 #ifndef SOLVER_H
 #define SOLVER_H
 
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/base/convergence_table.h>
+
 #include <set>
 #include <math.h>
 #include "functions.h"
+#include "support.h"
 #include "paramater_reader.h"
 #include "estimate_enrichment.h"
-
 
 
 template <int dim>
@@ -163,6 +166,7 @@ namespace Step1
     void estimate_error ();
     void refine_grid ();
     void output_results (const unsigned int cycle);
+    void process_solution();
 
   protected:
     double size;
@@ -832,6 +836,8 @@ namespace Step1
 //     triangulation.execute_coarsening_and_refinement ();
   }
 
+
+
   template <int dim>
   void LaplaceProblem<dim>::output_results (const unsigned int cycle)
   {
@@ -856,6 +862,65 @@ namespace Step1
 
     pcout << "...finished output results" << std::endl;
   }
+
+
+
+  template <int dim>
+  void LaplaceProblem<dim>::process_solution()
+  {
+    AssertThrow(shape == 0, ExcMessage("solution only for circular domain known"));
+    AssertThrow(n_enrichments == 1 &&
+                points_enrichments[0] == Point<dim>(),
+                ExcMessage("solution only for single source at origin"));
+
+    //Make enrichment function with spline ranging over whole domain.
+    //Gradient of enrichment function is related to gradient of the spline.
+    double center = 0;
+    double sigma = sigmas_rhs[0];
+    EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
+                                                 size,
+                                                 sigma);
+    radial_problem.debug_level = debug_level; //print output
+    radial_problem.run();
+    std::cout << "solving radial problem for error calculation "
+              << "(x, sigma): "
+              << center << ", " << sigma << std::endl;
+
+    //make points at which solution needs to interpolated
+    std::vector<double> interpolation_points_1D, interpolation_values_1D;
+    unsigned int n = 100;
+    double right_bound = size/2;
+    double h = size/n;
+    for (double p = center; p < right_bound; p+=h)
+      interpolation_points_1D.push_back(p);
+    interpolation_points_1D.push_back(right_bound);
+
+    radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+
+
+    //construct enrichment function and push
+    EnrichmentFunction<dim> exact_solution(Point<dim>(),
+                                           1, //TODO is not need. remove
+                                           interpolation_points_1D,
+                                           interpolation_values_1D);
+
+    Vector<float> difference_per_cell (triangulation.n_active_cells());
+
+    VectorTools::integrate_difference (dof_handler,
+                                       solution,
+                                       exact_solution,
+                                       difference_per_cell,
+                                       q_collection,
+                                       VectorTools::L2_norm);
+
+    const double L2_error = VectorTools::compute_global_error(triangulation,
+                                                              difference_per_cell,
+                                                              VectorTools::L2_norm);
+
+    std::cout << "L2 error norm: " << L2_error << std::endl;
+  }
+
+
 
   template <int dim>
   void LaplaceProblem<dim>::output_cell_attributes ()
@@ -966,6 +1031,8 @@ namespace Step1
                                           solution,
                                           Point<dim>())
               << std::endl;
+        if (shape == 0)
+          process_solution();
 
         //TODO Uncomment. correct function body
 //        estimate_error ();
