@@ -57,6 +57,7 @@
 
 #include "support.h"
 #include "estimate_enrichment.h"
+#include "paramater_reader.h"
 #include "solver.h"
 const unsigned int dim = 2;
 
@@ -67,10 +68,11 @@ int main (int argc,char **argv)
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        Step1::LaplaceProblem<dim> step1;
-
+        ParameterCollection<dim> prm;
         AssertThrow(argc>=2, ExcMessage("Parameter file not given."));
-        step1.read_parameters_from_file(argv[1]);
+        prm.init(argv[1]);
+
+        Step1::LaplaceProblem<dim> step1(prm);
 
         //TODO options not needed?
         PETScWrappers::set_option_value("-eps_target","-1.0");

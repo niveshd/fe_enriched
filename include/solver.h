@@ -4,7 +4,10 @@
 #include <set>
 #include <math.h>
 #include "functions.h"
+#include "paramater_reader.h"
 #include "estimate_enrichment.h"
+
+
 
 template <int dim>
 void plot_shape_function
@@ -128,10 +131,8 @@ namespace Step1
   {
   public:
     LaplaceProblem ();
+    LaplaceProblem (const ParameterCollection<dim> &prm);
     virtual ~LaplaceProblem();
-
-    void read_parameters_from_file
-    (const std::string &file_name);
 
     void read_parameters
     (const double &_size,
@@ -177,8 +178,6 @@ namespace Step1
     std::vector<Point<dim>> points_enrichments;
     std::vector<double> radii_predicates;
     std::vector<double> sigmas_rhs;
-
-    ParameterHandler prm;
 
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
@@ -245,8 +244,6 @@ namespace Step1
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem ()
     :
-    patches(5),
-    debug_level(1),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(1),
@@ -257,171 +254,68 @@ namespace Step1
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
     pcout (std::cout, (this_mpi_process == 0))
   {
+    size = 100;
+    shape = 0;
+    global_refinement = 7;
+    max_iterations = 1000;
+    tolerance = 1e-8;
+    patches = 1;
+    debug_level = 0;
+    n_enrichments = 1;
+    points_enrichments.push_back(Point<dim>());
+    radii_predicates.push_back(0);
+    sigmas_rhs.push_back(1);
   }
 
 
 
   template <int dim>
-  void LaplaceProblem<dim>::read_parameters_from_file
-  (const std::string &file_name)
+  LaplaceProblem<dim>::LaplaceProblem
+  (const ParameterCollection<dim> &prm)
+    :
+    size(prm.size),
+    shape(prm.shape),
+    patches(prm.patches),
+    debug_level(prm.debug_level),
+    global_refinement(prm.global_refinement),
+    n_enrichments(prm.n_enrichments),
+    n_enriched_cells(0),
+    points_enrichments(prm.points_enrichments),
+    radii_predicates(prm.radii_predicates),
+    sigmas_rhs(prm.sigmas_rhs),
+    dof_handler (triangulation),
+    fe_base(1),
+    fe_enriched(1),
+    fe_nothing(1,true),
+    mpi_communicator(MPI_COMM_WORLD),
+    n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
+    this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
+    pcout (std::cout, (this_mpi_process == 0)),
+    max_iterations(prm.max_iterations),
+    tolerance(prm.tolerance)
   {
-    pcout << "...reading parameters" << std::endl;
-
-    //declare parameters
-    prm.enter_subsection("geometry");
-    prm.declare_entry("size",
-                      "1",
-                      Patterns::Double(0));
-    prm.declare_entry("shape",
-                      "1",
-                      Patterns::Integer(0));
-    prm.declare_entry("Global refinement",
-                      "1",
-                      Patterns::Integer(1));
-    prm.leave_subsection();
-
-    prm.enter_subsection("solver");
-    prm.declare_entry("max iterations",
-                      "1000",
-                      Patterns::Integer(1));
-    prm.declare_entry("tolerance",
-                      "1e-8",
-                      Patterns::Double(0));
-    prm.leave_subsection();
-
-    prm.enter_subsection("output");
-    prm.declare_entry("patches",
-                      "5",
-                      Patterns::Integer(1));
-    prm.declare_entry("debug level",
-                      "0",
-                      Patterns::Integer(0,9));
-    prm.leave_subsection();
-
-
-    //parse parameter file
-    prm.parse_input(file_name, "#end-of-dealii parser");
-
-
-    //get parameters
-    prm.enter_subsection("geometry");
-    size = prm.get_double("size");
-    shape = prm.get_integer("shape");
-    global_refinement = prm.get_integer("Global refinement");
-    prm.leave_subsection();
-
-    prm.enter_subsection("solver");
-    max_iterations = prm.get_integer("max iterations");
-    tolerance = prm.get_double("tolerance");
-    prm.leave_subsection();
-
-    prm.enter_subsection("output");
-    patches = prm.get_integer("patches");
-    debug_level = prm.get_integer("debug level");
-    prm.leave_subsection();
-
-
     pcout << "Size : "<< size << std::endl;
     pcout << "Global refinement : " << global_refinement << std::endl;
     pcout << "Max Iterations : " << max_iterations << std::endl;
     pcout << "Tolerance : " << tolerance << std::endl;
     pcout << "Patches used for output: " << patches << std::endl;
     pcout << "Debug level: " << debug_level << std::endl;
-
-    //manual parsing
-    //open parameter file
-    std::ifstream prm_file(file_name);
-
-    //read lines until "#end-of-dealii parser" is reached
-    std::string line;
-    while (getline(prm_file,line))
-      if (line == "#end-of-dealii parser")
-        break;
-
-    AssertThrow(line == "#end-of-dealii parser",
-                ExcMessage("line missing in parameter file = \'#end-of-dealii parser\' "));
-
-    //function to read next line not starting with # or empty
-    auto skiplines = [&] ()
-    {
-      while (getline(prm_file,line))
-        {
-          if (line.size()==0 || line[0] == '#' || line[0] == ' ')
-            continue;
-          else
-            break;
-        }
-    };
-
-    std::stringstream s_stream;
-
-    //read num of enrichement points
-    skiplines();
-    s_stream.str(line);
-    s_stream >> n_enrichments;
     pcout << "Number of enrichments: " << n_enrichments << std::endl;
-
-    //note vector of points
-    for (unsigned int i=0; i!=n_enrichments; ++i)
-      {
-        skiplines();
-        s_stream.clear();
-        s_stream.str(line);
-
-        if (dim==2)
-          {
-            double x,y;
-            s_stream >> x >> y;
-            points_enrichments.push_back({x,y});
-          }
-        else if (dim==3)
-          {
-            double x,y,z;
-            s_stream << x << y << z;
-            points_enrichments.push_back({x,y,z});
-          }
-        else
-          AssertThrow(false, ExcMessage("Dimension not implemented"));
-      }
-
     pcout << "Enrichment points : " << std::endl;
     for (auto p:points_enrichments)
       pcout << p << std::endl;
-
-    //note vector of radii for predicates
-    for (unsigned int i=0; i!=n_enrichments; ++i)
-      {
-        skiplines();
-        s_stream.clear();
-        s_stream.str(line);
-
-        double r;
-        s_stream >> r;
-        radii_predicates.push_back(r);
-      }
 
     pcout << "Enrichment radii : " << std::endl;
     for (auto r:radii_predicates)
       pcout << r << std::endl;
 
-    //note vector of radii for predicates
-    for (unsigned int i=0; i!=n_enrichments; ++i)
-      {
-        skiplines();
-        s_stream.clear();
-        s_stream.str(line);
-
-        double r;
-        s_stream >> r;
-        sigmas_rhs.push_back(r);
-      }
-
     pcout << "Sigma : " << std::endl;
     for (auto r:sigmas_rhs)
       pcout << r << std::endl;
 
-    pcout << "...finished parameter reading from file." << std::endl;
+    pcout << "...finished parameter reading." << std::endl;
   }
+
 
   template <int dim>
   void LaplaceProblem<dim>::read_parameters
