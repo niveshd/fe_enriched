@@ -59,52 +59,26 @@
 #include "estimate_enrichment.h"
 #include "paramater_reader.h"
 #include "solver.h"
+#include "../tests/tests.h"
 const unsigned int dim = 2;
 
 
 int main (int argc,char **argv)
 {
-  try
-    {
-      Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-      {
-        ParameterCollection<dim> prm;
-        AssertThrow(argc>=2, ExcMessage("Parameter file not given."));
-        prm.init(argv[1]);
+  Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
+  MPILogInitAll all;
+  {
+    ParameterCollection<dim> prm;
+    AssertThrow(argc>=2, ExcMessage("Parameter file not given."));
+    prm.init(argv[1]);
 
-        Step1::LaplaceProblem<dim> step1(prm);
+    Step1::LaplaceProblem<dim> step1(prm);
 
-        //TODO options not needed?
-        PETScWrappers::set_option_value("-eps_target","-1.0");
-        PETScWrappers::set_option_value("-st_type","sinvert");
-        PETScWrappers::set_option_value("-st_ksp_type","cg");
-        PETScWrappers::set_option_value("-st_pc_type", "jacobi");
-        step1.run();
-      }
-
-    }
-  catch (std::exception &exc)
-    {
-      std::cerr << std::endl   << std::endl
-                << ".............................."
-                << std::endl;
-      std::cerr << "Exception on processing: " << std::endl
-                << exc.what() << std::endl
-                << "Aborting!" << std::endl
-                << ".............................."
-                << std::endl;
-
-      return 1;
-    }
-  catch (...)
-    {
-      std::cerr << std::endl << std::endl
-                << ".............................."
-                << std::endl;
-      std::cerr << "Unknown exception!" << std::endl
-                << "Aborting!" << std::endl
-                << ".............................."
-                << std::endl;
-      return 1;
-    };
+    //TODO options not needed?
+    PETScWrappers::set_option_value("-eps_target","-1.0");
+    PETScWrappers::set_option_value("-st_type","sinvert");
+    PETScWrappers::set_option_value("-st_ksp_type","cg");
+    PETScWrappers::set_option_value("-st_pc_type", "jacobi");
+    step1.run();
+  }
 }

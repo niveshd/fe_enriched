@@ -172,8 +172,10 @@ namespace Step1
     double size;
     unsigned int shape; //0 = ball, 1 = cube
     unsigned int patches;
-    //debug level = 0(output nothing), 1(output solution)
-    //2 (+ output grid data as well)
+    //debug level = 0(output nothing),
+    //1 (print statements)
+    //2 (output solution)
+    //3 (+ output grid data as well)
     //9 (+ shape functions as well)
     unsigned int debug_level;
     unsigned int global_refinement;
@@ -296,7 +298,7 @@ namespace Step1
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0)),
+    pcout (std::cout, (this_mpi_process == 0)  && (prm.debug_level >= 1)),
     max_iterations(prm.max_iterations),
     tolerance(prm.tolerance)
   {
@@ -527,6 +529,7 @@ namespace Step1
                                          cellwise_color_predicate_map,
                                          color_enrichments);
 
+    //TODO clear fe_collection such that multiple calls will work
     make_fe_collection_from_colored_enrichments (num_colors,
                                                  fe_sets,
                                                  color_enrichments,
@@ -555,9 +558,9 @@ namespace Step1
                                                      sigma);
         radial_problem.debug_level = debug_level; //print output
         radial_problem.run();
-        std::cout << "solved problem with "
-                  << "(x, sigma): "
-                  << center << ", " << sigma << std::endl;
+        pcout << "solved problem with "
+              << "(x, sigma): "
+              << center << ", " << sigma << std::endl;
 
         //make points at which solution needs to interpolated
         //use bisection like adapter for splines
@@ -603,7 +606,7 @@ namespace Step1
                                          predicate_colors,
                                          cellwise_color_predicate_map,
                                          fe_sets);
-    if (debug_level >= 2)
+    if (debug_level >= 3)
       output_cell_attributes();
 
     {
@@ -879,9 +882,9 @@ namespace Step1
                                                  sigma);
     radial_problem.debug_level = debug_level; //print output
     radial_problem.run();
-    std::cout << "solving radial problem for error calculation "
-              << "(x, sigma): "
-              << center << ", " << sigma << std::endl;
+    pcout << "solving radial problem for error calculation "
+          << "(x, sigma): "
+          << center << ", " << sigma << std::endl;
 
     //make points at which solution needs to interpolated
     std::vector<double> interpolation_points_1D, interpolation_values_1D;
@@ -914,10 +917,22 @@ namespace Step1
                                                               difference_per_cell,
                                                               VectorTools::L2_norm);
 
-    std::cout << "L2 error norm: " << L2_error << std::endl;
-  }
+    VectorTools::integrate_difference (dof_handler,
+                                       solution,
+                                       exact_solution,
+                                       difference_per_cell,
+                                       q_collection,
+                                       VectorTools::H1_norm);
 
+    const double H1_error = VectorTools::compute_global_error(triangulation,
+                                                              difference_per_cell,
+                                                              VectorTools::H1_norm);
 
+    deallog << "Dofs L2_norm H1_norm" << std::endl;
+    deallog << dof_handler.n_dofs() << " "
+            << L2_error << " "
+            << H1_error << std::endl;
+}
 
   template <int dim>
   void LaplaceProblem<dim>::output_cell_attributes ()
@@ -1037,7 +1052,7 @@ namespace Step1
         //TODO Uncomment. correct function body
 //        estimate_error ();
 
-        if (debug_level >= 1)
+        if (debug_level >= 2)
           output_results(cycle);
 
         //TODO UNCOMMENT. correct function body

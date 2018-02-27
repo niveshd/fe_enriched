@@ -190,13 +190,12 @@ void EstimateEnrichmentFunction<dim>::output_results () const
 template <int dim>
 void EstimateEnrichmentFunction<dim>::run ()
 {
-//  std::cout << "Solving problem in " << dim << " space dimensions." << std::endl;
-
-  std::cout << "Solving problem in dim.: " << dim
-            << " with center: " << center
-            << ", size: " << domain_size
-            << ", sigma: " << sigma
-            << std::endl;
+  if (debug_level >= 1)
+    std::cout << "Solving problem in dim.: " << dim
+              << " with center: " << center
+              << ", size: " << domain_size
+              << ", sigma: " << sigma
+              << std::endl;
 
   make_grid();
 
@@ -205,7 +204,8 @@ void EstimateEnrichmentFunction<dim>::run ()
   bool start = true;
   do
     {
-//      std::cout << "Refinement level: " << refinement << std::endl;
+      if (debug_level >= 1)
+        std::cout << "Refinement level: " << refinement << std::endl;
 
       if (cycles!=0)
         {
@@ -227,11 +227,12 @@ void EstimateEnrichmentFunction<dim>::run ()
     }
   while (relative_change > 0.005);
 
-  std::cout << "Radial solution at origin = "
-            << value
-            << " after global refinement "
-            << refinement
-            << std::endl;
+  if (debug_level >= 1)
+    std::cout << "Radial solution at origin = "
+              << value
+              << " after global refinement "
+              << refinement
+              << std::endl;
 
   if (debug_level >= 1)
     output_results ();
