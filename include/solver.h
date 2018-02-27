@@ -177,6 +177,7 @@ namespace Step1
     //9 (+ shape functions as well)
     unsigned int debug_level;
     unsigned int global_refinement;
+    unsigned int cycles;
     unsigned int n_enrichments;
     unsigned int n_enriched_cells;
     std::vector<Point<dim>> points_enrichments;
@@ -282,6 +283,7 @@ namespace Step1
     patches(prm.patches),
     debug_level(prm.debug_level),
     global_refinement(prm.global_refinement),
+    cycles(prm.cycles),
     n_enrichments(prm.n_enrichments),
     n_enriched_cells(0),
     points_enrichments(prm.points_enrichments),
@@ -436,7 +438,6 @@ namespace Step1
       for (unsigned int i=0; i<predicate_colors.size(); ++i)
         pcout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
     }
-
     //make color index
     {
       color_output.reinit(triangulation.n_active_cells());
@@ -513,6 +514,7 @@ namespace Step1
 
     //q collections the same size as different material identities
     //TODO in parameter file
+    //TODO clear so that multiple runs will work
     q_collection.push_back(QGauss<dim>(4));
     for (unsigned int i=1; i!=fe_sets.size(); ++i)
       q_collection.push_back(QGauss<dim>(10));
@@ -827,13 +829,8 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::refine_grid ()
   {
-//     const double threshold = 0.9 * estimated_error_per_cell.linfty_norm();
-//     GridRefinement::refine (triangulation,
-//                             estimated_error_per_cell,
-//                             threshold);
-
-//     triangulation.prepare_coarsening_and_refinement ();
-//     triangulation.execute_coarsening_and_refinement ();
+    triangulation.refine_global();
+    ++global_refinement;
   }
 
 
@@ -1005,12 +1002,15 @@ namespace Step1
 
     //Run making grids and building fe space only once.
     initialize();
-    build_fe_space();
+
 
     //TODO need cyles?
-    for (unsigned int cycle = 0; cycle < 1; ++cycle)
+    for (unsigned int cycle = 0; cycle <= cycles; ++cycle)
       {
         pcout << "Cycle "<< cycle <<std::endl;
+
+        build_fe_space();
+
         setup_system ();
 
         pcout << "Number of active cells:       "
@@ -1041,7 +1041,7 @@ namespace Step1
           output_results(cycle);
 
         //TODO UNCOMMENT. correct function body
-//        refine_grid ();
+        refine_grid ();
 
         pcout << "...step run complete" << std::endl;
       }
