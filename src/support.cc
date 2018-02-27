@@ -44,10 +44,14 @@ set_cellwise_color_set_and_fe_index
  &cellwise_color_predicate_map,
  std::vector <std::set<unsigned int>> &fe_sets)
 {
+  //clear output variables first
+  fe_sets.clear();
+  cellwise_color_predicate_map.clear();
+
   //set first element of fe_sets size to empty
   fe_sets.resize(1);
 
-  //loop throught cells and build fe table
+  //loop through cells and build fe table
   unsigned int cell_index = 0;
 
   auto cell = mesh.begin_active();
@@ -131,6 +135,7 @@ void make_colorwise_enrichment_functions
  &color_enrichments)   //colorwise enrichment functions indexed from 0!
 //color_enrichments[0] is color 1 enrichment function
 {
+  color_enrichments.clear();
   color_enrichments.resize (num_colors); // <<-- return by value and keep as a class member
 
   for (unsigned int i = 0; i < num_colors; ++i)
