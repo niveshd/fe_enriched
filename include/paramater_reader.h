@@ -15,6 +15,7 @@ struct ParameterCollection
   double size;
   unsigned int shape; //0 = ball, 1 = cube
   unsigned int global_refinement;
+  unsigned int cycles;
   unsigned int max_iterations;
   unsigned int fe_base_degree;
   unsigned int fe_enriched_degree;
@@ -52,6 +53,9 @@ init
   prm.declare_entry("Global refinement",
                     "1",
                     Patterns::Integer(1));
+  prm.declare_entry("cycles",
+                    "0",
+                    Patterns::Integer(0));
   prm.leave_subsection();
 
   prm.enter_subsection("solver");
@@ -88,6 +92,7 @@ init
   size = prm.get_double("size");
   shape = prm.get_integer("shape");
   global_refinement = prm.get_integer("Global refinement");
+  cycles = prm.get_integer("cycles");
   prm.leave_subsection();
 
   prm.enter_subsection("solver");
