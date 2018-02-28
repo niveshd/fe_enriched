@@ -1,6 +1,43 @@
 #ifndef SOLVER_H
 #define SOLVER_H
 
+#include <deal.II/base/utilities.h>
+#include <deal.II/base/function.h>
+#include <deal.II/base/conditional_ostream.h>
+
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/dofs/dof_renumbering.h>
+
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_tools.h>
+#include <deal.II/grid/grid_refinement.h>
+
+#include <deal.II/grid/grid_out.h>
+
+#include <deal.II/numerics/data_postprocessor.h>
+#include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/error_estimator.h>
+
+#include <deal.II/hp/dof_handler.h>
+#include <deal.II/hp/fe_values.h>
+#include <deal.II/hp/q_collection.h>
+#include <deal.II/hp/fe_collection.h>
+
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_nothing.h>
+#include <deal.II/fe/fe_system.h>
+#include <deal.II/fe/fe_enriched.h>
+#include <deal.II/fe/fe_values.h>
+
+#include <deal.II/lac/sparsity_tools.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_sparse_matrix.h>
+#include <deal.II/lac/petsc_solver.h>
+#include <deal.II/lac/petsc_precondition.h>
+#include <deal.II/lac/slepc_solver.h>
+#include <deal.II/base/parameter_handler.h>
+
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/base/convergence_table.h>
 
@@ -781,7 +818,6 @@ namespace Step1
   unsigned int LaplaceProblem<dim>::solve()
   {
     pcout << "...solving" << std::endl;
-
     SolverControl           solver_control (max_iterations,
                                             tolerance,
                                             false,

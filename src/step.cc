@@ -73,12 +73,6 @@ int main (int argc,char **argv)
     prm.init(argv[1]);
 
     Step1::LaplaceProblem<dim> step1(prm);
-
-    //TODO options not needed?
-    PETScWrappers::set_option_value("-eps_target","-1.0");
-    PETScWrappers::set_option_value("-st_type","sinvert");
-    PETScWrappers::set_option_value("-st_ksp_type","cg");
-    PETScWrappers::set_option_value("-st_pc_type", "jacobi");
     step1.run();
   }
 }
