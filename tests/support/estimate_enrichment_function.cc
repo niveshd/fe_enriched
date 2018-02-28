@@ -317,7 +317,7 @@ int main (int argc, char **argv)
 
 
   //cspline function within enrichment function
-  EnrichmentFunction<2> func(Point<2>(),
+  SplineEnrichmentFunction<2> func(Point<2>(),
                              sigma,
                              interpolation_points,
                              interpolation_values_1D);

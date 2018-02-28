@@ -130,7 +130,7 @@ void Problem<dim>::make_enrichment_function ()
 
 
       //construct enrichment function and push
-      EnrichmentFunction<dim> func(this->points_enrichments[i],
+      SplineEnrichmentFunction<dim> func(this->points_enrichments[i],
                                    this->radii_predicates[i],
                                    interpolation_points_1D,
                                    interpolation_values_1D);
@@ -184,7 +184,7 @@ void Problem<dim>::make_enrichment_function ()
 //  //2.const enrichment functions!
 //  for (unsigned int i=0; i<this->vec_predicates.size(); ++i)
 //    {
-//      EnrichmentFunction<dim> func(Point<2> (0,0),
+//      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
 //                                   2,
 //                                   0);  //constant function
 //      this->vec_enrichments.push_back( func );
@@ -211,7 +211,7 @@ void Problem<dim>::make_enrichment_function ()
 //        interpolation_values_1D.push_back(1-y*y);
 
 //      //construct enrichment function and push
-//      EnrichmentFunction<dim> func(this->points_enrichments[i],
+//      SplineEnrichmentFunction<dim> func(this->points_enrichments[i],
 //                                   this->radii_enrichments[i],
 //                                   interpolation_points_1D,
 //                                   interpolation_values_1D);

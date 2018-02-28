@@ -80,12 +80,12 @@ int main(int argc, char **argv)
   predicate_colors[2] = 1;
 
   //vector of enrichment functions
-  std::vector<EnrichmentFunction<dim>> vec_enrichments;
+  std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
   vec_enrichments.reserve( vec_predicates.size() );
   for (unsigned int i=0; i<vec_predicates.size(); ++i)
     {
       //constant function. point and radius chosen such that they cover whole domain
-      EnrichmentFunction<dim> func(Point<2> (0,0),
+      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
                                    2,
                                    i);
       vec_enrichments.push_back( func );

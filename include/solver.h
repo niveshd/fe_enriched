@@ -216,7 +216,7 @@ namespace Step1
     using cell_function = std::function<const Function<dim>*
                           (const typename Triangulation<dim>::cell_iterator &)>;
 
-    std::vector<EnrichmentFunction<dim>> vec_enrichments;
+    std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
     std::vector<cell_function>  color_enrichments;
 
@@ -298,7 +298,7 @@ namespace Step1
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0)  && (prm.debug_level >= 1)),
+    pcout (std::cout, (this_mpi_process == 0)   &&(prm.debug_level >= 1)),
     max_iterations(prm.max_iterations),
     tolerance(prm.tolerance)
   {
@@ -580,7 +580,7 @@ namespace Step1
 
 
             //construct enrichment function and push
-            EnrichmentFunction<dim> func(points_enrichments[i],
+            SplineEnrichmentFunction<dim> func(points_enrichments[i],
                                          radii_predicates[i],
                                          interpolation_points_1D,
                                          interpolation_values_1D);
@@ -589,7 +589,7 @@ namespace Step1
         else
           {
             pcout << "Dummy function added at " << i << std::endl;
-            EnrichmentFunction<dim> func(Point<dim>(),1,0);
+            SplineEnrichmentFunction<dim> func(Point<dim>(),1,0);
             vec_enrichments.push_back(func);
           }
 
@@ -888,23 +888,29 @@ namespace Step1
 
     //make points at which solution needs to interpolated
     std::vector<double> interpolation_points_1D, interpolation_values_1D;
-    unsigned int n = 100;
+    double cut_point = 1;
+    unsigned int n1 = 10, n2 = 200;
     double right_bound = size/2;
-    double h = size/n;
-    for (double p = center; p < right_bound; p+=h)
+    double h1 = cut_point/n1, h2 = (size-cut_point)/n2;
+    for (double p = center; p < cut_point; p+=h1)
+      interpolation_points_1D.push_back(p);
+    for (double p = cut_point; p < right_bound; p+=h2)
       interpolation_points_1D.push_back(p);
     interpolation_points_1D.push_back(right_bound);
 
     radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
 
 
-    //construct enrichment function and push
-    EnrichmentFunction<dim> exact_solution(Point<dim>(),
+    //construct enrichment function and make spline function
+    SplineEnrichmentFunction<dim> exact_solution(Point<dim>(),
                                            1, //TODO is not need. remove
                                            interpolation_points_1D,
                                            interpolation_values_1D);
 
     Vector<float> difference_per_cell (triangulation.n_active_cells());
+
+    //find error due to spline approximation
+
 
     VectorTools::integrate_difference (dof_handler,
                                        solution,
@@ -928,11 +934,12 @@ namespace Step1
                                                               difference_per_cell,
                                                               VectorTools::H1_norm);
 
-    deallog << "Dofs L2_norm H1_norm" << std::endl;
-    deallog << dof_handler.n_dofs() << " "
+    deallog << "refinement Dofs L2_norm H1_norm" << std::endl;
+    deallog << global_refinement << " "
+            << dof_handler.n_dofs() << " "
             << L2_error << " "
             << H1_error << std::endl;
-}
+  }
 
   template <int dim>
   void LaplaceProblem<dim>::output_cell_attributes ()

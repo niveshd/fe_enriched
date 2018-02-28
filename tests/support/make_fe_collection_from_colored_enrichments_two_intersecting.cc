@@ -141,11 +141,11 @@ int main(int argc, char **argv)
   vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
 
   //vector of enrichment functions
-  std::vector<EnrichmentFunction<dim>> vec_enrichments;
+  std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
   vec_enrichments.reserve( vec_predicates.size() );
   for (unsigned int i=0; i<vec_predicates.size(); ++i)
     {
-      EnrichmentFunction<dim> func(Point<2> (0,0),
+      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
                                    2,
                                    10+i);  //constant function
       vec_enrichments.push_back( func );

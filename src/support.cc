@@ -122,7 +122,7 @@ template <int dim>
 void make_colorwise_enrichment_functions
 (const unsigned int &num_colors,          //needs number of colors
 
- const std::vector<EnrichmentFunction<dim>>
+ const std::vector<SplineEnrichmentFunction<dim>>
  &vec_enrichments,     //enrichment functions based on predicate id
 
  const std::map<unsigned int,
@@ -270,7 +270,7 @@ template
 void make_colorwise_enrichment_functions
 (const unsigned int &num_colors,          //needs number of colors
 
- const std::vector<EnrichmentFunction<2>>
+ const std::vector<SplineEnrichmentFunction<2>>
  &vec_enrichments,     //enrichment functions based on predicate id
 
  const std::map<unsigned int,
@@ -286,7 +286,7 @@ template
 void make_colorwise_enrichment_functions
 (const unsigned int &num_colors,          //needs number of colors
 
- const std::vector<EnrichmentFunction<3>>
+ const std::vector<SplineEnrichmentFunction<3>>
  &vec_enrichments,     //enrichment functions based on predicate id
 
  const std::map<unsigned int,

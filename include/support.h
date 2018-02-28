@@ -66,10 +66,10 @@ private:
 
 
 template <int dim>
-class EnrichmentFunction : public Function<dim>
+class SplineEnrichmentFunction : public Function<dim>
 {
 public:
-  EnrichmentFunction(const Point<dim> &origin,
+  SplineEnrichmentFunction(const Point<dim> &origin,
                      const double     &sigma,
                      const std::vector<double> &interpolation_points_1d,
                      const std::vector<double> &interpolation_values_1d)
@@ -82,7 +82,7 @@ public:
   {}
 
   //To be used only for debugging
-  EnrichmentFunction(const Point<dim> &origin,
+  SplineEnrichmentFunction(const Point<dim> &origin,
                      const double &sigma,
                      const double &constant)
     :
@@ -101,7 +101,7 @@ public:
           interpolation_values)
   {}
 
-  EnrichmentFunction(EnrichmentFunction &&other)
+  SplineEnrichmentFunction(SplineEnrichmentFunction &&other)
     :
     origin(other.origin),
     sigma(other.sigma),
@@ -111,7 +111,7 @@ public:
   {
   }
 
-  EnrichmentFunction(const EnrichmentFunction &other)
+  SplineEnrichmentFunction(const SplineEnrichmentFunction &other)
     :
     origin(other.origin),
     sigma(other.sigma),
@@ -129,15 +129,6 @@ public:
     Tensor<1,dim> dist = point-origin;
     const double r = dist.norm();
     return cspline.value(Point<1>(r));
-  }
-
-  //TODO remove?
-  bool is_enriched(const Point<dim> &point) const
-  {
-    if (origin.distance(point) < sigma)
-      return true;
-    else
-      return false;
   }
 
   virtual Tensor< 1, dim> gradient (const Point<dim > &p,
@@ -164,7 +155,7 @@ private:
   //
   std::vector<double> interpolation_points;
   std::vector<double> interpolation_values;
-  //enrichement function as CSpline based on radius
+  //enrichment function as CSpline based on radius
   Functions::CSpline<1> cspline;
 };
 
@@ -201,7 +192,7 @@ template <int dim>
 void make_colorwise_enrichment_functions
 (const unsigned int &num_colors,          //needs number of colors
 
- const std::vector<EnrichmentFunction<dim>>
+ const std::vector<SplineEnrichmentFunction<dim>>
  &vec_enrichments,     //enrichment functions based on predicate id
 
  const std::map<unsigned int,
