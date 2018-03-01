@@ -1,6 +1,7 @@
 #ifndef PARAMETER_READER_H
 #define PARAMETER_READER_H
 
+#include <deal.II/base/point.h>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -10,19 +11,81 @@
 template<int dim>
 struct ParameterCollection
 {
-  void init(const std::string &file_name);
+  ParameterCollection(const std::string &file_name);
+
+  ParameterCollection
+  (const double size,
+   const unsigned int shape,
+   const unsigned int global_refinement,
+   const unsigned int cycles,
+   const unsigned int fe_base_degree,
+   const unsigned int fe_enriched_degree,
+   const unsigned int max_iterations,
+   const double tolerance,
+   const unsigned int patches,
+   const unsigned int debug_level,
+   const unsigned int n_enrichments,
+   const std::vector<Point<dim>> points_enrichments,
+   const std::vector<double> radii_predicates,
+   const std::vector<double> sigmas_rhs)
+    :
+    size(size),
+    shape(shape),
+    global_refinement(global_refinement),
+    cycles(cycles),
+    fe_base_degree(fe_base_degree),
+    fe_enriched_degree(fe_enriched_degree),
+    max_iterations(max_iterations),
+    tolerance(tolerance),
+    patches(patches),
+    debug_level(debug_level),
+    n_enrichments(n_enrichments),
+    points_enrichments(points_enrichments),
+    radii_predicates(radii_predicates),
+    sigmas_rhs(sigmas_rhs)
+  {}
+
+  void print()
+  {
+    std::cout << "Size : "<< size << std::endl;
+    std::cout << "Shape : " << shape << std::endl;
+    std::cout << "Global refinement : " << global_refinement << std::endl;
+    std::cout << "Cycles : " << cycles << std::endl;
+    std::cout << "FE base degree : " << fe_base_degree << std::endl;
+    std::cout << "FE enriched degree : " << fe_enriched_degree << std::endl;
+    std::cout << "Max Iterations : " << max_iterations << std::endl;
+    std::cout << "Tolerance : " << tolerance << std::endl;
+    std::cout << "Patches used for output: " << patches << std::endl;
+    std::cout << "Debug level: " << debug_level << std::endl;
+    std::cout << "Number of enrichments: " << n_enrichments << std::endl;
+
+    std::cout << "Enrichment points : " << std::endl;
+    for (auto p:points_enrichments)
+      std::cout << p << std::endl;
+
+    std::cout << "Enrichment radii : " << std::endl;
+    for (auto r:radii_predicates)
+      std::cout << r << std::endl;
+
+    std::cout << "Sigma : " << std::endl;
+    for (auto r:sigmas_rhs)
+      std::cout << r << std::endl;
+  }
+
 
   double size;
   unsigned int shape; //0 = ball, 1 = cube
   unsigned int global_refinement;
   unsigned int cycles;
-  unsigned int max_iterations;
   unsigned int fe_base_degree;
   unsigned int fe_enriched_degree;
+  unsigned int max_iterations;
   double tolerance;
   unsigned int patches;
-  //debug level = 0(output nothing), 1(output solution)
-  //2 (+ output grid data as well)
+  //debug level = 0(output nothing),
+  //1 (print statements)
+  //2 (output solution)
+  //3 (+ output grid data as well)
   //9 (+ shape functions as well)
   unsigned int debug_level;
   unsigned int n_enrichments;
@@ -33,8 +96,7 @@ struct ParameterCollection
 
 
 template<int dim>
-void ParameterCollection<dim>::
-init
+ParameterCollection<dim>::ParameterCollection
 (const std::string &file_name)
 {
 

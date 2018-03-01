@@ -172,20 +172,23 @@ namespace Step1
   public:
     LaplaceProblem ();
     LaplaceProblem (const ParameterCollection<dim> &prm);
-    virtual ~LaplaceProblem();
+    LaplaceProblem
+    (const double size,
+     const unsigned int shape,
+     const unsigned int global_refinement,
+     const unsigned int cycles,
+     const unsigned int fe_base_degree,
+     const unsigned int fe_enriched_degree,
+     const unsigned int max_iterations,
+     const double tolerance,
+     const unsigned int patches,
+     const unsigned int debug_level,
+     const unsigned int n_enrichments,
+     const std::vector<Point<dim>> points_enrichments,
+     const std::vector<double> radii_predicates,
+     const std::vector<double> sigmas_rhs);
 
-    void read_parameters
-    (const double &_size,
-     const unsigned int &_shape,
-     const unsigned int &_global_refinement,
-     const unsigned int &_max_iterations,
-     const double &_tolerance,
-     const unsigned int &_patches,
-     const unsigned int &_debug_level,
-     const unsigned int &_n_enrichments,
-     const std::vector<Point<dim>> &_points_enrichments,
-     const std::vector<double> &_radii_predicates,
-     const std::vector<double> &_sigmas_rhs);
+    virtual ~LaplaceProblem();
 
     void run ();
 
@@ -206,22 +209,8 @@ namespace Step1
     void process_solution();
 
   protected:
-    double size;
-    unsigned int shape; //0 = ball, 1 = cube
-    unsigned int patches;
-    //debug level = 0(output nothing),
-    //1 (print statements)
-    //2 (output solution)
-    //3 (+ output grid data as well)
-    //9 (+ shape functions as well)
-    unsigned int debug_level;
-    unsigned int global_refinement;
-    unsigned int cycles;
-    unsigned int n_enrichments;
+    ParameterCollection<dim> prm;
     unsigned int n_enriched_cells;
-    std::vector<Point<dim>> points_enrichments;
-    std::vector<double> radii_predicates;
-    std::vector<double> sigmas_rhs;
 
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
@@ -277,57 +266,15 @@ namespace Step1
     std::vector<Vector<float>> predicate_output;
     Vector<float> color_output;
     Vector<float> vec_fe_index;
-
-    //solver parameters
-    unsigned int max_iterations;
-    double tolerance;
   };
 
 
 
   template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem ()
+  LaplaceProblem<dim>:: LaplaceProblem ()
     :
+    prm(),
     n_enriched_cells(0),
-    dof_handler (triangulation),
-    fe_base(1),
-    fe_enriched(1),
-    fe_nothing(1,true),
-    mpi_communicator(MPI_COMM_WORLD),
-    n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
-    this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0))
-  {
-    size = 100;
-    shape = 0;
-    global_refinement = 7;
-    max_iterations = 1000;
-    tolerance = 1e-8;
-    patches = 1;
-    debug_level = 0;
-    n_enrichments = 1;
-    points_enrichments.push_back(Point<dim>());
-    radii_predicates.push_back(0);
-    sigmas_rhs.push_back(1);
-  }
-
-
-
-  template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem
-  (const ParameterCollection<dim> &prm)
-    :
-    size(prm.size),
-    shape(prm.shape),
-    patches(prm.patches),
-    debug_level(prm.debug_level),
-    global_refinement(prm.global_refinement),
-    cycles(prm.cycles),
-    n_enrichments(prm.n_enrichments),
-    n_enriched_cells(0),
-    points_enrichments(prm.points_enrichments),
-    radii_predicates(prm.radii_predicates),
-    sigmas_rhs(prm.sigmas_rhs),
     dof_handler (triangulation),
     fe_base(prm.fe_base_degree),
     fe_enriched(prm.fe_enriched_degree),
@@ -335,81 +282,83 @@ namespace Step1
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0)   &&(prm.debug_level >= 1)),
-    max_iterations(prm.max_iterations),
-    tolerance(prm.tolerance)
+    pcout (std::cout, (this_mpi_process == 0))
   {
-    pcout << "Size : "<< size << std::endl;
-    pcout << "Global refinement : " << global_refinement << std::endl;
-    pcout << "Fe base: " << fe_base.get_name() << std::endl;
-    pcout << "Fe enriched: " << fe_enriched.get_name() << std::endl;
-    pcout << "Max Iterations : " << max_iterations << std::endl;
-    pcout << "Tolerance : " << tolerance << std::endl;
-    pcout << "Patches used for output: " << patches << std::endl;
-    pcout << "Debug level: " << debug_level << std::endl;
-    pcout << "Number of enrichments: " << n_enrichments << std::endl;
-    pcout << "Enrichment points : " << std::endl;
-    for (auto p:points_enrichments)
-      pcout << p << std::endl;
+    prm.print();
 
-    pcout << "Enrichment radii : " << std::endl;
-    for (auto r:radii_predicates)
-      pcout << r << std::endl;
+    pcout << "...default parameters set" << std::endl;
+  }
 
-    pcout << "Sigma : " << std::endl;
-    for (auto r:sigmas_rhs)
-      pcout << r << std::endl;
+
+
+  template <int dim>
+  LaplaceProblem<dim>::LaplaceProblem
+  (const ParameterCollection<dim> &parameter)
+    :
+    prm(parameter),
+    n_enriched_cells(0),
+    dof_handler (triangulation),
+    fe_base(prm.fe_base_degree),
+    fe_enriched(prm.fe_enriched_degree),
+    fe_nothing(1,true),
+    mpi_communicator(MPI_COMM_WORLD),
+    n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
+    this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
+    pcout (std::cout, (this_mpi_process == 0)   &&(prm.debug_level >= 1))
+  {
+
+    prm.print();
 
     pcout << "...parameters set" << std::endl;
   }
 
 
   template <int dim>
-  void LaplaceProblem<dim>::read_parameters
-  (const double &_size,
-   const unsigned int &_shape,
-   const unsigned int &_global_refinement,
-   const unsigned int &_max_iterations,
-   const double &_tolerance,
-   const unsigned int &_patches,
-   const unsigned int &_debug_level,
-   const unsigned int &_n_enrichments,
-   const std::vector<Point<dim>> &_points_enrichments,
-   const std::vector<double> &_radii_predicates,
-   const std::vector<double> &_sigmas_rhs)
+  LaplaceProblem<dim>::LaplaceProblem
+  (const double size,
+   const unsigned int shape,
+   const unsigned int global_refinement,
+   const unsigned int cycles,
+   const unsigned int fe_base_degree,
+   const unsigned int fe_enriched_degree,
+   const unsigned int max_iterations,
+   const double tolerance,
+   const unsigned int patches,
+   const unsigned int debug_level,
+   const unsigned int n_enrichments,
+   const std::vector<Point<dim>> points_enrichments,
+   const std::vector<double> radii_predicates,
+   const std::vector<double> sigmas_rhs)
+    :
+    prm
+    (size,
+     shape,
+     global_refinement,
+     cycles,
+     fe_base_degree,
+     fe_enriched_degree,
+     max_iterations,
+     tolerance,
+     patches,
+     debug_level,
+     n_enrichments,
+     points_enrichments,
+     radii_predicates,
+     sigmas_rhs),
+    n_enriched_cells(0),
+    dof_handler (triangulation),
+    fe_base(prm.fe_base_degree),
+    fe_enriched(prm.fe_enriched_degree),
+    fe_nothing(1,true),
+    mpi_communicator(MPI_COMM_WORLD),
+    n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
+    this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
+    pcout (std::cout, (this_mpi_process == 0)   &&(prm.debug_level >= 1))
+
   {
-    size = _size;
-    shape = _shape;
-    global_refinement = _global_refinement;
-    max_iterations = _max_iterations;
-    tolerance = _tolerance;
-    patches = _patches;
-    debug_level = _debug_level;
-    n_enrichments = _n_enrichments;
-    points_enrichments = _points_enrichments;
-    radii_predicates = _radii_predicates;
-    sigmas_rhs = _sigmas_rhs;
+    prm.print();
 
-    pcout << "Size : "<< size << std::endl;
-    pcout << "Global refinement : " << global_refinement << std::endl;
-    pcout << "Max Iterations : " << max_iterations << std::endl;
-    pcout << "Tolerance : " << tolerance << std::endl;
-    pcout << "Patches used for output: " << patches << std::endl;
-    pcout << "Debug level: " << debug_level << std::endl;
-    pcout << "Number of enrichments: " << n_enrichments << std::endl;
-    pcout << "Enrichment points : " << std::endl;
-    for (auto p:points_enrichments)
-      pcout << p << std::endl;
-
-    pcout << "Enrichment radii : " << std::endl;
-    for (auto r:radii_predicates)
-      pcout << r << std::endl;
-
-    pcout << "Sigma : " << std::endl;
-    for (auto r:sigmas_rhs)
-      pcout << r << std::endl;
-
-    pcout << "...finished parameter reading." << std::endl;
+    pcout << "...parameters set" << std::endl;
   }
 
   template <int dim>
@@ -417,12 +366,12 @@ namespace Step1
   {
     pcout << "...Start initializing" << std::endl;
     //set up basic grid
-    if (shape == 1)
-      GridGenerator::hyper_cube (triangulation, -size/2.0, size/2.0);
-    else if (shape == 0)
+    if (prm.shape == 1)
+      GridGenerator::hyper_cube (triangulation, -prm.size/2.0, prm.size/2.0);
+    else if (prm.shape == 0)
       {
         Point<dim> center = Point<dim>();
-        GridGenerator::hyper_ball (triangulation, center, size/2.0);
+        GridGenerator::hyper_ball (triangulation, center, prm.size/2.0);
         triangulation.set_all_manifold_ids_on_boundary(0);
         static SphericalManifold<dim> spherical_manifold(center);
         triangulation.set_manifold(0,spherical_manifold);
@@ -431,28 +380,28 @@ namespace Step1
       AssertThrow(false,ExcMessage("Shape not implemented."));
 
 
-    triangulation.refine_global (global_refinement);
+    triangulation.refine_global (prm.global_refinement);
 
-    pcout << "step size: " << size/std::pow(2.0,global_refinement) << std::endl;
+    pcout << "step size: " << prm.size/std::pow(2.0,prm.global_refinement) << std::endl;
 
-    Assert(points_enrichments.size()==n_enrichments &&
-           radii_predicates.size()==n_enrichments &&
-           sigmas_rhs.size()==n_enrichments,
+    Assert(prm.points_enrichments.size()==prm.n_enrichments &&
+           prm.radii_predicates.size()==prm.n_enrichments &&
+           prm.sigmas_rhs.size()==prm.n_enrichments,
            ExcMessage
            ("Incorrect parameters: enrichment points, predicate radii and sigmas should be of same size"));
 
     //initialize vector of predicate functions, f: assign cell --> 1 or 0
-    for (unsigned int i=0; i != n_enrichments; ++i)
+    for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
-        vec_predicates.push_back( EnrichmentPredicate<dim>(points_enrichments[i],
-                                                           radii_predicates[i]) );
+        vec_predicates.push_back( EnrichmentPredicate<dim>(prm.points_enrichments[i],
+                                                           prm.radii_predicates[i]) );
       }
 
     //set a vector of right hand side functions
-    for (unsigned int i=0; i != n_enrichments; ++i)
+    for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
-        GaussianFunction<dim> rhs(points_enrichments[i],
-                                  sigmas_rhs[i]);
+        GaussianFunction<dim> rhs(prm.points_enrichments[i],
+                                  prm.sigmas_rhs[i]);
         vec_rhs.push_back(rhs);
       }
 
@@ -493,7 +442,7 @@ namespace Step1
     //build fe table. should be called everytime number of cells change!
     build_tables();
 
-    if (debug_level == 9)
+    if (prm.debug_level == 9)
       {
         if (triangulation.n_active_cells() < 100)
           {
@@ -589,11 +538,11 @@ namespace Step1
       {
         //formulate a 1d/radial problem with x coordinate and radius (i.e sigma)
         double center = 0;
-        double sigma = sigmas_rhs[i];
+        double sigma = prm.sigmas_rhs[i];
         EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                     size,
+                                                     prm.size,
                                                      sigma);
-        radial_problem.debug_level = debug_level; //print output
+        radial_problem.debug_level = prm.debug_level; //print output
         radial_problem.run();
         pcout << "solved problem with "
               << "(x, sigma): "
@@ -602,7 +551,7 @@ namespace Step1
         //make points at which solution needs to interpolated
         //use bisection like adapter for splines
         std::vector<double> interpolation_points_1D, interpolation_values_1D;
-        double radius = radii_predicates[i];
+        double radius = prm.radii_predicates[i];
         unsigned int n = 5;
         double right_bound = center + 2*radius;
         double h = 2.0*radius/n;
@@ -611,16 +560,16 @@ namespace Step1
         interpolation_points_1D.push_back(right_bound);
 
         //add enrichment function only when predicate radius is non-zero
-        if (radii_predicates[i] != 0)
+        if (prm.radii_predicates[i] != 0)
           {
             radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
 
 
             //construct enrichment function and push
-            SplineEnrichmentFunction<dim> func(points_enrichments[i],
-                                         radii_predicates[i],
-                                         interpolation_points_1D,
-                                         interpolation_values_1D);
+            SplineEnrichmentFunction<dim> func(prm.points_enrichments[i],
+                                               prm.radii_predicates[i],
+                                               interpolation_points_1D,
+                                               interpolation_values_1D);
             vec_enrichments.push_back(func);
           }
         else
@@ -643,7 +592,7 @@ namespace Step1
                                          predicate_colors,
                                          cellwise_color_predicate_map,
                                          fe_sets);
-    if (debug_level >= 3)
+    if (prm.debug_level >= 3)
       output_cell_attributes();
 
     {
@@ -818,8 +767,8 @@ namespace Step1
   unsigned int LaplaceProblem<dim>::solve()
   {
     pcout << "...solving" << std::endl;
-    SolverControl           solver_control (max_iterations,
-                                            tolerance,
+    SolverControl           solver_control (prm.max_iterations,
+                                            prm.tolerance,
                                             false,
                                             false);
     PETScWrappers::SolverCG cg (solver_control,
@@ -869,7 +818,7 @@ namespace Step1
   void LaplaceProblem<dim>::refine_grid ()
   {
     triangulation.refine_global();
-    ++global_refinement;
+    ++prm.global_refinement;
   }
 
 
@@ -878,7 +827,7 @@ namespace Step1
   void LaplaceProblem<dim>::output_results (const unsigned int cycle)
   {
     pcout << "...output results" << std::endl;
-    pcout << "Patches used: " << patches << std::endl;
+    pcout << "Patches used: " << prm.patches << std::endl;
 
     Assert (cycle < 10, ExcNotImplemented());
     if (this_mpi_process==0)
@@ -891,7 +840,7 @@ namespace Step1
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
         data_out.add_data_vector (solution, "solution");
-        data_out.build_patches (patches);
+        data_out.build_patches (prm.patches);
         data_out.write_vtk (output);
         output.close();
       }
@@ -904,19 +853,19 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::process_solution()
   {
-    AssertThrow(shape == 0, ExcMessage("solution only for circular domain known"));
-    AssertThrow(n_enrichments == 1 &&
-                points_enrichments[0] == Point<dim>(),
+    AssertThrow(prm.shape == 0, ExcMessage("solution only for circular domain known"));
+    AssertThrow(prm.n_enrichments == 1 &&
+                prm.points_enrichments[0] == Point<dim>(),
                 ExcMessage("solution only for single source at origin"));
 
     //Make enrichment function with spline ranging over whole domain.
     //Gradient of enrichment function is related to gradient of the spline.
     double center = 0;
-    double sigma = sigmas_rhs[0];
+    double sigma = prm.sigmas_rhs[0];
     EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                 size,
+                                                 prm.size,
                                                  sigma);
-    radial_problem.debug_level = debug_level; //print output
+    radial_problem.debug_level = prm.debug_level; //print output
     radial_problem.run();
     pcout << "solving radial problem for error calculation "
           << "(x, sigma): "
@@ -926,8 +875,8 @@ namespace Step1
     std::vector<double> interpolation_points_1D, interpolation_values_1D;
     double cut_point = 1;
     unsigned int n1 = 10, n2 = 200;
-    double right_bound = size/2;
-    double h1 = cut_point/n1, h2 = (size-cut_point)/n2;
+    double right_bound = prm.size/2;
+    double h1 = cut_point/n1, h2 = (prm.size-cut_point)/n2;
     for (double p = center; p < cut_point; p+=h1)
       interpolation_points_1D.push_back(p);
     for (double p = cut_point; p < right_bound; p+=h2)
@@ -939,9 +888,9 @@ namespace Step1
 
     //construct enrichment function and make spline function
     SplineEnrichmentFunction<dim> exact_solution(Point<dim>(),
-                                           1, //TODO is not need. remove
-                                           interpolation_points_1D,
-                                           interpolation_values_1D);
+                                                 1, //TODO is not need. remove
+                                                 interpolation_points_1D,
+                                                 interpolation_values_1D);
 
     Vector<float> difference_per_cell (triangulation.n_active_cells());
 
@@ -971,7 +920,7 @@ namespace Step1
                                                               VectorTools::H1_norm);
 
     deallog << "refinement Dofs L2_norm H1_norm" << std::endl;
-    deallog << global_refinement << " "
+    deallog << prm.global_refinement << " "
             << dof_handler.n_dofs() << " "
             << L2_error << " "
             << H1_error << std::endl;
@@ -1063,7 +1012,7 @@ namespace Step1
 
 
     //TODO need cyles?
-    for (unsigned int cycle = 0; cycle <= cycles; ++cycle)
+    for (unsigned int cycle = 0; cycle <= prm.cycles; ++cycle)
       {
         pcout << "Cycle "<< cycle <<std::endl;
 
@@ -1078,7 +1027,7 @@ namespace Step1
               << dof_handler.n_dofs ()
               << std::endl;
 
-        if (debug_level == 9)
+        if (prm.debug_level == 9)
           plot_shape_function<dim>(dof_handler);
 
         assemble_system ();
@@ -1089,13 +1038,13 @@ namespace Step1
                                           solution,
                                           Point<dim>())
               << std::endl;
-        if (shape == 0)
+        if (prm.shape == 0)
           process_solution();
 
         //TODO Uncomment. correct function body
 //        estimate_error ();
 
-        if (debug_level >= 2)
+        if (prm.debug_level >= 2)
           output_results(cycle);
 
         //TODO UNCOMMENT. correct function body

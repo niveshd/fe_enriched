@@ -86,8 +86,8 @@ int main(int argc, char **argv)
     {
       //constant function. point and radius chosen such that they cover whole domain
       SplineEnrichmentFunction<dim> func(Point<2> (0,0),
-                                   2,
-                                   i);
+                                         2,
+                                         i);
       vec_enrichments.push_back( func );
     }
 

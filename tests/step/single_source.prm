@@ -1,7 +1,7 @@
 subsection geometry
     set size = 100
     set shape = 0
-    set Global refinement = 9
+    set Global refinement = 7
     set cycles = 0
 end
 

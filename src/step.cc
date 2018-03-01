@@ -68,9 +68,8 @@ int main (int argc,char **argv)
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPILogInitAll all;
   {
-    ParameterCollection<dim> prm;
     AssertThrow(argc>=2, ExcMessage("Parameter file not given."));
-    prm.init(argv[1]);
+    ParameterCollection<dim> prm(argv[1]);
 
     Step1::LaplaceProblem<dim> step1(prm);
     step1.run();

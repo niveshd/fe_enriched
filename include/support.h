@@ -70,9 +70,9 @@ class SplineEnrichmentFunction : public Function<dim>
 {
 public:
   SplineEnrichmentFunction(const Point<dim> &origin,
-                     const double     &sigma,
-                     const std::vector<double> &interpolation_points_1d,
-                     const std::vector<double> &interpolation_values_1d)
+                           const double     &sigma,
+                           const std::vector<double> &interpolation_points_1d,
+                           const std::vector<double> &interpolation_values_1d)
     : Function<dim>(1),
       origin(origin),
       sigma(sigma),
@@ -83,8 +83,8 @@ public:
 
   //To be used only for debugging
   SplineEnrichmentFunction(const Point<dim> &origin,
-                     const double &sigma,
-                     const double &constant)
+                           const double &sigma,
+                           const double &constant)
     :
     Function<dim>(1),
     origin(origin),

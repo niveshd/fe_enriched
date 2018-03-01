@@ -318,9 +318,9 @@ int main (int argc, char **argv)
 
   //cspline function within enrichment function
   SplineEnrichmentFunction<2> func(Point<2>(),
-                             sigma,
-                             interpolation_points,
-                             interpolation_values_1D);
+                                   sigma,
+                                   interpolation_points,
+                                   interpolation_values_1D);
 
 
   //check how well spline approximates function

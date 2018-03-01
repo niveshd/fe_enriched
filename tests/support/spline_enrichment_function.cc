@@ -69,8 +69,36 @@ template <int dim>
 class Problem : public Step1::LaplaceProblem<dim>
 {
 public:
-  Problem ():
-    Step1::LaplaceProblem<dim>() {}
+  Problem   (const double size,
+             const unsigned int shape,
+             const unsigned int global_refinement,
+             const unsigned int cycles,
+             const unsigned int fe_base_degree,
+             const unsigned int fe_enriched_degree,
+             const unsigned int max_iterations,
+             const double tolerance,
+             const unsigned int patches,
+             const unsigned int debug_level,
+             const unsigned int n_enrichments,
+             const std::vector<Point<dim>> points_enrichments,
+             const std::vector<double> radii_predicates,
+             const std::vector<double> sigmas_rhs)
+    :
+    Step1::LaplaceProblem<dim>(
+      size,
+      shape,
+      global_refinement,
+      cycles,
+      fe_base_degree,
+      fe_enriched_degree,
+      max_iterations,
+      tolerance,
+      patches,
+      debug_level,
+      n_enrichments,
+      points_enrichments,
+      radii_predicates,
+      sigmas_rhs) {}
 
   void run_pre_solution_steps()
   {
@@ -78,7 +106,7 @@ public:
     this->build_fe_space();
     this->setup_system();
 
-    if (this->debug_level == 9)
+    if (this->prm.debug_level == 9)
       plot_shape_function<dim>(this->dof_handler);
   }
 
@@ -130,10 +158,10 @@ void Problem<dim>::make_enrichment_function ()
 
 
       //construct enrichment function and push
-      SplineEnrichmentFunction<dim> func(this->points_enrichments[i],
-                                   this->radii_predicates[i],
-                                   interpolation_points_1D,
-                                   interpolation_values_1D);
+      SplineEnrichmentFunction<dim> func(this->prm.points_enrichments[i],
+                                         this->prm.radii_predicates[i],
+                                         interpolation_points_1D,
+                                         interpolation_values_1D);
       this->vec_enrichments.push_back(func);
 
 
@@ -235,16 +263,18 @@ int main (int argc,char **argv)
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPILogInitAll all;
   {
-    Problem<dim> step_test;
-    step_test.read_parameters
-    (4,   //domain size
-     1,   //cube shape
-     2,   //global refinement
-     10000, //max iterations
+    Problem<dim> step_test
+    ((double)4,   //domain size
+     (unsigned int)1,   //cube shape
+     (unsigned int)2,   //global refinement
+     0,
+     (unsigned int)1,   //fe base degree
+     (unsigned int)1,   //fe enriched degree
+     (unsigned int)10000, //max iterations
      1e-8,  //tolerance
-     15,   //patches
-     9,   //debug level
-     1,   //num enrichments
+     (unsigned int)15,   //patches
+     (unsigned int)9,   //debug level
+     (unsigned int)1,   //num enrichments
     {Point<dim>()}, //enrichment points
     {1},    //predicate radii
     {0.05}); //sigmas
