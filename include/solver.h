@@ -398,11 +398,12 @@ namespace Step1
       }
 
     //set a vector of right hand side functions
+    vec_rhs.resize(prm.n_enrichments);
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
-        RightHandSide<dim> rhs(prm.points_enrichments[i],
-                                  prm.sigmas_rhs[i]);
-        vec_rhs.push_back(rhs);
+        vec_rhs[i].initialize(prm.points_enrichments[i],
+                              prm.sigmas_rhs[i],
+                              prm.rhs_expressions[i]);
       }
 
     pcout << "...finish initializing" << std::endl;
@@ -541,7 +542,8 @@ namespace Step1
         double sigma = prm.sigmas_rhs[i];
         EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
                                                      prm.size,
-                                                     sigma);
+                                                     sigma,
+                                                     prm.rhs_expressions[i]);
         radial_problem.debug_level = prm.debug_level; //print output
         radial_problem.run();
         pcout << "solved problem with "
@@ -849,7 +851,7 @@ namespace Step1
   }
 
 
-
+  //use this only when exact solution is known or can be solved
   template <int dim>
   void LaplaceProblem<dim>::process_solution()
   {
@@ -864,7 +866,8 @@ namespace Step1
     double sigma = prm.sigmas_rhs[0];
     EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
                                                  prm.size,
-                                                 sigma);
+                                                 sigma,
+                                                 prm.rhs_expressions[0]);
     radial_problem.debug_level = prm.debug_level; //print output
     radial_problem.run();
     pcout << "solving radial problem for error calculation "

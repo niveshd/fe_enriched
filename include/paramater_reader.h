@@ -92,6 +92,7 @@ struct ParameterCollection
   std::vector<Point<dim>> points_enrichments;
   std::vector<double> radii_predicates;
   std::vector<double> sigmas_rhs;
+  std::vector<std::string> rhs_expressions;
 };
 
 
@@ -144,7 +145,6 @@ ParameterCollection<dim>::ParameterCollection
                     Patterns::Integer(0,9));
   prm.leave_subsection();
 
-
   //parse parameter file
   prm.parse_input(file_name, "#end-of-dealii parser");
 
@@ -191,7 +191,7 @@ ParameterCollection<dim>::ParameterCollection
               ExcMessage("line missing in parameter file = \'#end-of-dealii parser\' "));
 
   //function to read next line not starting with # or empty
-  auto skiplines = [&] ()
+  auto read_next_proper_line = [&] (std::string &line)
   {
     while (getline(prm_file,line))
       {
@@ -205,7 +205,7 @@ ParameterCollection<dim>::ParameterCollection
   std::stringstream s_stream;
 
   //read num of enrichement points
-  skiplines();
+  read_next_proper_line(line);
   s_stream.str(line);
   s_stream >> n_enrichments;
   //std::cout << "Number of enrichments: " << n_enrichments << std::endl;
@@ -213,7 +213,7 @@ ParameterCollection<dim>::ParameterCollection
   //note vector of points
   for (unsigned int i=0; i!=n_enrichments; ++i)
     {
-      skiplines();
+      read_next_proper_line(line);
       s_stream.clear();
       s_stream.str(line);
 
@@ -240,7 +240,7 @@ ParameterCollection<dim>::ParameterCollection
   //note vector of radii for predicates
   for (unsigned int i=0; i!=n_enrichments; ++i)
     {
-      skiplines();
+      read_next_proper_line(line);
       s_stream.clear();
       s_stream.str(line);
 
@@ -253,10 +253,10 @@ ParameterCollection<dim>::ParameterCollection
 //  for (auto r:radii_predicates)
   //std::cout << r << std::endl;
 
-  //note vector of radii for predicates
+  //note vector of sigmas for rhs
   for (unsigned int i=0; i!=n_enrichments; ++i)
     {
-      skiplines();
+      read_next_proper_line(line);
       s_stream.clear();
       s_stream.str(line);
 
@@ -268,6 +268,21 @@ ParameterCollection<dim>::ParameterCollection
   //std::cout << "Sigma : " << std::endl;
 //  for (auto r:sigmas_rhs)
   //std::cout << r << std::endl;
+
+  //read right hand side function expressions
+  for (unsigned int i=0; i!=n_enrichments; ++i)
+    {
+
+      read_next_proper_line(line);
+      s_stream.clear();
+
+      rhs_expressions.push_back(line);
+    }
+
+  std::cout << "rhs expressions : " << std::endl;
+  for (auto r:rhs_expressions)
+    std::cout << r << std::endl;
+
 
   //std::cout << "...finished parameter reading from file." << std::endl;
 }
