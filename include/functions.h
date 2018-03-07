@@ -3,15 +3,17 @@
 
 #include <deal.II/base/exceptions.h>
 
+namespace Step1 {
+
 template <int dim>
-class GaussianFunction :  public Function<dim>
+class RightHandSide :  public Function<dim>
 {
   Point<dim> center;
   double sigma;
   double coeff;
 public:
-  GaussianFunction ();
-  GaussianFunction (const Point<dim> &center, const double &sigma);
+  RightHandSide ();
+  RightHandSide (const Point<dim> &center, const double &sigma);
   virtual void value (const Point<dim> &p,
                       double   &value) const;
   virtual void value_list (const std::vector<Point<dim> > &points,
@@ -19,7 +21,7 @@ public:
 };
 
 template <int dim>
-GaussianFunction<dim>::GaussianFunction ()
+RightHandSide<dim>::RightHandSide ()
   :
   Function<dim> (),
   center(Point<dim>()),
@@ -29,7 +31,7 @@ GaussianFunction<dim>::GaussianFunction ()
 }
 
 template <int dim>
-GaussianFunction<dim>::GaussianFunction (const Point<dim> &center,
+RightHandSide<dim>::RightHandSide (const Point<dim> &center,
                                          const double &sigma)
   :
   Function<dim> (),
@@ -41,7 +43,7 @@ GaussianFunction<dim>::GaussianFunction (const Point<dim> &center,
 
 template <int dim>
 inline
-void GaussianFunction<dim>::value (const Point<dim> &p,
+void RightHandSide<dim>::value (const Point<dim> &p,
                                    double           &value) const
 {
   double r_squared = p.distance_square(center);
@@ -49,7 +51,7 @@ void GaussianFunction<dim>::value (const Point<dim> &p,
 }
 
 template <int dim>
-void GaussianFunction<dim>::value_list
+void RightHandSide<dim>::value_list
 (const std::vector<Point<dim> > &points,
  std::vector<double >           &value_list) const
 {
@@ -58,8 +60,9 @@ void GaussianFunction<dim>::value_list
   AssertDimension(points.size(), value_list.size());
 
   for (unsigned int p=0; p<n_points; ++p)
-    GaussianFunction::value (points[p],
+    RightHandSide::value (points[p],
                              value_list[p]);
 }
 
+}
 #endif

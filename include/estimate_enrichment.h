@@ -30,6 +30,7 @@
 
 using namespace dealii;
 
+namespace Step1{
 //TODO remove template and make it for 1d
 template <int dim>
 class EstimateEnrichmentFunction : public Function<dim>
@@ -74,5 +75,6 @@ private:
   Vector<double>       solution;
   Vector<double>       system_rhs;
 };
+}
 
 #endif

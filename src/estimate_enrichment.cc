@@ -3,6 +3,7 @@
 #include <deal.II/numerics/error_estimator.h>
 #include <functions.h>
 
+namespace Step1{
 //unnamed namespace
 namespace EstimateEnrichment
 {
@@ -87,7 +88,7 @@ template <int dim>
 void EstimateEnrichmentFunction<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const GaussianFunction<dim> rhs(center,sigma);
+  const RightHandSide<dim> rhs(center,sigma);
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
@@ -273,3 +274,5 @@ EstimateEnrichmentFunction<dim>::~EstimateEnrichmentFunction()
 //instantiations
 template struct EstimateEnrichmentFunction<1>;
 template struct EstimateEnrichmentFunction<2>;
+
+}

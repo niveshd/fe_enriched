@@ -69,9 +69,7 @@ int main (int argc,char **argv)
   MPILogInitAll all;
   {
     AssertThrow(argc>=2, ExcMessage("Parameter file not given."));
-    ParameterCollection<dim> prm(argv[1]);
-
-    Step1::LaplaceProblem<dim> step1(prm);
+    Step1::LaplaceProblem<dim> step1(argv[1]);
     step1.run();
   }
 }

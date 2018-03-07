@@ -171,7 +171,7 @@ namespace Step1
   {
   public:
     LaplaceProblem ();
-    LaplaceProblem (const ParameterCollection<dim> &prm);
+    LaplaceProblem (const std::string &file_name);
     LaplaceProblem
     (const double size,
      const unsigned int shape,
@@ -237,7 +237,7 @@ namespace Step1
 
     ConditionalOStream pcout;
 
-    std::vector<GaussianFunction<dim>> vec_rhs;
+    std::vector<RightHandSide<dim>> vec_rhs;
 
     using cell_function = std::function<const Function<dim>*
                           (const typename Triangulation<dim>::cell_iterator &)>;
@@ -293,9 +293,9 @@ namespace Step1
 
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem
-  (const ParameterCollection<dim> &parameter)
+  (const std::string &file_name)
     :
-    prm(parameter),
+    prm(file_name),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(prm.fe_base_degree),
@@ -400,7 +400,7 @@ namespace Step1
     //set a vector of right hand side functions
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
-        GaussianFunction<dim> rhs(prm.points_enrichments[i],
+        RightHandSide<dim> rhs(prm.points_enrichments[i],
                                   prm.sigmas_rhs[i]);
         vec_rhs.push_back(rhs);
       }
@@ -1038,7 +1038,9 @@ namespace Step1
                                           solution,
                                           Point<dim>())
               << std::endl;
-        if (prm.shape == 0)
+        if (prm.shape == 0 &&
+            prm.n_enrichments == 1 &&
+            prm.points_enrichments[0] == Point<dim>())
           process_solution();
 
         //TODO Uncomment. correct function body

@@ -124,7 +124,7 @@ template <int dim>
 void PoissonSolver<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const GaussianFunction<dim> rhs(center,sigma);
+  const RightHandSide<dim> rhs(center,sigma);
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
