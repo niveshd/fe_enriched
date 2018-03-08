@@ -124,7 +124,7 @@ template <int dim>
 void PoissonSolver<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  Step1::RightHandSide<dim> rhs;
+  Step1::SigmaFunction<dim> rhs;
   rhs.initialize(center,
                  sigma,
                  "1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))");

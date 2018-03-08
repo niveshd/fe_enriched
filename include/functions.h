@@ -12,17 +12,17 @@ namespace Step1
 {
 
   template <int dim>
-  class RightHandSide :  public Function<dim>
+  class SigmaFunction :  public Function<dim>
   {
     Point<dim> center;
     FunctionParser<dim> func;
   public:
-    RightHandSide():
+    SigmaFunction():
       Function<dim>(),
       func(1) {}
 
     //to help with resize function. doesn't copy function parser(func)!
-    RightHandSide(RightHandSide &&other)
+    SigmaFunction(SigmaFunction &&other)
       :
       center(other.center),
       func(1) {}
@@ -37,7 +37,7 @@ namespace Step1
   };
 
   template <int dim>
-  void RightHandSide<dim>::initialize (const Point<dim> &_center,
+  void SigmaFunction<dim>::initialize (const Point<dim> &_center,
                                        const double &sigma,
                                        const std::string &func_expr)
   {
@@ -71,7 +71,7 @@ namespace Step1
 
   template <int dim>
   inline
-  void RightHandSide<dim>::value (const Point<dim> &p,
+  void SigmaFunction<dim>::value (const Point<dim> &p,
                                   double           &value) const
   {
     const Point<dim> d(p - center);
@@ -79,7 +79,7 @@ namespace Step1
   }
 
   template <int dim>
-  void RightHandSide<dim>::value_list
+  void SigmaFunction<dim>::value_list
   (const std::vector<Point<dim> > &points,
    std::vector<double >           &value_list) const
   {
@@ -88,7 +88,7 @@ namespace Step1
     AssertDimension(points.size(), value_list.size());
 
     for (unsigned int p=0; p<n_points; ++p)
-      RightHandSide::value (points[p],
+      SigmaFunction::value (points[p],
                             value_list[p]);
   }
 

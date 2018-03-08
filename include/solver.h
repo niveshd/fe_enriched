@@ -242,7 +242,7 @@ namespace Step1
 
     ConditionalOStream pcout;
 
-    std::vector<RightHandSide<dim>> vec_rhs;
+    std::vector<SigmaFunction<dim>> vec_rhs;
 
     using cell_function = std::function<const Function<dim>*
                           (const typename Triangulation<dim>::cell_iterator &)>;
@@ -873,72 +873,111 @@ namespace Step1
   template <int dim>
   void LaplaceProblem<dim>::process_solution()
   {
-    AssertThrow(prm.shape == 0, ExcMessage("solution only for circular domain known"));
-    AssertThrow(prm.n_enrichments == 1 &&
-                prm.points_enrichments[0] == Point<dim>(),
-                ExcMessage("solution only for single source at origin"));
-
-    //Make enrichment function with spline ranging over whole domain.
-    //Gradient of enrichment function is related to gradient of the spline.
-    double center = 0;
-    double sigma = prm.sigma;
-    EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                 prm.size,
-                                                 sigma,
-                                                 prm.rhs_radial_problem);
-    radial_problem.debug_level = prm.debug_level; //print output
-    radial_problem.run();
-    pcout << "solving radial problem for error calculation "
-          << "(x, sigma): "
-          << center << ", " << sigma << std::endl;
-
-    //make points at which solution needs to interpolated
-    std::vector<double> interpolation_points_1D, interpolation_values_1D;
-    double cut_point = 1;
-    unsigned int n1 = 10, n2 = 200;
-    double right_bound = prm.size/2;
-    double h1 = cut_point/n1, h2 = (prm.size-cut_point)/n2;
-    for (double p = center; p < cut_point; p+=h1)
-      interpolation_points_1D.push_back(p);
-    for (double p = cut_point; p < right_bound; p+=h2)
-      interpolation_points_1D.push_back(p);
-    interpolation_points_1D.push_back(right_bound);
-
-    radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
-
-
-    //construct enrichment function and make spline function
-    SplineEnrichmentFunction<dim> exact_solution(Point<dim>(),
-                                                 1, //TODO is not need. remove
-                                                 interpolation_points_1D,
-                                                 interpolation_values_1D);
-
     Vector<float> difference_per_cell (triangulation.n_active_cells());
+    double L2_error, H1_error;
 
-    //find error due to spline approximation
+    if (!prm.exact_soln_expr.empty())
+      {
+        pcout << "...using exact solution for error calculation" << std::endl;
+
+        SigmaFunction<dim> exact_solution;
+        exact_solution.initialize(Point<dim>(),
+                                  prm.sigma,
+                                  prm.exact_soln_expr);
 
 
-    VectorTools::integrate_difference (dof_handler,
-                                       solution,
-                                       exact_solution,
-                                       difference_per_cell,
-                                       q_collection,
-                                       VectorTools::L2_norm);
+        VectorTools::integrate_difference (dof_handler,
+                                           solution,
+                                           exact_solution,
+                                           difference_per_cell,
+                                           q_collection,
+                                           VectorTools::L2_norm);
+        L2_error = VectorTools::compute_global_error(triangulation,
+                                                     difference_per_cell,
+                                                     VectorTools::L2_norm);
 
-    const double L2_error = VectorTools::compute_global_error(triangulation,
-                                                              difference_per_cell,
-                                                              VectorTools::L2_norm);
+        VectorTools::integrate_difference (dof_handler,
+                                           solution,
+                                           exact_solution,
+                                           difference_per_cell,
+                                           q_collection,
+                                           VectorTools::H1_norm);
+        H1_error = VectorTools::compute_global_error(triangulation,
+                                                     difference_per_cell,
+                                                     VectorTools::H1_norm);
+      }
+    else if (prm.estimate_exact_soln)
+      {
+        AssertThrow(prm.shape == 0,
+                    ExcMessage("solution only for circular domain known"));
+        AssertThrow(prm.n_enrichments == 1 &&
+                    prm.points_enrichments[0] == Point<dim>(),
+                    ExcMessage("solution only for single source at origin"));
 
-    VectorTools::integrate_difference (dof_handler,
-                                       solution,
-                                       exact_solution,
-                                       difference_per_cell,
-                                       q_collection,
-                                       VectorTools::H1_norm);
+        pcout << "...estimate exact solution for error calculation" << std::endl;
 
-    const double H1_error = VectorTools::compute_global_error(triangulation,
-                                                              difference_per_cell,
-                                                              VectorTools::H1_norm);
+        //Make enrichment function with spline ranging over whole domain.
+        //Gradient of enrichment function is related to gradient of the spline.
+        double center = 0;
+        double sigma = prm.sigma;
+        EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
+                                                     prm.size,
+                                                     sigma,
+                                                     prm.rhs_radial_problem);
+        radial_problem.debug_level = prm.debug_level; //print output
+        radial_problem.run();
+        pcout << "solving radial problem for error calculation "
+              << "(x, sigma): "
+              << center << ", " << sigma << std::endl;
+
+        //make points at which solution needs to interpolated
+        std::vector<double> interpolation_points_1D, interpolation_values_1D;
+        double cut_point = 1;
+        unsigned int n1 = 10, n2 = 200;
+        double right_bound = prm.size/2;
+        double h1 = cut_point/n1, h2 = (prm.size-cut_point)/n2;
+        for (double p = center; p < cut_point; p+=h1)
+          interpolation_points_1D.push_back(p);
+        for (double p = cut_point; p < right_bound; p+=h2)
+          interpolation_points_1D.push_back(p);
+        interpolation_points_1D.push_back(right_bound);
+
+        radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+
+
+        //construct enrichment function and make spline function
+        SplineEnrichmentFunction<dim> exact_solution(Point<dim>(),
+                                                     1, //TODO is not need. remove
+                                                     interpolation_points_1D,
+                                                     interpolation_values_1D);
+
+
+        VectorTools::integrate_difference (dof_handler,
+                                           solution,
+                                           exact_solution,
+                                           difference_per_cell,
+                                           q_collection,
+                                           VectorTools::L2_norm);
+        L2_error = VectorTools::compute_global_error(triangulation,
+                                                     difference_per_cell,
+                                                     VectorTools::L2_norm);
+
+        VectorTools::integrate_difference (dof_handler,
+                                           solution,
+                                           exact_solution,
+                                           difference_per_cell,
+                                           q_collection,
+                                           VectorTools::H1_norm);
+        H1_error = VectorTools::compute_global_error(triangulation,
+                                                     difference_per_cell,
+                                                     VectorTools::H1_norm);
+      }
+    else
+      {
+        pcout << "...error can't be calculated" << std::endl;
+        return;
+      }
+
 
     deallog << "refinement Dofs L2_norm H1_norm" << std::endl;
     deallog << prm.global_refinement << " "

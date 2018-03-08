@@ -177,7 +177,7 @@ namespace Step1
   void EstimateEnrichmentFunction<dim>::assemble_system ()
   {
     QGauss<dim>  quadrature_formula(2);
-    RightHandSide<dim> rhs;
+    SigmaFunction<dim> rhs;
     rhs.initialize(center,sigma,rhs_expr);
     FEValues<dim> fe_values (fe, quadrature_formula,
                              update_values   | update_gradients |
@@ -291,19 +291,18 @@ namespace Step1
     make_grid();
 
     double old_value=0, value=1, relative_change = 1;
-    int cycles = 0;
     bool start = true;
     do
       {
-        if (debug_level >= 1)
-          std::cout << "Refinement level: " << refinement << std::endl;
-
-        if (cycles!=0)
+        if (!start)
           {
             refine_grid ();
             ++refinement;
           }
-        ++cycles;
+
+        if (debug_level >= 1)
+          std::cout << "Refinement level: " << refinement << std::endl;
+
         setup_system ();
         assemble_system ();
         solve ();
