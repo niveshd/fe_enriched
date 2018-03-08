@@ -124,7 +124,10 @@ template <int dim>
 void PoissonSolver<dim>::assemble_system ()
 {
   QGauss<dim>  quadrature_formula(2);
-  const RightHandSide<dim> rhs(center,sigma);
+  Step1::RightHandSide<dim> rhs;
+  rhs.initialize(center,
+                 sigma,
+                 "1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))");
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values   | update_gradients |
                            update_quadrature_points | update_JxW_values);
@@ -299,9 +302,12 @@ int main (int argc, char **argv)
   problem_2d.evaluate_at_x_values(interpolation_points,interpolation_values_2D);
 
   //solve 1d problem
-  EstimateEnrichmentFunction<1> problem_1d(Point<1>(0),
-                                           domain_size,
-                                           sigma);
+  Step1::EstimateEnrichmentFunction<1> problem_1d
+  (Point<1>(0),
+   domain_size,
+   sigma,
+   "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+   11);
   problem_1d.run();
   std::vector<double> interpolation_values_1D;
   problem_1d.evaluate_at_x_values(interpolation_points,interpolation_values_1D);

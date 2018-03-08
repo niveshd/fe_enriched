@@ -58,9 +58,12 @@ int main (int argc, char **argv)
 
 
       //solve 1d problem
-      EstimateEnrichmentFunction<1> problem_1d(Point<1>(0),
-                                               domain_size,
-                                               sigma);
+      Step1::EstimateEnrichmentFunction<1> problem_1d
+      (Point<1>(0),
+       domain_size,
+       sigma,
+       "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+       11);
       std::cout << "Solving with sigma,coeff: " << sigma << "," << coeff << std::endl;
       problem_1d.run();
 

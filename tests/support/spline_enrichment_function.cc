@@ -69,36 +69,7 @@ template <int dim>
 class Problem : public Step1::LaplaceProblem<dim>
 {
 public:
-  Problem   (const double size,
-             const unsigned int shape,
-             const unsigned int global_refinement,
-             const unsigned int cycles,
-             const unsigned int fe_base_degree,
-             const unsigned int fe_enriched_degree,
-             const unsigned int max_iterations,
-             const double tolerance,
-             const unsigned int patches,
-             const unsigned int debug_level,
-             const unsigned int n_enrichments,
-             const std::vector<Point<dim>> points_enrichments,
-             const std::vector<double> radii_predicates,
-             const std::vector<double> sigmas_rhs)
-    :
-    Step1::LaplaceProblem<dim>(
-      size,
-      shape,
-      global_refinement,
-      cycles,
-      fe_base_degree,
-      fe_enriched_degree,
-      max_iterations,
-      tolerance,
-      patches,
-      debug_level,
-      n_enrichments,
-      points_enrichments,
-      radii_predicates,
-      sigmas_rhs) {}
+  using Step1::LaplaceProblem<dim>::LaplaceProblem;
 
   void run_pre_solution_steps()
   {
@@ -132,9 +103,12 @@ void Problem<dim>::make_enrichment_function ()
       double center = 0;
       double domain_size = 100;
       double sigma = 0.05;
-      EstimateEnrichmentFunction<1> problem_1d(Point<1>(center),
-                                               domain_size,
-                                               sigma);
+      Step1::EstimateEnrichmentFunction<1> problem_1d
+      (Point<1>(center),
+       domain_size,
+       sigma,
+       "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+       11);
       problem_1d.run();
 
 
@@ -264,20 +238,25 @@ int main (int argc,char **argv)
   MPILogInitAll all;
   {
     Problem<dim> step_test
-    ((double)4,   //domain size
-     (unsigned int)1,   //cube shape
-     (unsigned int)2,   //global refinement
+    (4,   //domain size
+     1,   //cube shape
+     2,   //global refinement
      0,
-     (unsigned int)1,   //fe base degree
-     (unsigned int)1,   //fe enriched degree
-     (unsigned int)10000, //max iterations
+     1,   //fe base degree
+     1,   //fe enriched degree
+     10000, //max iterations
      1e-8,  //tolerance
-     (unsigned int)15,   //patches
-     (unsigned int)9,   //debug level
-     (unsigned int)1,   //num enrichments
+     0.05,
+     "",
+     true,
+     "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+     15,   //patches
+     9,   //debug level
+     1,   //num enrichments
     {Point<dim>()}, //enrichment points
     {1},    //predicate radii
-    {0.05}); //sigmas
+    {0.05},
+    {"1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))"}); //sigmas
 
     step_test.run_pre_solution_steps();
   }

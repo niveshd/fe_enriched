@@ -1,8 +1,12 @@
 #ifndef FUNCTIONS_H
 #define FUNCTIONS_H
 
+#include <deal.II/base/point.h>
+#include <deal.II/base/function.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parsed_function.h>
+
+using namespace dealii;
 
 namespace Step1
 {

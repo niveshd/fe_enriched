@@ -38,7 +38,6 @@ int main (int argc, char **argv)
 //  deallog.precision(2);
 
   double sigma = 0.05;
-  double coeff = 100;
 
   //make vector determining the combinations used
   std::vector<double> left_bound = {-50,-60,-70,-80};
@@ -63,10 +62,13 @@ int main (int argc, char **argv)
 
 
       //solve 1d problem
-      EstimateEnrichmentFunction<1> problem_1d(Point<1>(center[i]),
-                                               left_bound[i],
-                                               right_bound[i],
-                                               sigma);
+      Step1::EstimateEnrichmentFunction<1> problem_1d
+      (Point<1>(center[i]),
+       left_bound[i],
+       right_bound[i],
+       sigma,
+       "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+       7);
       std::cout << "Solving with size,origin: " << left_bound[i]
                 << "," << right_bound[i]
                 << "," << center[i] << std::endl;

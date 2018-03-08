@@ -43,13 +43,14 @@ namespace Step1
     EstimateEnrichmentFunction (const Point<dim> &center,
                                 const double &domain_size,
                                 const double &sigma,
-                                const std::string &rhs_expr);
+                                const std::string &rhs_expr,
+                                const double &refinement=11);
     EstimateEnrichmentFunction  (const Point<dim> &center,
                                  const double &left_bound,
                                  const double &right_bound,
                                  const double &sigma,
                                  const std::string &rhs_expr,
-                                 const double &refinement=7);
+                                 const double &refinement=11);
     ~EstimateEnrichmentFunction();
     void run ();
     void evaluate_at_x_values
@@ -108,7 +109,8 @@ namespace Step1
   (const Point<dim> &center,
    const double &domain_size,
    const double &sigma,
-   const std::string &rhs_expr)
+   const std::string &rhs_expr,
+   const double &refinement)
     :
     Function<dim>(1),
     center(center),
@@ -116,7 +118,7 @@ namespace Step1
     sigma(sigma),
     rhs_expr(rhs_expr),
     debug_level(0),
-    refinement(11),
+    refinement(refinement),
     fe (1),
     dof_handler (triangulation)
   {

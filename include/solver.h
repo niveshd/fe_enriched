@@ -173,20 +173,25 @@ namespace Step1
     LaplaceProblem ();
     LaplaceProblem (const ParameterCollection<dim> &prm);
     LaplaceProblem
-    (const double size,
-     const unsigned int shape,
-     const unsigned int global_refinement,
-     const unsigned int cycles,
-     const unsigned int fe_base_degree,
-     const unsigned int fe_enriched_degree,
-     const unsigned int max_iterations,
-     const double tolerance,
-     const unsigned int patches,
-     const unsigned int debug_level,
-     const unsigned int n_enrichments,
-     const std::vector<Point<dim>> points_enrichments,
-     const std::vector<double> radii_predicates,
-     const std::vector<double> sigmas_rhs);
+    (const double &size,
+     const unsigned int &shape,
+     const unsigned int &global_refinement,
+     const unsigned int &cycles,
+     const unsigned int &fe_base_degree,
+     const unsigned int &fe_enriched_degree,
+     const unsigned int &max_iterations,
+     const double &tolerance,
+     const double &sigma,
+     const std::string &exact_soln_expr,
+     const bool &estimate_exact_soln,
+     const std::string &rhs_radial_problem,
+     const unsigned int &patches,
+     const unsigned int &debug_level,
+     const unsigned int &n_enrichments,
+     const std::vector<Point<dim>> &points_enrichments,
+     const std::vector<double> &radii_predicates,
+     const std::vector<double> &sigmas_rhs,
+     const std::vector<std::string> &rhs_expressions);
 
     virtual ~LaplaceProblem();
 
@@ -293,9 +298,9 @@ namespace Step1
 
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem
-  (const ParameterCollection<dim> &parameter)
+  (const ParameterCollection<dim> &_par)
     :
-    prm(parameter),
+    prm(_par),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(prm.fe_base_degree),
@@ -317,23 +322,29 @@ namespace Step1
 
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem
-  (const double size,
-   const unsigned int shape,
-   const unsigned int global_refinement,
-   const unsigned int cycles,
-   const unsigned int fe_base_degree,
-   const unsigned int fe_enriched_degree,
-   const unsigned int max_iterations,
-   const double tolerance,
-   const unsigned int patches,
-   const unsigned int debug_level,
-   const unsigned int n_enrichments,
-   const std::vector<Point<dim>> points_enrichments,
-   const std::vector<double> radii_predicates,
-   const std::vector<double> sigmas_rhs)
+  (const double &size,
+   const unsigned int &shape,
+   const unsigned int &global_refinement,
+   const unsigned int &cycles,
+   const unsigned int &fe_base_degree,
+   const unsigned int &fe_enriched_degree,
+   const unsigned int &max_iterations,
+   const double &tolerance,
+   const double &sigma,
+   const std::string &exact_soln_expr,
+   const bool &estimate_exact_soln,
+   const std::string &rhs_radial_problem,
+   const unsigned int &patches,
+   const unsigned int &debug_level,
+   const unsigned int &n_enrichments,
+   const std::vector<Point<dim>> &points_enrichments,
+   const std::vector<double> &radii_predicates,
+   const std::vector<double> &sigmas_rhs,
+   const std::vector<std::string> &rhs_expressions)
     :
     prm
-    (size,
+    (dim,
+     size,
      shape,
      global_refinement,
      cycles,
@@ -341,12 +352,17 @@ namespace Step1
      fe_enriched_degree,
      max_iterations,
      tolerance,
+     sigma,
+     exact_soln_expr,
+     estimate_exact_soln,
+     rhs_radial_problem,
      patches,
      debug_level,
      n_enrichments,
      points_enrichments,
      radii_predicates,
-     sigmas_rhs),
+     sigmas_rhs,
+     rhs_expressions),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(prm.fe_base_degree),

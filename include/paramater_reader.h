@@ -23,12 +23,17 @@ struct ParameterCollection
    const unsigned int &fe_enriched_degree,
    const unsigned int &max_iterations,
    const double &tolerance,
+   const double &sigma,
+   const std::string &exact_soln_expr,
+   const bool &estimate_exact_soln,
+   const std::string &rhs_radial_problem,
    const unsigned int &patches,
    const unsigned int &debug_level,
    const unsigned int &n_enrichments,
    const std::vector<Point<dimension>> &points_enrichments,
    const std::vector<double> &radii_predicates,
-   const std::vector<double> &sigmas_rhs)
+   const std::vector<double> &sigmas_rhs,
+   const std::vector<std::string> &rhs_expressions)
     :
     dim(dim),
     size(size),
@@ -39,12 +44,17 @@ struct ParameterCollection
     fe_enriched_degree(fe_enriched_degree),
     max_iterations(max_iterations),
     tolerance(tolerance),
+    sigma(sigma),
+    exact_soln_expr(exact_soln_expr),
+    estimate_exact_soln(estimate_exact_soln),
+    rhs_radial_problem(rhs_radial_problem),
     patches(patches),
     debug_level(debug_level),
     n_enrichments(n_enrichments),
     points_enrichments(points_enrichments),
     radii_predicates(radii_predicates),
-    sigmas_rhs(sigmas_rhs)
+    sigmas_rhs(sigmas_rhs),
+    rhs_expressions(rhs_expressions)
   {}
 
   void print()
@@ -96,7 +106,7 @@ struct ParameterCollection
   double tolerance;
 
   //parameters related to exact solution
-  bool sigma;
+  double sigma;
   std::string exact_soln_expr;
 
   //value = true ==> estimate exact solution from radial problem
