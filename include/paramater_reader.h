@@ -8,27 +8,29 @@
 #include <deal.II/base/parameter_handler.h>
 
 
-template<int dim>
+template <int dimension>
 struct ParameterCollection
 {
   ParameterCollection(const std::string &file_name);
 
   ParameterCollection
-  (const double size,
-   const unsigned int shape,
-   const unsigned int global_refinement,
-   const unsigned int cycles,
-   const unsigned int fe_base_degree,
-   const unsigned int fe_enriched_degree,
-   const unsigned int max_iterations,
-   const double tolerance,
-   const unsigned int patches,
-   const unsigned int debug_level,
-   const unsigned int n_enrichments,
-   const std::vector<Point<dim>> points_enrichments,
-   const std::vector<double> radii_predicates,
-   const std::vector<double> sigmas_rhs)
+  (const int &dim,
+   const double &size,
+   const unsigned int &shape,
+   const unsigned int &global_refinement,
+   const unsigned int &cycles,
+   const unsigned int &fe_base_degree,
+   const unsigned int &fe_enriched_degree,
+   const unsigned int &max_iterations,
+   const double &tolerance,
+   const unsigned int &patches,
+   const unsigned int &debug_level,
+   const unsigned int &n_enrichments,
+   const std::vector<Point<dimension>> &points_enrichments,
+   const std::vector<double> &radii_predicates,
+   const std::vector<double> &sigmas_rhs)
     :
+    dim(dim),
     size(size),
     shape(shape),
     global_refinement(global_refinement),
@@ -47,17 +49,22 @@ struct ParameterCollection
 
   void print()
   {
-    std::cout << "Size : "<< size << std::endl;
-    std::cout << "Shape : " << shape << std::endl;
-    std::cout << "Global refinement : " << global_refinement << std::endl;
-    std::cout << "Cycles : " << cycles << std::endl;
-    std::cout << "FE base degree : " << fe_base_degree << std::endl;
-    std::cout << "FE enriched degree : " << fe_enriched_degree << std::endl;
-    std::cout << "Max Iterations : " << max_iterations << std::endl;
-    std::cout << "Tolerance : " << tolerance << std::endl;
-    std::cout << "Patches used for output: " << patches << std::endl;
-    std::cout << "Debug level: " << debug_level << std::endl;
-    std::cout << "Number of enrichments: " << n_enrichments << std::endl;
+    std::cout << "Dim : " << dim << std::endl
+              << "Size : "<< size << std::endl
+              << "Shape : " << shape << std::endl
+              << "Global refinement : " << global_refinement << std::endl
+              << "Cycles : " << cycles << std::endl
+              << "FE base degree : " << fe_base_degree << std::endl
+              << "FE enriched degree : " << fe_enriched_degree << std::endl
+              << "Max Iterations : " << max_iterations << std::endl
+              << "Tolerance : " << tolerance << std::endl
+              << "sigma for exact solution : " << sigma << std::endl
+              << "exact solution expr : " << exact_soln_expr << std::endl
+              << "solve radial problem : " << estimate_exact_soln << std::endl
+              << "rhs radial problem : " << rhs_radial_problem << std::endl
+              << "Patches used for output: " << patches << std::endl
+              << "Debug level: " << debug_level << std::endl
+              << "Number of enrichments: " << n_enrichments << std::endl;
 
     std::cout << "Enrichment points : " << std::endl;
     for (auto p:points_enrichments)
@@ -70,9 +77,15 @@ struct ParameterCollection
     std::cout << "Sigma : " << std::endl;
     for (auto r:sigmas_rhs)
       std::cout << r << std::endl;
+
+    std::cout << "rhs expressions : " << std::endl;
+    for (auto r:rhs_expressions)
+      std::cout << r << std::endl;
   }
 
 
+  //TODO remove template paramter and use this
+  int dim;
   double size;
   unsigned int shape; //0 = ball, 1 = cube
   unsigned int global_refinement;
@@ -81,6 +94,15 @@ struct ParameterCollection
   unsigned int fe_enriched_degree;
   unsigned int max_iterations;
   double tolerance;
+
+  //parameters related to exact solution
+  bool sigma;
+  std::string exact_soln_expr;
+
+  //value = true ==> estimate exact solution from radial problem
+  bool estimate_exact_soln;
+  std::string rhs_radial_problem;
+
   unsigned int patches;
   //debug level = 0(output nothing),
   //1 (print statements)
@@ -89,14 +111,15 @@ struct ParameterCollection
   //9 (+ shape functions as well)
   unsigned int debug_level;
   unsigned int n_enrichments;
-  std::vector<Point<dim>> points_enrichments;
+  //TODO make vector of double and make a function to get points
+  std::vector<Point<dimension>> points_enrichments;
   std::vector<double> radii_predicates;
   std::vector<double> sigmas_rhs;
   std::vector<std::string> rhs_expressions;
 };
 
 
-template<int dim>
+template <int dim>
 ParameterCollection<dim>::ParameterCollection
 (const std::string &file_name)
 {
@@ -107,6 +130,9 @@ ParameterCollection<dim>::ParameterCollection
 
   //declare parameters
   prm.enter_subsection("geometry");
+  prm.declare_entry("dim",
+                    "2",
+                    Patterns::Integer());
   prm.declare_entry("size",
                     "1",
                     Patterns::Double(0));
@@ -120,6 +146,7 @@ ParameterCollection<dim>::ParameterCollection
                     "0",
                     Patterns::Integer(0));
   prm.leave_subsection();
+
 
   prm.enter_subsection("solver");
   prm.declare_entry("fe base degree",
@@ -136,6 +163,23 @@ ParameterCollection<dim>::ParameterCollection
                     Patterns::Double(0));
   prm.leave_subsection();
 
+
+  prm.enter_subsection("expressions");
+  prm.declare_entry("sigma",
+                    "1",
+                    Patterns::Double());
+  prm.declare_entry("exact solution expression",
+                    "",
+                    Patterns::Anything());
+  prm.declare_entry("estimate exact solution",
+                    "false",
+                    Patterns::Bool());
+  prm.declare_entry("rhs radial problem",
+                    "",
+                    Patterns::Anything());
+  prm.leave_subsection();
+
+
   prm.enter_subsection("output");
   prm.declare_entry("patches",
                     "1",
@@ -151,6 +195,7 @@ ParameterCollection<dim>::ParameterCollection
 
   //get parameters
   prm.enter_subsection("geometry");
+  dim = prm.get_integer("dim");
   size = prm.get_double("size");
   shape = prm.get_integer("shape");
   global_refinement = prm.get_integer("Global refinement");
@@ -164,18 +209,18 @@ ParameterCollection<dim>::ParameterCollection
   tolerance = prm.get_double("tolerance");
   prm.leave_subsection();
 
+  prm.enter_subsection("expressions");
+  sigma = prm.get_double("sigma");
+  exact_soln_expr = prm.get("exact solution expression");
+  estimate_exact_soln = prm.get_bool("estimate exact solution");
+  rhs_radial_problem = prm.get("rhs radial problem");
+  prm.leave_subsection();
+
   prm.enter_subsection("output");
   patches = prm.get_integer("patches");
   debug_level = prm.get_integer("debug level");
   prm.leave_subsection();
 
-
-  //std::cout << "Size : "<< size << std::endl;
-  //std::cout << "Global refinement : " << global_refinement << std::endl;
-  //std::cout << "Max Iterations : " << max_iterations << std::endl;
-  //std::cout << "Tolerance : " << tolerance << std::endl;
-  //std::cout << "Patches used for output: " << patches << std::endl;
-  //std::cout << "Debug level: " << debug_level << std::endl;
 
   //manual parsing
   //open parameter file
@@ -208,7 +253,6 @@ ParameterCollection<dim>::ParameterCollection
   read_next_proper_line(line);
   s_stream.str(line);
   s_stream >> n_enrichments;
-  //std::cout << "Number of enrichments: " << n_enrichments << std::endl;
 
   //note vector of points
   for (unsigned int i=0; i!=n_enrichments; ++i)
@@ -226,16 +270,12 @@ ParameterCollection<dim>::ParameterCollection
       else if (dim==3)
         {
           double x,y,z;
-          s_stream << x << y << z;
+          s_stream >> x >> y >> z;
           points_enrichments.push_back({x,y,z});
         }
       else
         AssertThrow(false, ExcMessage("Dimension not implemented"));
     }
-
-  //std::cout << "Enrichment points : " << std::endl;
-//  for (auto p:points_enrichments)
-  //std::cout << p << std::endl;
 
   //note vector of radii for predicates
   for (unsigned int i=0; i!=n_enrichments; ++i)
@@ -249,10 +289,6 @@ ParameterCollection<dim>::ParameterCollection
       radii_predicates.push_back(r);
     }
 
-  //std::cout << "Enrichment radii : " << std::endl;
-//  for (auto r:radii_predicates)
-  //std::cout << r << std::endl;
-
   //note vector of sigmas for rhs
   for (unsigned int i=0; i!=n_enrichments; ++i)
     {
@@ -265,10 +301,6 @@ ParameterCollection<dim>::ParameterCollection
       sigmas_rhs.push_back(r);
     }
 
-  //std::cout << "Sigma : " << std::endl;
-//  for (auto r:sigmas_rhs)
-  //std::cout << r << std::endl;
-
   //read right hand side function expressions
   for (unsigned int i=0; i!=n_enrichments; ++i)
     {
@@ -278,13 +310,6 @@ ParameterCollection<dim>::ParameterCollection
 
       rhs_expressions.push_back(line);
     }
-
-  std::cout << "rhs expressions : " << std::endl;
-  for (auto r:rhs_expressions)
-    std::cout << r << std::endl;
-
-
-  //std::cout << "...finished parameter reading from file." << std::endl;
 }
 
 #endif

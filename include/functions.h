@@ -15,13 +15,13 @@ namespace Step1
   public:
     RightHandSide():
       Function<dim>(),
-      func(1){}
+      func(1) {}
 
     //to help with resize function. doesn't copy function parser(func)!
     RightHandSide(RightHandSide &&other)
       :
-    center(other.center),
-    func(1){}
+      center(other.center),
+      func(1) {}
 
     void initialize (const Point<dim> &center,
                      const double &sigma,
@@ -39,8 +39,11 @@ namespace Step1
   {
     center = _center;
     std::string variables;
-    std::map<std::string,double> constants = {{"sigma",sigma},
-                                              {"pi", numbers::PI}};
+    std::map<std::string,double> constants =
+    {
+      {"sigma",sigma},
+      {"pi", numbers::PI}
+    };
 
     AssertThrow(dim == 1 || dim == 2 || dim == 3,
                 ExcMessage("Dimension not implemented"));

@@ -171,7 +171,7 @@ namespace Step1
   {
   public:
     LaplaceProblem ();
-    LaplaceProblem (const std::string &file_name);
+    LaplaceProblem (const ParameterCollection<dim> &prm);
     LaplaceProblem
     (const double size,
      const unsigned int shape,
@@ -293,9 +293,9 @@ namespace Step1
 
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem
-  (const std::string &file_name)
+  (const ParameterCollection<dim> &parameter)
     :
-    prm(file_name),
+    prm(parameter),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(prm.fe_base_degree),
@@ -307,6 +307,8 @@ namespace Step1
     pcout (std::cout, (this_mpi_process == 0)   &&(prm.debug_level >= 1))
   {
 
+    AssertThrow (prm.dim == dim,
+                 ExcMessage("parameter file dim != problem dim"));
     prm.print();
 
     pcout << "...parameters set" << std::endl;
@@ -539,11 +541,11 @@ namespace Step1
       {
         //formulate a 1d/radial problem with x coordinate and radius (i.e sigma)
         double center = 0;
-        double sigma = prm.sigmas_rhs[i];
+        double sigma = prm.sigma;
         EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
                                                      prm.size,
                                                      sigma,
-                                                     prm.rhs_expressions[i]);
+                                                     prm.rhs_radial_problem);
         radial_problem.debug_level = prm.debug_level; //print output
         radial_problem.run();
         pcout << "solved problem with "
@@ -863,11 +865,11 @@ namespace Step1
     //Make enrichment function with spline ranging over whole domain.
     //Gradient of enrichment function is related to gradient of the spline.
     double center = 0;
-    double sigma = prm.sigmas_rhs[0];
+    double sigma = prm.sigma;
     EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
                                                  prm.size,
                                                  sigma,
-                                                 prm.rhs_expressions[0]);
+                                                 prm.rhs_radial_problem);
     radial_problem.debug_level = prm.debug_level; //print output
     radial_problem.run();
     pcout << "solving radial problem for error calculation "

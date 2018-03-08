@@ -60,7 +60,6 @@
 #include "paramater_reader.h"
 #include "solver.h"
 #include "../tests/tests.h"
-const unsigned int dim = 2;
 
 
 int main (int argc,char **argv)
@@ -68,8 +67,19 @@ int main (int argc,char **argv)
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPILogInitAll all;
   {
+    const int dim = 2;
+
     AssertThrow(argc>=2, ExcMessage("Parameter file not given."));
-    Step1::LaplaceProblem<dim> step1(argv[1]);
-    step1.run();
+    ParameterCollection<dim> prm(argv[1]);
+
+    if (prm.dim == 2)
+      {
+        Step1::LaplaceProblem<2> step1(prm);
+        step1.run();
+      }
+    else if (prm.dim == 3)
+//      Step1::LaplaceProblem<3> step1(prm);
+//    else
+      AssertThrow(false, ExcMessage("Dimension incorect. dim can be 2 or 3"));
   }
 }
