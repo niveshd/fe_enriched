@@ -108,6 +108,7 @@ void Problem<dim>::make_enrichment_function ()
        domain_size,
        sigma,
        "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+       "0",
        11);
       problem_1d.run();
 
@@ -246,17 +247,18 @@ int main (int argc,char **argv)
      1,   //fe enriched degree
      10000, //max iterations
      1e-8,  //tolerance
-     0.05,
+     "1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))",
+     "0",
+     "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+     "0",
      "",
      true,
-     "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
      15,   //patches
      9,   //debug level
      1,   //num enrichments
     {Point<dim>()}, //enrichment points
     {1},    //predicate radii
-    {0.05},
-    {"1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))"}); //sigmas
+    {0.05}); //sigmas
 
     step_test.run_pre_solution_steps();
   }

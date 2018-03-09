@@ -68,6 +68,7 @@ int main (int argc, char **argv)
        right_bound[i],
        sigma,
        "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+       "0",
        7);
       std::cout << "Solving with size,origin: " << left_bound[i]
                 << "," << right_bound[i]

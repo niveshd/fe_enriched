@@ -51,7 +51,6 @@ struct ParameterCollection
     boundary_radial_problem(boundary_radial_problem),
     exact_soln_expr(exact_soln_expr),
     estimate_exact_soln(estimate_exact_soln),
-    rhs_radial_problem(rhs_radial_problem),
     patches(patches),
     debug_level(debug_level),
     n_enrichments(n_enrichments),

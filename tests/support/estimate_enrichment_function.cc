@@ -307,6 +307,7 @@ int main (int argc, char **argv)
    domain_size,
    sigma,
    "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+   "0",
    11);
   problem_1d.run();
   std::vector<double> interpolation_values_1D;

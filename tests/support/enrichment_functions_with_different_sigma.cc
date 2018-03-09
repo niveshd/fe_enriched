@@ -63,6 +63,7 @@ int main (int argc, char **argv)
        domain_size,
        sigma,
        "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+       "0",
        11);
       std::cout << "Solving with sigma,coeff: " << sigma << "," << coeff << std::endl;
       problem_1d.run();
