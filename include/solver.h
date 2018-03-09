@@ -181,17 +181,18 @@ namespace Step1
      const unsigned int &fe_enriched_degree,
      const unsigned int &max_iterations,
      const double &tolerance,
-     const double &sigma,
+     const std::string &rhs_value_expr,
+     const std::string &boundary_value_expr,
+     const std::string &rhs_radial_problem,
+     const std::string &boundary_radial_problem,
      const std::string &exact_soln_expr,
      const bool &estimate_exact_soln,
-     const std::string &rhs_radial_problem,
      const unsigned int &patches,
      const unsigned int &debug_level,
      const unsigned int &n_enrichments,
      const std::vector<Point<dim>> &points_enrichments,
      const std::vector<double> &radii_predicates,
-     const std::vector<double> &sigmas_rhs,
-     const std::vector<std::string> &rhs_expressions);
+     const std::vector<double> &sigmas);
 
     virtual ~LaplaceProblem();
 
@@ -330,17 +331,18 @@ namespace Step1
    const unsigned int &fe_enriched_degree,
    const unsigned int &max_iterations,
    const double &tolerance,
-   const double &sigma,
+   const std::string &rhs_value_expr,
+   const std::string &boundary_value_expr,
+   const std::string &rhs_radial_problem,
+   const std::string &boundary_radial_problem,
    const std::string &exact_soln_expr,
    const bool &estimate_exact_soln,
-   const std::string &rhs_radial_problem,
    const unsigned int &patches,
    const unsigned int &debug_level,
    const unsigned int &n_enrichments,
    const std::vector<Point<dim>> &points_enrichments,
    const std::vector<double> &radii_predicates,
-   const std::vector<double> &sigmas_rhs,
-   const std::vector<std::string> &rhs_expressions)
+   const std::vector<double> &sigmas)
     :
     prm
     (dim,
@@ -352,17 +354,18 @@ namespace Step1
      fe_enriched_degree,
      max_iterations,
      tolerance,
-     sigma,
+     rhs_value_expr,
+     boundary_value_expr,
+     rhs_radial_problem,
+     boundary_radial_problem,
      exact_soln_expr,
      estimate_exact_soln,
-     rhs_radial_problem,
      patches,
      debug_level,
      n_enrichments,
      points_enrichments,
      radii_predicates,
-     sigmas_rhs,
-     rhs_expressions),
+     sigmas),
     n_enriched_cells(0),
     dof_handler (triangulation),
     fe_base(prm.fe_base_degree),
@@ -371,7 +374,7 @@ namespace Step1
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0)   &&(prm.debug_level >= 1))
+    pcout (std::cout, (this_mpi_process == 0)  &&(prm.debug_level >= 1))
 
   {
     prm.print();
@@ -404,7 +407,7 @@ namespace Step1
 
     Assert(prm.points_enrichments.size()==prm.n_enrichments &&
            prm.radii_predicates.size()==prm.n_enrichments &&
-           prm.sigmas_rhs.size()==prm.n_enrichments,
+           prm.sigmas.size()==prm.n_enrichments,
            ExcMessage
            ("Incorrect parameters: enrichment points, predicate radii and sigmas should be of same size"));
 
@@ -420,8 +423,8 @@ namespace Step1
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
         vec_rhs[i].initialize(prm.points_enrichments[i],
-                              prm.sigmas_rhs[i],
-                              prm.rhs_expressions[i]);
+                              prm.sigmas[i],
+                              prm.rhs_value_expr);
       }
 
     pcout << "...finish initializing" << std::endl;
@@ -557,11 +560,12 @@ namespace Step1
       {
         //formulate a 1d/radial problem with x coordinate and radius (i.e sigma)
         double center = 0;
-        double sigma = prm.sigma;
+        double sigma = prm.sigmas[i];
         EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
                                                      prm.size,
                                                      sigma,
-                                                     prm.rhs_radial_problem);
+                                                     prm.rhs_radial_problem,
+                                                     prm.boundary_radial_problem);
         radial_problem.debug_level = prm.debug_level; //print output
         radial_problem.run();
         pcout << "solved problem with "
@@ -657,9 +661,16 @@ namespace Step1
     constraints.reinit (locally_relevant_dofs);
     DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
     //TODO  crashing here!
+
+    SigmaFunction<dim> boundary_value_func;
+    boundary_value_func.initialize(prm.points_enrichments[0],
+                                   prm.sigmas[0],
+                                   prm.boundary_value_expr);
+
+
     VectorTools::interpolate_boundary_values (dof_handler,
                                               0,
-                                              Functions::ZeroFunction<dim> (1),
+                                              boundary_value_func,
                                               constraints);
     constraints.close ();
 
@@ -759,7 +770,6 @@ namespace Step1
                 cell_rhs(i) += (rhs_value[q_point] *
                                 fe_values.shape_value(i,q_point) *
                                 fe_values.JxW(q_point));
-
               }
 
           // exploit symmetry
@@ -882,7 +892,7 @@ namespace Step1
 
         SigmaFunction<dim> exact_solution;
         exact_solution.initialize(Point<dim>(),
-                                  prm.sigma,
+                                  prm.sigmas[0],
                                   prm.exact_soln_expr);
 
 
@@ -919,11 +929,12 @@ namespace Step1
         //Make enrichment function with spline ranging over whole domain.
         //Gradient of enrichment function is related to gradient of the spline.
         double center = 0;
-        double sigma = prm.sigma;
+        double sigma = prm.sigmas[0];
         EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
                                                      prm.size,
                                                      sigma,
-                                                     prm.rhs_radial_problem);
+                                                     prm.rhs_radial_problem,
+                                                     prm.boundary_radial_problem);
         radial_problem.debug_level = prm.debug_level; //print output
         radial_problem.run();
         pcout << "solving radial problem for error calculation "

@@ -14,10 +14,14 @@ subsection solver
 end
 
 subsection expressions
-    set sigma = 0.05
+    set rhs value = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
+    set boundary value = 0
+
+    set rhs value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
+    set boundary value radial problem = 0
+
     set exact solution expression =
     set estimate exact solution = true
-    set rhs radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
 end
 
 subsection output
@@ -41,7 +45,3 @@ end
 #sigma for enrichment functions
 #1
 0.05
-
-#right hand side functions (pi and sigma are parameters)
-1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
-

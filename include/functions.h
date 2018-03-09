@@ -30,8 +30,8 @@ namespace Step1
     void initialize (const Point<dim> &center,
                      const double &sigma,
                      const std::string &func_expr);
-    virtual void value (const Point<dim> &p,
-                        double   &value) const;
+    double value (const Point<dim> &p,
+                  const unsigned int  component = 0) const;
     virtual void value_list (const std::vector<Point<dim> > &points,
                              std::vector<double >           &value_list) const;
   };
@@ -71,11 +71,11 @@ namespace Step1
 
   template <int dim>
   inline
-  void SigmaFunction<dim>::value (const Point<dim> &p,
-                                  double           &value) const
+  double SigmaFunction<dim>::value (const Point<dim> &p,
+                                    const unsigned int   component) const
   {
     const Point<dim> d(p - center);
-    value = func.value(d);
+    return func.value(d);
   }
 
   template <int dim>
@@ -88,8 +88,7 @@ namespace Step1
     AssertDimension(points.size(), value_list.size());
 
     for (unsigned int p=0; p<n_points; ++p)
-      SigmaFunction::value (points[p],
-                            value_list[p]);
+      value_list[p] = value(points[p]);
   }
 
 }

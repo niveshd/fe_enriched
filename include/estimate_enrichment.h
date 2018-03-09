@@ -44,12 +44,14 @@ namespace Step1
                                 const double &domain_size,
                                 const double &sigma,
                                 const std::string &rhs_expr,
+                                const std::string &boundary_expr,
                                 const double &refinement=11);
     EstimateEnrichmentFunction  (const Point<dim> &center,
                                  const double &left_bound,
                                  const double &right_bound,
                                  const double &sigma,
                                  const std::string &rhs_expr,
+                                 const std::string &boundary_expr,
                                  const double &refinement=11);
     ~EstimateEnrichmentFunction();
     void run ();
@@ -70,6 +72,7 @@ namespace Step1
     double left_bound, right_bound;
     double sigma;
     std::string rhs_expr;
+    std::string boundary_expr;
     std::vector<double> rhs_values;
   public:
     unsigned int debug_level;
@@ -84,32 +87,13 @@ namespace Step1
     Vector<double>       system_rhs;
   };
 
-  namespace EstimateEnrichment
-  {
-    template <int dim>
-    class BoundaryValues: public Function<dim>
-    {
-    public:
-      BoundaryValues () : Function<dim>() {}
-      virtual double value (const Point<dim>   &p,
-                            const unsigned int  component = 0) const;
-    };
-
-    template <int dim>
-    double BoundaryValues<dim>::value (const Point<dim> &p,
-                                       const unsigned int /*component*/) const
-    {
-      return 0; //TODO is the boundary value 0? just use constant function!
-    }
-
-  }
-
   template <int dim>
   EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
   (const Point<dim> &center,
    const double &domain_size,
    const double &sigma,
    const std::string &rhs_expr,
+   const std::string &boundary_expr,
    const double &refinement)
     :
     Function<dim>(1),
@@ -117,6 +101,7 @@ namespace Step1
     domain_size(domain_size),
     sigma(sigma),
     rhs_expr(rhs_expr),
+    boundary_expr(boundary_expr),
     debug_level(0),
     refinement(refinement),
     fe (1),
@@ -134,6 +119,7 @@ namespace Step1
    const double &right_bound,
    const double &sigma,
    const std::string &rhs_expr,
+   const std::string &boundary_expr,
    const double &refinement)
     :
     Function<dim>(1),
@@ -142,6 +128,7 @@ namespace Step1
     right_bound(right_bound),
     sigma(sigma),
     rhs_expr(rhs_expr),
+    boundary_expr(boundary_expr),
     debug_level(0),
     refinement(refinement),
     fe (1),
@@ -226,15 +213,20 @@ namespace Step1
           }
       }
     std::map<types::global_dof_index,double> boundary_values;
+    SigmaFunction<dim> boundary_func;
+    boundary_func.initialize(center,
+                             sigma,
+                             boundary_expr);
+
     VectorTools::interpolate_boundary_values (dof_handler,
                                               0,
-                                              EstimateEnrichment::BoundaryValues<dim>(),
+                                              boundary_func,
                                               boundary_values);
     //TODO find a better way to do this!
     AssertDimension(dim,1);   //Here we assume a 1D problem
     VectorTools::interpolate_boundary_values (dof_handler,
                                               1,
-                                              EstimateEnrichment::BoundaryValues<dim>(),
+                                              boundary_func,
                                               boundary_values);
 
     MatrixTools::apply_boundary_values (boundary_values,

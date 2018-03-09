@@ -23,17 +23,18 @@ struct ParameterCollection
    const unsigned int &fe_enriched_degree,
    const unsigned int &max_iterations,
    const double &tolerance,
-   const double &sigma,
+   const std::string &rhs_value_expr,
+   const std::string &boundary_value_expr,
+   const std::string &rhs_radial_problem,
+   const std::string &boundary_radial_problem,
    const std::string &exact_soln_expr,
    const bool &estimate_exact_soln,
-   const std::string &rhs_radial_problem,
    const unsigned int &patches,
    const unsigned int &debug_level,
    const unsigned int &n_enrichments,
    const std::vector<Point<dimension>> &points_enrichments,
    const std::vector<double> &radii_predicates,
-   const std::vector<double> &sigmas_rhs,
-   const std::vector<std::string> &rhs_expressions)
+   const std::vector<double> &sigmas)
     :
     dim(dim),
     size(size),
@@ -44,7 +45,10 @@ struct ParameterCollection
     fe_enriched_degree(fe_enriched_degree),
     max_iterations(max_iterations),
     tolerance(tolerance),
-    sigma(sigma),
+    rhs_value_expr(rhs_value_expr),
+    boundary_value_expr(boundary_value_expr),
+    rhs_radial_problem(rhs_radial_problem),
+    boundary_radial_problem(boundary_radial_problem),
     exact_soln_expr(exact_soln_expr),
     estimate_exact_soln(estimate_exact_soln),
     rhs_radial_problem(rhs_radial_problem),
@@ -53,8 +57,7 @@ struct ParameterCollection
     n_enrichments(n_enrichments),
     points_enrichments(points_enrichments),
     radii_predicates(radii_predicates),
-    sigmas_rhs(sigmas_rhs),
-    rhs_expressions(rhs_expressions)
+    sigmas(sigmas)
   {}
 
   void print()
@@ -68,10 +71,18 @@ struct ParameterCollection
               << "FE enriched degree : " << fe_enriched_degree << std::endl
               << "Max Iterations : " << max_iterations << std::endl
               << "Tolerance : " << tolerance << std::endl
-              << "sigma for exact solution : " << sigma << std::endl
-              << "exact solution expr : " << exact_soln_expr << std::endl
-              << "solve radial problem : " << estimate_exact_soln << std::endl
-              << "rhs radial problem : " << rhs_radial_problem << std::endl
+              << "rhs - main problem : "
+              << rhs_value_expr << std::endl
+              << "boundary value - main problem : "
+              << boundary_value_expr << std::endl
+              << "rhs of radial problem : "
+              << rhs_radial_problem << std::endl
+              << "boundary value of radial problem : "
+              << boundary_radial_problem << std::endl
+              << "exact solution expr : "
+              << exact_soln_expr << std::endl
+              << "estimate exact solution using radial problem : "
+              << estimate_exact_soln << std::endl
               << "Patches used for output: " << patches << std::endl
               << "Debug level: " << debug_level << std::endl
               << "Number of enrichments: " << n_enrichments << std::endl;
@@ -84,12 +95,8 @@ struct ParameterCollection
     for (auto r:radii_predicates)
       std::cout << r << std::endl;
 
-    std::cout << "Sigma : " << std::endl;
-    for (auto r:sigmas_rhs)
-      std::cout << r << std::endl;
-
-    std::cout << "rhs expressions : " << std::endl;
-    for (auto r:rhs_expressions)
+    std::cout << "Sigma values of different sources : " << std::endl;
+    for (auto r:sigmas)
       std::cout << r << std::endl;
   }
 
@@ -106,12 +113,15 @@ struct ParameterCollection
   double tolerance;
 
   //parameters related to exact solution
-  double sigma;
-  std::string exact_soln_expr;
+  std::string rhs_value_expr;
+  std::string boundary_value_expr;
 
   //value = true ==> estimate exact solution from radial problem
-  bool estimate_exact_soln;
   std::string rhs_radial_problem;
+  std::string boundary_radial_problem;
+
+  std::string exact_soln_expr;
+  bool estimate_exact_soln;
 
   unsigned int patches;
   //debug level = 0(output nothing),
@@ -124,8 +134,7 @@ struct ParameterCollection
   //TODO make vector of double and make a function to get points
   std::vector<Point<dimension>> points_enrichments;
   std::vector<double> radii_predicates;
-  std::vector<double> sigmas_rhs;
-  std::vector<std::string> rhs_expressions;
+  std::vector<double> sigmas;
 };
 
 
@@ -175,18 +184,24 @@ ParameterCollection<dim>::ParameterCollection
 
 
   prm.enter_subsection("expressions");
-  prm.declare_entry("sigma",
-                    "1",
-                    Patterns::Double());
+  prm.declare_entry("rhs value",
+                    "0",
+                    Patterns::Anything());
+  prm.declare_entry("boundary value",
+                    "0",
+                    Patterns::Anything());
+  prm.declare_entry("rhs value radial problem",
+                    "0",
+                    Patterns::Anything());
+  prm.declare_entry("boundary value radial problem",
+                    "0",
+                    Patterns::Anything());
   prm.declare_entry("exact solution expression",
-                    "",
+                    "0",
                     Patterns::Anything());
   prm.declare_entry("estimate exact solution",
                     "false",
                     Patterns::Bool());
-  prm.declare_entry("rhs radial problem",
-                    "",
-                    Patterns::Anything());
   prm.leave_subsection();
 
 
@@ -220,10 +235,12 @@ ParameterCollection<dim>::ParameterCollection
   prm.leave_subsection();
 
   prm.enter_subsection("expressions");
-  sigma = prm.get_double("sigma");
+  rhs_value_expr = prm.get("rhs value");
+  boundary_value_expr = prm.get("boundary value");
+  rhs_radial_problem = prm.get("rhs value radial problem");
+  boundary_radial_problem = prm.get("boundary value radial problem");
   exact_soln_expr = prm.get("exact solution expression");
   estimate_exact_soln = prm.get_bool("estimate exact solution");
-  rhs_radial_problem = prm.get("rhs radial problem");
   prm.leave_subsection();
 
   prm.enter_subsection("output");
@@ -308,17 +325,7 @@ ParameterCollection<dim>::ParameterCollection
 
       double r;
       s_stream >> r;
-      sigmas_rhs.push_back(r);
-    }
-
-  //read right hand side function expressions
-  for (unsigned int i=0; i!=n_enrichments; ++i)
-    {
-
-      read_next_proper_line(line);
-      s_stream.clear();
-
-      rhs_expressions.push_back(line);
+      sigmas.push_back(r);
     }
 }
 
