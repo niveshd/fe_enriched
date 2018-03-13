@@ -989,6 +989,11 @@ namespace Step1
         return;
       }
 
+    pcout << "refinement Dofs L2_norm H1_norm" << std::endl;
+    pcout << prm.global_refinement << " "
+          << dof_handler.n_dofs() << " "
+          << L2_error << " "
+          << H1_error << std::endl;
 
     deallog << "refinement Dofs L2_norm H1_norm" << std::endl;
     deallog << prm.global_refinement << " "
@@ -1120,8 +1125,9 @@ namespace Step1
         if (prm.debug_level >= 2)
           output_results(cycle);
 
-        //TODO UNCOMMENT. correct function body
-        refine_grid ();
+        //Donot refine if loop is at the end
+        if (cycle != prm.cycles)
+          refine_grid ();
 
         pcout << "...step run complete" << std::endl;
       }
