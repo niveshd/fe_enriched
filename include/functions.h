@@ -32,6 +32,8 @@ namespace Step1
                      const std::string &func_expr);
     double value (const Point<dim> &p,
                   const unsigned int  component = 0) const;
+    Tensor<1,dim> gradient (const Point<dim> &p,
+                            const unsigned int   component = 0) const;
     virtual void value_list (const std::vector<Point<dim> > &points,
                              std::vector<double >           &value_list) const;
   };
@@ -76,6 +78,16 @@ namespace Step1
   {
     const Point<dim> d(p - center);
     return func.value(d);
+  }
+
+
+  template <int dim>
+  inline
+  Tensor<1,dim> SigmaFunction<dim>::gradient (const Point<dim> &p,
+                                              const unsigned int   component) const
+  {
+    const Point<dim> d(p - center);
+    return func.gradient(d, component);
   }
 
   template <int dim>

@@ -2,7 +2,7 @@ subsection geometry
     set dim = 2
     set size = 100
     set shape = 0
-    set Global refinement = 7
+    set Global refinement = 10
     set cycles = 0
 end
 
@@ -14,13 +14,11 @@ subsection solver
 end
 
 subsection expressions
-    set sigma = 0.05
+    set rhs value = -(exp(-(x*x + y*y)/(2*sigma*sigma))*(- 2*sigma*sigma + x*x + y*y))/(2*sigma*sigma*sigma*sigma*sigma*sigma*pi)
+    set boundary value = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
 
-    set rhs expression =
-    set boundary expression = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
-
-    set rhs radial problem =
-    set boundary radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
+    set rhs value radial problem = -(exp(-(x*x)/(2*sigma*sigma))*(- 2*sigma*sigma + x*x))/(2*sigma*sigma*sigma*sigma*sigma*sigma*pi)
+    set boundary value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
 
     set exact solution expression = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
     set estimate exact solution = false
@@ -42,11 +40,8 @@ end
 0 0
 
 #radii for predicates
-1 #for enrichment
+0 #1=enrichment, 0=no_enrichment
 
 #sigma for enrichment functions
 #1
 0.05
-
-#right hand side functions (pi and sigma are parameters)
-todo
