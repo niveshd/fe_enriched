@@ -660,7 +660,6 @@ namespace Step1
     constraints.clear();
     constraints.reinit (locally_relevant_dofs);
     DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
-    //TODO  crashing here!
 
     SigmaFunction<dim> boundary_value_func;
     boundary_value_func.initialize(prm.points_enrichments[0],
@@ -868,9 +867,28 @@ namespace Step1
     pcout << "...output results" << std::endl;
     pcout << "Patches used: " << prm.patches << std::endl;
 
-    //TODO create exact solution vector
+    Vector<double> exact_soln_vector, error_vector;
+    SigmaFunction<dim> exact_solution;
 
-    //TODO create error vector
+    if (prm.exact_soln_expr != "")
+      {
+        //create exact solution vector
+        exact_soln_vector.reinit(dof_handler.n_dofs());
+        exact_solution.initialize(Point<dim>(),
+                                  prm.sigmas[0],
+                                  prm.exact_soln_expr);
+        VectorTools::project(dof_handler,
+                             constraints,
+                             q_collection,
+                             exact_solution,
+                             exact_soln_vector);
+
+        //create error vector
+        error_vector.reinit(dof_handler.n_dofs());
+        Vector<double> full_solution(solution);
+        error_vector += full_solution;
+        error_vector -= exact_soln_vector;
+      }
 
     Assert (cycle < 10, ExcNotImplemented());
     if (this_mpi_process==0)
@@ -883,7 +901,11 @@ namespace Step1
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
         data_out.add_data_vector (solution, "solution");
-        //TODO add error vector and exact solution vector
+        if (prm.exact_soln_expr != "")
+          {
+            data_out.add_data_vector (exact_soln_vector, "exact_solution");
+            data_out.add_data_vector (error_vector, "error_vector");
+          }
         data_out.build_patches (prm.patches);
         data_out.write_vtk (output);
         output.close();

@@ -196,7 +196,7 @@ ParameterCollection<dim>::ParameterCollection
                     "0",
                     Patterns::Anything());
   prm.declare_entry("exact solution expression",
-                    "0",
+                    "",
                     Patterns::Anything());
   prm.declare_entry("estimate exact solution",
                     "false",
