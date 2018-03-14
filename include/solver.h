@@ -803,13 +803,22 @@ namespace Step1
                                             false);
     PETScWrappers::SolverCG cg (solver_control,
                                 mpi_communicator);
-//    PETScWrappers::PreconditionBoomerAMG preconditioner(system_matrix);
+
+    //choose preconditioner
+#define amg
+#ifdef amg
+    PETScWrappers::PreconditionBoomerAMG::AdditionalData additional_data;
+    additional_data.symmetric_operator = true;
+    PETScWrappers::PreconditionBoomerAMG preconditioner(system_matrix,
+                                                        additional_data);
+#else
     PETScWrappers::PreconditionJacobi preconditioner(system_matrix);
+#endif
+
     cg.solve (system_matrix, solution, system_rhs,
               preconditioner);
 
     Vector<double> localized_solution (solution);
-//    pcout << "local solution " << localized_solution.size() << ":" << solution.size() << std::endl;
 
     constraints.distribute (localized_solution);
     solution = localized_solution;
@@ -859,6 +868,10 @@ namespace Step1
     pcout << "...output results" << std::endl;
     pcout << "Patches used: " << prm.patches << std::endl;
 
+    //TODO create exact solution vector
+
+    //TODO create error vector
+
     Assert (cycle < 10, ExcNotImplemented());
     if (this_mpi_process==0)
       {
@@ -870,6 +883,7 @@ namespace Step1
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
         data_out.add_data_vector (solution, "solution");
+        //TODO add error vector and exact solution vector
         data_out.build_patches (prm.patches);
         data_out.write_vtk (output);
         output.close();
