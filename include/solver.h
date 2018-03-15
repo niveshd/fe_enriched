@@ -206,7 +206,7 @@ namespace Step1
 
   private:
     void build_tables ();
-    void output_cell_attributes ();  //change to const later
+    void output_cell_attributes (const unsigned int &cycle);  //change to const later
     void assemble_system ();
     unsigned int solve ();
     void estimate_error ();
@@ -272,6 +272,7 @@ namespace Step1
     std::vector<Vector<float>> predicate_output;
     Vector<float> color_output;
     Vector<float> vec_fe_index;
+    Vector<float> mat_id;
   };
 
 
@@ -448,18 +449,6 @@ namespace Step1
       for (unsigned int i=0; i<predicate_colors.size(); ++i)
         pcout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
     }
-    //make color index
-    {
-      color_output.reinit(triangulation.n_active_cells());
-      unsigned int index = 0;
-      for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-           cell != dof_handler.end();
-           ++cell, ++index)
-        for (unsigned int i=0; i<vec_predicates.size(); ++i)
-          if ( vec_predicates[i](cell) )
-            color_output[index] = predicate_colors[i];
-    }
-
 
     //build fe table. should be called everytime number of cells change!
     build_tables();
@@ -577,7 +566,8 @@ namespace Step1
         std::vector<double> interpolation_points_1D, interpolation_values_1D;
         double radius = prm.radii_predicates[i];
         unsigned int n = 5;
-        double right_bound = center + 2*radius;
+
+        double right_bound = center + std::min(2*radius, prm.size/2.0);
         double h = 2.0*radius/n;
         for (double p = center; p < right_bound; p+=h)
           interpolation_points_1D.push_back(p);
@@ -616,9 +606,6 @@ namespace Step1
                                          predicate_colors,
                                          cellwise_color_predicate_map,
                                          fe_sets);
-    if (prm.debug_level >= 3)
-      output_cell_attributes();
-
     {
       //print material table
       pcout << "\nMaterial table : " << std::endl;
@@ -894,7 +881,7 @@ namespace Step1
     if (this_mpi_process==0)
       {
         std::string filename = "solution-";
-        filename += ('0' + cycle);
+        filename += Utilities::to_string(cycle);
         filename += ".vtk";
         std::ofstream output (filename.c_str());
 
@@ -1039,11 +1026,11 @@ namespace Step1
   }
 
   template <int dim>
-  void LaplaceProblem<dim>::output_cell_attributes ()
+  void LaplaceProblem<dim>::output_cell_attributes (const unsigned int &cycle)
   {
     pcout << "...output pre-solution" << std::endl;
 
-    std::string file_name = "pre_solution";
+    std::string file_name = "pre_solution_" + Utilities::to_string(cycle);
 
 //     std::vector<Vector<float>> shape_funct(dof_handler.n_dofs(),
 //                                            Vector<float>(dof_handler.n_dofs()));
@@ -1068,7 +1055,13 @@ namespace Step1
       }
     pcout << "Number of enriched cells: " << n_enriched_cells << std::endl;
 
-    // set predicate vector
+    /*
+     * set predicate vector. This will change with each refinement.
+     * But since the fe indices, fe mapping and enrichment functions don't
+     * change with refinement, we are not changing the enriched space.
+     * Enrichment functions don't change because color map, fe indices and
+     * material id don't change.
+     */
     {
       predicate_output.resize(vec_predicates.size());
       for (unsigned int i = 0; i < vec_predicates.size(); ++i)
@@ -1086,27 +1079,41 @@ namespace Step1
         }
     }
 
+    //make color index
+    {
+      color_output.reinit(triangulation.n_active_cells());
+      unsigned int index = 0;
+      for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
+           cell != dof_handler.end();
+           ++cell, ++index)
+        for (unsigned int i=0; i<vec_predicates.size(); ++i)
+          if ( vec_predicates[i](cell) )
+            color_output[index] = predicate_colors[i];
+    }
+
+    //make material id
+    mat_id.reinit(triangulation.n_active_cells());
+    {
+      unsigned int index = 0;
+      for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
+           cell != dof_handler.end();
+           ++cell, ++index)
+            mat_id[index] = cell->material_id();
+    }
+
     // print fe_index, colors and predicate
     if (this_mpi_process==0)
       {
         file_name += ".vtk";
         std::ofstream output (file_name.c_str());
-
-
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
         data_out.add_data_vector (vec_fe_index, "fe_index");
         data_out.add_data_vector (color_output, "colors");
+        data_out.add_data_vector (mat_id, "mat_id");
         for (unsigned int i = 0; i < predicate_output.size(); ++i)
           data_out.add_data_vector (predicate_output[i], "predicate_" + std::to_string(i));
-
-        /*
-        for (unsigned int i = 0; i < shape_funct.size(); ++i)
-          if (shape_funct[i].l_infty() > 0)
-            data_out.add_data_vector (shape_funct[i], "shape_funct_" + std::to_string(i));
-        */
-
-        data_out.build_patches (); //TODO <... this is the one to additionally refine cells for output only
+        data_out.build_patches ();
         data_out.write_vtk (output);
       }
     pcout << "...finished output pre-solution" << std::endl;
@@ -1121,6 +1128,7 @@ namespace Step1
 
     //Run making grids and building fe space only once.
     initialize();
+    build_fe_space();
 
 
     //TODO need cyles?
@@ -1128,7 +1136,8 @@ namespace Step1
       {
         pcout << "Cycle "<< cycle <<std::endl;
 
-        build_fe_space();
+        if (prm.debug_level >= 3)
+          output_cell_attributes(cycle);
 
         setup_system ();
 

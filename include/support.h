@@ -166,14 +166,29 @@ using EnrichmentFunctionArray = std::vector<std::vector<std::function<const Func
                                 (const typename Triangulation<dim, dim>::cell_iterator &) >>>;
 
 
-
+/*
+ * Assign colors to predicates. No two predicates which are
+ * both active on a cell have the same color. Predicates that
+ * share cell in this sense are said to be connected.
+ */
 template <int dim, class MeshType>
 unsigned int color_predicates
 (const MeshType &mesh,
  const std::vector<EnrichmentPredicate<dim>> &,
  std::vector<unsigned int> &);
 
-
+/*
+ * create a vector of fe sets. The index of the vector represents
+ * active_fe_index and each fe index is associated with a set of colors.
+ * A cell with an fe index associated with colors {a,b} means that
+ * predicates active in the cell have colors a or b. All the
+ * fe indices and their associated sets are in @par fe_sets.
+ * Active_fe_index of cell is added as well here.
+ * Eg: fe_sets = { {}, {1}, {2}, {1,2} } means
+ * cells have no predicates or predicates with colors 1 or 2 or (1 and 2)
+ * cell with active fe index 2 has predicates with color 2,
+ * with active fe index 3 has predicates with color 1 and 2.
+ */
 template <int dim, class MeshType>
 void
 set_cellwise_color_set_and_fe_index

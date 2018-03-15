@@ -6,12 +6,15 @@ unsigned int color_predicates
  const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
  std::vector<unsigned int> &predicate_colors)
 {
-  unsigned int num_indices = vec_predicates.size();
+  const unsigned int num_indices = vec_predicates.size();
 
   DynamicSparsityPattern dsp;
   dsp.reinit ( num_indices, num_indices );
 
-  //find connections between subdomains defined by predicates
+  /* find connections between subdomains defined by predicates
+   * if the connection exists, add it to a graph object represented
+   * by dynamic sparsity pattern
+   */
   for (unsigned int i = 0; i < num_indices; ++i)
     for (unsigned int j = i+1; j < num_indices; ++j)
       if ( GridTools::find_connection_between_subdomains
@@ -19,12 +22,8 @@ unsigned int color_predicates
         dsp.add(i,j);
 
   dsp.symmetrize();
-
-  //color different regions (defined by predicate)
   SparsityPattern sp_graph;
   sp_graph.copy_from(dsp);
-
-  Assert( num_indices == sp_graph.n_rows() , ExcInternalError() );
   predicate_colors.resize(num_indices);
 
   //return num of colors and assign each predicate with a color
@@ -48,45 +47,73 @@ set_cellwise_color_set_and_fe_index
   fe_sets.clear();
   cellwise_color_predicate_map.clear();
 
-  //set first element of fe_sets size to empty
+  /*
+   * set first element of fe_sets size to empty. This means that
+   * the default, fe index = 0 is associated with an empty set, since no
+   * predicate is active in these regions.
+   */
   fe_sets.resize(1);
 
-  //loop through cells and build fe table
-  unsigned int cell_index = 0;
-
+  /*
+   * loop through cells and create new fe index if needed.
+   * Each fe index is associated with a set of colors. A cell
+   * with an fe index associated with colors {a,b} means that
+   * predicates active in the cell have colors a or b. All the
+   * fe indices and their associated sets are in @par fe_sets.
+   * Active_fe_index of cell is added as well here.
+   * Eg: fe_sets = { {}, {1}, {2}, {1,2} } means
+   * Cells have no predicates or predicates with colors 1 or 2 or (1 and 2)
+   * active. Cell with active fe index 2 has predicates with color 2,
+   * with active fe index 3 has predicates with color 1 and 2.
+   *
+   * Associate each cell_id with set of pairs. The number of pairs
+   * is equal to the number of predicates active in the given cell.
+   * The pair represents predicate color and the active predicate with
+   * that color in that cell. Each color can only correspond to a single
+   * predicate since predicates with the same color are disjoint domains.
+   */
+  unsigned int map_index(0);
   auto cell = mesh.begin_active();
   auto endc = mesh.end();
-  for (unsigned int cell_index=0;
-       cell != endc; ++cell, ++cell_index)
+  for (;
+       cell != endc; ++cell)
     {
-      cell->set_active_fe_index (0);  //No enrichment at all
+      //set default fe index ==> no enrichment
+      cell->set_active_fe_index (0);
+      cell->set_material_id(map_index);
       std::set<unsigned int> color_list;
 
-      //loop through predicate function to find connected subdomains
-      //connections between same color regions is checked again.
+      //loop through active predicates in a cell
       for (unsigned int i=0; i<vec_predicates.size(); ++i)
         {
-          //add if predicate true to vector of functions
           if (vec_predicates[i](cell))
             {
-              //add color and predicate pair to each cell if predicate is true.
-              auto ret = cellwise_color_predicate_map[cell_index].insert
+              /*
+               * create a pair predicate color and predicate id and add it
+               * to a map associated with each enriched cell
+               */
+              auto ret = cellwise_color_predicate_map[map_index].insert
                          (std::pair <unsigned int, unsigned int> (predicate_colors[i], i));
 
               color_list.insert(predicate_colors[i]);
 
-              //A single predicate for a single color! repeat addition not accepted.
-              Assert( ret.second == true, ExcInternalError () );
+              //TODO check if single color doesn't have multiple predicates!
 
-//                 pcout << " - " << predicate_colors[i] << "(" << i << ")" ;
+//              pcout << " - " << predicate_colors[i] << "(" << i << ")" ;
             }
         }
 
 //         if (!color_list.empty())
 //                 pcout << std::endl;
 
+      /*
+       * check if color combination is already added.
+       * If already added, set the active fe index based on
+       * its index in the fe_sets. If the combination doesn't
+       * exist, add the set to fe_sets and once again set the
+       * active fe index as last index in fe_sets.
+       */
       bool found = false;
-      //check if color combination is already added
       if ( !color_list.empty() )
         {
           for ( unsigned int j=0; j<fe_sets.size(); ++j)
@@ -112,8 +139,8 @@ set_cellwise_color_set_and_fe_index
               //                 pcout << "color combo set pushed at " << fe_sets.size()-1 << std::endl;
               */
             }
-
         }
+      ++map_index;
     }
 }
 
@@ -143,7 +170,7 @@ void make_colorwise_enrichment_functions
       color_enrichments[i] =
         [ &,i] (const typename Triangulation<dim, dim>::cell_iterator & cell)
       {
-        unsigned int id = cell->index();
+        unsigned int id = cell->material_id();
 
         //i'th function corresponds to i+1 color
         return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
@@ -257,6 +284,31 @@ template
 void
 set_cellwise_color_set_and_fe_index
 (hp::DoFHandler<3,3> &mesh,
+ const std::vector<EnrichmentPredicate<3>> &vec_predicates,
+ const std::vector<unsigned int> &predicate_colors,
+ std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
+ std::vector <std::set<unsigned int>> &fe_sets);
+
+
+
+template
+void
+set_cellwise_color_set_and_fe_index
+(DoFHandler<2,2> &mesh,
+ const std::vector<EnrichmentPredicate<2>> &vec_predicates,
+ const std::vector<unsigned int> &predicate_colors,
+ std::map<unsigned int,
+ std::map<unsigned int, unsigned int> >
+ &cellwise_color_predicate_map,
+ std::vector <std::set<unsigned int>> &fe_sets);
+
+
+template
+void
+set_cellwise_color_set_and_fe_index
+(DoFHandler<3,3> &mesh,
  const std::vector<EnrichmentPredicate<3>> &vec_predicates,
  const std::vector<unsigned int> &predicate_colors,
  std::map<unsigned int,
