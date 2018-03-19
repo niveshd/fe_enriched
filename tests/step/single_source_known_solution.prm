@@ -1,9 +1,9 @@
 subsection geometry
     set dim = 2
-    set size = 100
-    set shape = 0
-    set Global refinement = 7
-    set cycles = 0
+    set size = 2
+    set shape = 1
+    set Global refinement = 2
+    set cycles = 5
 end
 
 subsection solver
@@ -26,7 +26,7 @@ end
 
 subsection output
     set patches = 1
-    set debug level = 1
+    set debug level = 3
 end
 
 #end-of-dealii parser
@@ -44,4 +44,4 @@ end
 
 #sigma for enrichment functions
 #1
-0.05
+1
