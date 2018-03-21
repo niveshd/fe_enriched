@@ -41,7 +41,7 @@ using namespace dealii;
 template <int dim>
 struct EnrichmentPredicate
 {
-  EnrichmentPredicate(const Point<dim> origin, const int radius)
+  EnrichmentPredicate(const Point<dim> origin, const double radius)
     :origin(origin),radius(radius) {}
 
   template <class Iterator>
@@ -54,14 +54,14 @@ struct EnrichmentPredicate
   {
     return origin;
   }
-  const int &get_radius()
+  const double &get_radius()
   {
     return radius;
   }
 
 private:
   const Point<dim> origin;
-  const int radius;
+  const double radius;
 };
 
 

@@ -209,7 +209,6 @@ namespace Step1
     void output_cell_attributes (const unsigned int &cycle);  //change to const later
     void assemble_system ();
     unsigned int solve ();
-    void estimate_error ();
     void refine_grid ();
     void output_results (const unsigned int cycle);
     void process_solution();
@@ -401,16 +400,13 @@ namespace Step1
     else
       AssertThrow(false,ExcMessage("Shape not implemented."));
 
-
     triangulation.refine_global (prm.global_refinement);
-
-    pcout << "step size: " << prm.size/std::pow(2.0,prm.global_refinement) << std::endl;
 
     Assert(prm.points_enrichments.size()==prm.n_enrichments &&
            prm.radii_predicates.size()==prm.n_enrichments &&
            prm.sigmas.size()==prm.n_enrichments,
            ExcMessage
-           ("Incorrect parameters: enrichment points, predicate radii and sigmas should be of same size"));
+           ("Number of enrichment points, predicate radii and sigmas should be equal"));
 
     //initialize vector of predicate functions, f: assign cell --> 1 or 0
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
@@ -550,32 +546,36 @@ namespace Step1
         //formulate a 1d/radial problem with x coordinate and radius (i.e sigma)
         double center = 0;
         double sigma = prm.sigmas[i];
-        EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                     prm.size,
-                                                     sigma,
-                                                     prm.rhs_radial_problem,
-                                                     prm.boundary_radial_problem);
-        radial_problem.debug_level = prm.debug_level; //print output
-        radial_problem.run();
-        pcout << "solved problem with "
-              << "(x, sigma): "
-              << center << ", " << sigma << std::endl;
+        //Actual size is twice the radius. For hexahedral cells, dimension can
+        //extend upto sqrt(3) times! so take a factor of 4 in total.
+        double size = prm.radii_predicates[i]*4;
 
-        //make points at which solution needs to interpolated
-        //use bisection like adapter for splines
-        std::vector<double> interpolation_points_1D, interpolation_values_1D;
-        double radius = prm.radii_predicates[i];
-        unsigned int n = 5;
-
-        double right_bound = center + std::min(2*radius, prm.size/2.0);
-        double h = 2.0*radius/n;
-        for (double p = center; p < right_bound; p+=h)
-          interpolation_points_1D.push_back(p);
-        interpolation_points_1D.push_back(right_bound);
-
-        //add enrichment function only when predicate radius is non-zero
         if (prm.radii_predicates[i] != 0)
           {
+            EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
+                                                         size,
+                                                         sigma,
+                                                         prm.rhs_radial_problem,
+                                                         prm.boundary_radial_problem);
+            radial_problem.debug_level = prm.debug_level; //print output
+            radial_problem.run();
+            pcout << "solved problem with "
+                  << "(x, sigma): "
+                  << center << ", " << sigma << std::endl;
+
+            //make points at which solution needs to interpolated
+            std::vector<double> interpolation_points_1D, interpolation_values_1D;
+            double radius = size/2; //only half side is important
+            unsigned int n = 5;
+            double right_bound(center + radius);
+            double h = radius/n;
+
+            for (double p = center; p < right_bound; p+=h)
+              interpolation_points_1D.push_back(p);
+            interpolation_points_1D.push_back(right_bound);
+
+            //add enrichment function only when predicate radius is non-zero
+
             radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
 
 
@@ -592,7 +592,6 @@ namespace Step1
             SplineEnrichmentFunction<dim> func(Point<dim>(),1,0);
             vec_enrichments.push_back(func);
           }
-
       }
   }
 
@@ -821,28 +820,40 @@ namespace Step1
   }
 
   template <int dim>
-  void LaplaceProblem<dim>::estimate_error ()
-  {
-    {
-      const PETScWrappers::MPI::Vector *sol;
-      Vector<float>   *error;
-
-      hp::QCollection<dim-1> face_quadrature_formula;
-      face_quadrature_formula.push_back (QGauss<dim-1>(3));
-      face_quadrature_formula.push_back (QGauss<dim-1>(3));
-
-//       KellyErrorEstimator<dim>::estimate (dof_handler,
-//                                           face_quadrature_formula,
-//                                           typename FunctionMap<dim>::type(),
-//                                           sol,
-//                                           error);
-    }
-  }
-
-  template <int dim>
   void LaplaceProblem<dim>::refine_grid ()
   {
-    triangulation.refine_global();
+    const Vector<double> localized_solution (solution);
+    Vector<float> local_error_per_cell (triangulation.n_active_cells());
+
+    hp::QCollection<dim-1> q_collection_face;
+    for (unsigned int i=0; i < q_collection.size(); ++i)
+      q_collection_face.push_back(QGauss<dim-1>(q_collection[i].size()));
+
+    KellyErrorEstimator<dim>::estimate (dof_handler,
+                                        q_collection_face,
+                                        typename FunctionMap<dim>::type(),
+                                        localized_solution,
+                                        local_error_per_cell,
+                                        ComponentMask(),
+                                        nullptr,
+                                        n_mpi_processes,
+                                        this_mpi_process);
+    const unsigned int n_local_cells
+      = GridTools::count_cells_with_subdomain_association (triangulation,
+                                                           this_mpi_process);
+    PETScWrappers::MPI::Vector
+    distributed_all_errors (mpi_communicator,
+                            triangulation.n_active_cells(),
+                            n_local_cells);
+    for (unsigned int i=0; i<local_error_per_cell.size(); ++i)
+      if (local_error_per_cell(i) != 0)
+        distributed_all_errors(i) = local_error_per_cell(i);
+    distributed_all_errors.compress (VectorOperation::insert);
+    const Vector<float> localized_all_errors (distributed_all_errors);
+    GridRefinement::refine_and_coarsen_fixed_number (triangulation,
+                                                     localized_all_errors,
+                                                     0.3, 0.03);
+    triangulation.execute_coarsening_and_refinement ();
     ++prm.global_refinement;
   }
 
@@ -941,8 +952,9 @@ namespace Step1
       }
     else if (prm.estimate_exact_soln)
       {
+        //Not very accurate estimation
         AssertThrow(prm.shape == 0,
-                    ExcMessage("solution only for circular domain known"));
+                    ExcMessage("solution only for circular domain can be estimated"));
         AssertThrow(prm.n_enrichments == 1 &&
                     prm.points_enrichments[0] == Point<dim>(),
                     ExcMessage("solution only for single source at origin"));
@@ -953,8 +965,11 @@ namespace Step1
         //Gradient of enrichment function is related to gradient of the spline.
         double center = 0;
         double sigma = prm.sigmas[0];
+        double size = prm.size;
+        //Ensure the radial problem is solved for diagonal incase shape is square
+        if (prm.shape==1) size = size*sqrt(dim);
         EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                     prm.size,
+                                                     size,
                                                      sigma,
                                                      prm.rhs_radial_problem,
                                                      prm.boundary_radial_problem);
@@ -968,7 +983,7 @@ namespace Step1
         std::vector<double> interpolation_points_1D, interpolation_values_1D;
         double cut_point = 1;
         unsigned int n1 = 10, n2 = 200;
-        double right_bound = prm.size/2;
+        double right_bound = size/2;
         double h1 = cut_point/n1, h2 = (prm.size-cut_point)/n2;
         for (double p = center; p < cut_point; p+=h1)
           interpolation_points_1D.push_back(p);
@@ -1012,8 +1027,9 @@ namespace Step1
         return;
       }
 
-    pcout << "refinement Dofs L2_norm H1_norm" << std::endl;
+    pcout << "refinement h_smallest Dofs L2_norm H1_norm" << std::endl;
     pcout << prm.global_refinement << " "
+          << prm.size/std::pow(2.0,prm.global_refinement) << " "
           << dof_handler.n_dofs() << " "
           << L2_error << " "
           << H1_error << std::endl;
@@ -1031,15 +1047,6 @@ namespace Step1
     pcout << "...output pre-solution" << std::endl;
 
     std::string file_name = "pre_solution_" + Utilities::to_string(cycle);
-
-//     std::vector<Vector<float>> shape_funct(dof_handler.n_dofs(),
-//                                            Vector<float>(dof_handler.n_dofs()));
-//
-//     for (unsigned int i = 0; i < dof_handler.n_dofs(); ++i)
-//     {
-//       shape_funct[i] = i;
-//       constraints.distribute(shape_funct[i]);
-//     }
 
     //find number of enriched cells and set active fe index
     vec_fe_index.reinit(triangulation.n_active_cells());
@@ -1098,7 +1105,7 @@ namespace Step1
       for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
            cell != dof_handler.end();
            ++cell, ++index)
-            mat_id[index] = cell->material_id();
+        mat_id[index] = cell->material_id();
     }
 
     // print fe_index, colors and predicate
@@ -1159,13 +1166,8 @@ namespace Step1
                                           solution,
                                           Point<dim>())
               << std::endl;
-        if (prm.shape == 0 &&
-            prm.n_enrichments == 1 &&
-            prm.points_enrichments[0] == Point<dim>())
+        if (prm.exact_soln_expr != "" || prm.estimate_exact_soln==true)
           process_solution();
-
-        //TODO Uncomment. correct function body
-//        estimate_error ();
 
         if (prm.debug_level >= 2)
           output_results(cycle);
