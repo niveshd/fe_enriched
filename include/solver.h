@@ -807,9 +807,7 @@ namespace Step1
 
     constraints.distribute (localized_solution);
     solution = localized_solution;
-
     pcout << "...finished solving" << std::endl;
-
     return solver_control.last_step();
   }
 
@@ -1033,12 +1031,6 @@ namespace Step1
           << dof_handler.n_dofs() << " "
           << L2_error << " "
           << H1_error << std::endl;
-
-    deallog << "refinement Dofs L2_norm H1_norm" << std::endl;
-    deallog << prm.global_refinement << " "
-            << dof_handler.n_dofs() << " "
-            << L2_error << " "
-            << H1_error << std::endl;
   }
 
   template <int dim>
@@ -1076,36 +1068,28 @@ namespace Step1
           predicate_output[i].reinit(triangulation.n_active_cells());
         }
 
-      unsigned int index = 0;
-      for (typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler.begin_active();
-           cell != dof_handler.end(); ++cell, ++index)
+      for (auto cell : dof_handler.active_cell_iterators())
         {
           for (unsigned int i=0; i<vec_predicates.size(); ++i)
             if ( vec_predicates[i](cell) )
-              predicate_output[i][index] = i+1;
+              predicate_output[i][cell->active_cell_index()] = i+1;
         }
     }
 
     //make color index
     {
       color_output.reinit(triangulation.n_active_cells());
-      unsigned int index = 0;
-      for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-           cell != dof_handler.end();
-           ++cell, ++index)
+      for (auto cell : dof_handler.active_cell_iterators())
         for (unsigned int i=0; i<vec_predicates.size(); ++i)
           if ( vec_predicates[i](cell) )
-            color_output[index] = predicate_colors[i];
+            color_output[cell->active_cell_index()] = predicate_colors[i];
     }
 
     //make material id
     mat_id.reinit(triangulation.n_active_cells());
     {
-      unsigned int index = 0;
-      for (typename hp::DoFHandler<dim>::cell_iterator cell= dof_handler.begin_active();
-           cell != dof_handler.end();
-           ++cell, ++index)
-        mat_id[index] = cell->material_id();
+      for (auto cell : dof_handler.active_cell_iterators())
+        mat_id[cell->active_cell_index()] = cell->material_id();
     }
 
     // print fe_index, colors and predicate
@@ -1132,11 +1116,11 @@ namespace Step1
   LaplaceProblem<dim>::run()
   {
     pcout << "...run problem" << std::endl;
+    double norm_soln_old(0), norm_rel_change_old(1);
 
     //Run making grids and building fe space only once.
     initialize();
     build_fe_space();
-
 
     //TODO need cyles?
     for (unsigned int cycle = 0; cycle <= prm.cycles; ++cycle)
@@ -1166,6 +1150,40 @@ namespace Step1
                                           solution,
                                           Point<dim>())
               << std::endl;
+
+        //calculate L2 norm of solution
+        {
+          double norm_soln_new, norm_rel_change_new;
+          Vector<float> difference_per_cell (triangulation.n_active_cells());
+          VectorTools::integrate_difference (dof_handler,
+                                             solution,
+                                             ZeroFunction<dim>(),
+                                             difference_per_cell,
+                                             q_collection,
+                                             VectorTools::H1_norm);
+          norm_soln_new = VectorTools::compute_global_error(triangulation,
+                                                            difference_per_cell,
+                                                            VectorTools::H1_norm);
+          //relative change can only be calculated for cycle > 0
+          if (cycle > 0)
+            norm_rel_change_new = std::abs((norm_soln_new - norm_soln_old)/norm_soln_old);
+
+          //change of relative change of norm only makes sense for cycle > 1
+          if (cycle > 1)
+            {
+              pcout << "relative change of solution norm "
+                    << norm_rel_change_new << std::endl;
+              deallog << (norm_rel_change_new < norm_rel_change_old)
+                      << std::endl;
+            }
+
+          norm_soln_old = norm_soln_new;
+
+          //first sample of relative change of norm comes only cycle = 1
+          if (cycle > 0)
+            norm_rel_change_old = norm_rel_change_new;
+        }
+
         if (prm.exact_soln_expr != "" || prm.estimate_exact_soln==true)
           process_solution();
 

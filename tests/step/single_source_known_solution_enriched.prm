@@ -10,7 +10,7 @@ subsection solver
     set fe base degree = 1
     set fe enriched degree = 1
     set max iterations = 50000
-    set tolerance = 1e-12
+    set tolerance = 1e-9
 end
 
 subsection expressions
