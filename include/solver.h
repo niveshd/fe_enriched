@@ -138,12 +138,9 @@ void plot_shape_function
 
   // get material ids:
   Vector<float> fe_index(dof_handler.get_triangulation().n_active_cells());
-  typename hp::DoFHandler<dim>::active_cell_iterator
-  cell = dof_handler.begin_active (),
-  endc = dof_handler.end ();
-  for (unsigned int index=0; cell!=endc; ++cell,++index)
+  for (auto cell : dof_handler.active_cell_iterators())
     {
-      fe_index[index] = cell->active_fe_index();
+      fe_index[cell->active_cell_index()] = cell->active_fe_index();
     }
   data_out.add_data_vector(fe_index, "fe_index");
 
@@ -707,10 +704,7 @@ namespace Step1
                                    update_quadrature_points | update_JxW_values);
 
 
-    typename hp::DoFHandler<dim>::active_cell_iterator
-    cell = dof_handler.begin_active (),
-    endc = dof_handler.end ();
-    for (; cell!=endc; ++cell)
+    for (auto cell : dof_handler.active_cell_iterators())
       if (cell->subdomain_id() == this_mpi_process )
         {
           fe_values_hp.reinit (cell);

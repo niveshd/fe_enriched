@@ -1,0 +1,55 @@
+subsection geometry
+    set dim = 2
+    set size = 8
+    set shape = 1
+    set Global refinement = 4
+    set cycles = 5
+end
+
+subsection solver
+    set fe base degree = 1
+    set fe enriched degree = 1
+    set max iterations = 50000
+    set tolerance = 1e-9
+end
+
+subsection expressions
+    set rhs value = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
+    set boundary value = 0
+
+    set rhs value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
+    set boundary value radial problem = 0
+    set estimate exact solution = false
+end
+
+subsection output
+    set patches = 1
+    set debug level = 1
+end
+
+#end-of-dealii parser
+
+#num of enrichment predicates
+5
+
+#points for enrichment functions/predicates
+2 2
+1 1
+0 0
+-2 -2
+-1 -1
+
+
+#radii for predicates
+0.4
+0.4
+0.4
+0.4
+0.4
+
+#sigma for enrichment functions
+0.1
+0.1
+0.1
+0.1
+0.1
