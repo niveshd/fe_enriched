@@ -229,6 +229,7 @@ namespace Step1
 
     PETScWrappers::MPI::SparseMatrix        system_matrix;
     PETScWrappers::MPI::Vector              solution;
+    Vector<double>                          localized_solution;
     PETScWrappers::MPI::Vector              system_rhs;
 
     ConstraintMatrix constraints;
@@ -797,10 +798,10 @@ namespace Step1
     cg.solve (system_matrix, solution, system_rhs,
               preconditioner);
 
-    Vector<double> localized_solution (solution);
+    Vector<double> local_soln (solution);
 
-    constraints.distribute (localized_solution);
-    solution = localized_solution;
+    constraints.distribute (local_soln);
+    solution = local_soln;
     pcout << "...finished solving" << std::endl;
     return solver_control.last_step();
   }
@@ -875,7 +876,7 @@ namespace Step1
 
         //create error vector
         error_vector.reinit(dof_handler.n_dofs());
-        Vector<double> full_solution(solution);
+        Vector<double> full_solution(localized_solution);
         error_vector += full_solution;
         error_vector -= exact_soln_vector;
       }
@@ -890,7 +891,7 @@ namespace Step1
 
         DataOut<dim,hp::DoFHandler<dim> > data_out;
         data_out.attach_dof_handler (dof_handler);
-        data_out.add_data_vector (solution, "solution");
+        data_out.add_data_vector (localized_solution, "solution");
         if (prm.exact_soln_expr != "")
           {
             data_out.add_data_vector (exact_soln_vector, "exact_solution");
@@ -921,9 +922,8 @@ namespace Step1
                                   prm.sigmas[0],
                                   prm.exact_soln_expr);
 
-
         VectorTools::integrate_difference (dof_handler,
-                                           solution,
+                                           localized_solution,
                                            exact_solution,
                                            difference_per_cell,
                                            q_collection,
@@ -933,7 +933,7 @@ namespace Step1
                                                      VectorTools::L2_norm);
 
         VectorTools::integrate_difference (dof_handler,
-                                           solution,
+                                           localized_solution,
                                            exact_solution,
                                            difference_per_cell,
                                            q_collection,
@@ -1133,24 +1133,30 @@ namespace Step1
               << dof_handler.n_dofs ()
               << std::endl;
 
-        if (prm.debug_level == 9)
+        if (prm.debug_level == 9 && this_mpi_process==0)
           plot_shape_function<dim>(dof_handler);
 
         assemble_system ();
         auto n_iterations = solve ();
         pcout << "Number of iterations: " << n_iterations << std::endl;
+        localized_solution.reinit(dof_handler.n_dofs());
+        localized_solution = solution;
+        double value = VectorTools::point_value(dof_handler,
+                                                localized_solution,
+                                                Point<dim>());
         pcout << "Solution at origin:   "
-              << VectorTools::point_value(dof_handler,
-                                          solution,
-                                          Point<dim>())
+              << value
               << std::endl;
 
+
         //calculate L2 norm of solution
+        if (this_mpi_process==0)
         {
+          pcout << "calculating L2 norm of soln" << std::endl;
           double norm_soln_new, norm_rel_change_new;
           Vector<float> difference_per_cell (triangulation.n_active_cells());
           VectorTools::integrate_difference (dof_handler,
-                                             solution,
+                                             localized_solution,
                                              ZeroFunction<dim>(),
                                              difference_per_cell,
                                              q_collection,
@@ -1176,12 +1182,15 @@ namespace Step1
           //first sample of relative change of norm comes only cycle = 1
           if (cycle > 0)
             norm_rel_change_old = norm_rel_change_new;
+
+          pcout << "End of L2 calculation" << std::endl;
         }
 
-        if (prm.exact_soln_expr != "" || prm.estimate_exact_soln==true)
+        if ((prm.exact_soln_expr != "" || prm.estimate_exact_soln==true) &&
+            this_mpi_process == 0)
           process_solution();
 
-        if (prm.debug_level >= 2)
+        if (prm.debug_level >= 2  && this_mpi_process==0)
           output_results(cycle);
 
         //Donot refine if loop is at the end
