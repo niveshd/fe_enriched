@@ -2,8 +2,8 @@ subsection geometry
     set dim = 2
     set size = 2
     set shape = 1
-    set Global refinement = 2
-    set cycles = 7
+    set Global refinement = 3
+    set cycles = 5
 end
 
 subsection solver

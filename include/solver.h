@@ -843,9 +843,9 @@ namespace Step1
         distributed_all_errors(i) = local_error_per_cell(i);
     distributed_all_errors.compress (VectorOperation::insert);
     const Vector<float> localized_all_errors (distributed_all_errors);
-    GridRefinement::refine_and_coarsen_fixed_number (triangulation,
-                                                     localized_all_errors,
-                                                     0.3, 0.03);
+    GridRefinement::refine_and_coarsen_fixed_fraction (triangulation,
+                                                       localized_all_errors,
+                                                       0.85, 0);
     triangulation.execute_coarsening_and_refinement ();
     ++prm.global_refinement;
   }
@@ -1151,40 +1151,40 @@ namespace Step1
 
         //calculate L2 norm of solution
         if (this_mpi_process==0)
-        {
-          pcout << "calculating L2 norm of soln" << std::endl;
-          double norm_soln_new, norm_rel_change_new;
-          Vector<float> difference_per_cell (triangulation.n_active_cells());
-          VectorTools::integrate_difference (dof_handler,
-                                             localized_solution,
-                                             ZeroFunction<dim>(),
-                                             difference_per_cell,
-                                             q_collection,
-                                             VectorTools::H1_norm);
-          norm_soln_new = VectorTools::compute_global_error(triangulation,
-                                                            difference_per_cell,
-                                                            VectorTools::H1_norm);
-          //relative change can only be calculated for cycle > 0
-          if (cycle > 0)
-            norm_rel_change_new = std::abs((norm_soln_new - norm_soln_old)/norm_soln_old);
+          {
+            pcout << "calculating L2 norm of soln" << std::endl;
+            double norm_soln_new, norm_rel_change_new;
+            Vector<float> difference_per_cell (triangulation.n_active_cells());
+            VectorTools::integrate_difference (dof_handler,
+                                               localized_solution,
+                                               ZeroFunction<dim>(),
+                                               difference_per_cell,
+                                               q_collection,
+                                               VectorTools::H1_norm);
+            norm_soln_new = VectorTools::compute_global_error(triangulation,
+                                                              difference_per_cell,
+                                                              VectorTools::H1_norm);
+            //relative change can only be calculated for cycle > 0
+            if (cycle > 0)
+              norm_rel_change_new = std::abs((norm_soln_new - norm_soln_old)/norm_soln_old);
 
-          //change of relative change of norm only makes sense for cycle > 1
-          if (cycle > 1)
-            {
-              pcout << "relative change of solution norm "
-                    << norm_rel_change_new << std::endl;
-              deallog << (norm_rel_change_new < norm_rel_change_old)
-                      << std::endl;
-            }
+            //moniter relative change of norm in later stages
+            if (cycle > 3)
+              {
+                pcout << "relative change of solution norm "
+                      << norm_rel_change_new << std::endl;
+                deallog << (norm_rel_change_new < norm_rel_change_old)
+                        << std::endl;
+              }
 
-          norm_soln_old = norm_soln_new;
+            norm_soln_old = norm_soln_new;
 
-          //first sample of relative change of norm comes only cycle = 1
-          if (cycle > 0)
-            norm_rel_change_old = norm_rel_change_new;
+            //first sample of relative change of norm comes only cycle = 1
+            if (cycle > 0)
+              norm_rel_change_old = norm_rel_change_new;
 
-          pcout << "End of L2 calculation" << std::endl;
-        }
+            pcout << "End of L2 calculation" << std::endl;
+          }
 
         if ((prm.exact_soln_expr != "" || prm.estimate_exact_soln==true) &&
             this_mpi_process == 0)
