@@ -17,7 +17,7 @@ unsigned int color_predicates
    */
   for (unsigned int i = 0; i < num_indices; ++i)
     for (unsigned int j = i+1; j < num_indices; ++j)
-      if ( GridTools::find_connection_between_subdomains
+      if ( find_connection_between_subdomains
            (mesh, vec_predicates[i], vec_predicates[j]) )
         dsp.add(i,j);
 
@@ -250,6 +250,39 @@ void make_fe_collection_from_colored_enrichments
 }
 
 
+
+template <class MeshType>
+bool find_connection_between_subdomains
+(const MeshType                                                              &mesh,
+ const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
+ const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2
+)
+{
+  std::vector<bool> locally_active_vertices_on_subdomain (mesh.get_triangulation().n_vertices(),
+                                                          false);
+
+  //Mark vertices in subdomain (1) defined by predicate 1
+  for (typename MeshType::active_cell_iterator
+       cell = mesh.begin_active();
+       cell != mesh.end(); ++cell)
+    if (predicate_1(cell)) // True predicate --> Part of region 1
+      for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
+        locally_active_vertices_on_subdomain[cell->vertex_index(v)] = true;
+
+  //Find if cells in subdomain (2) defined by predicate 2 share vertices with region 1.
+  for (typename MeshType::active_cell_iterator
+       cell = mesh.begin_active();
+       cell != mesh.end(); ++cell)
+    if (predicate_2(cell)) // True predicate --> Potential connection between subdomains
+      for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
+        if (locally_active_vertices_on_subdomain[cell->vertex_index(v)] == true)
+          {
+            return true;
+          }
+  return false;
+}
+
+
 //template instantiations
 template unsigned int color_predicates
 (const Triangulation<2,2> &mesh,
@@ -385,3 +418,31 @@ void make_fe_collection_from_colored_enrichments
   const FE_Q<3> &fe_enriched,        //fe element multiplied by enrichment function
   const FE_Nothing<3> &fe_nothing,
   hp::FECollection<3> &fe_collection);
+
+
+template
+bool find_connection_between_subdomains
+(const hp::DoFHandler<2> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, hp::DoFHandler<2>>::type &)> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, hp::DoFHandler<2>>::type &)> &);
+
+
+ template
+ bool find_connection_between_subdomains
+ (const hp::DoFHandler<3> &,
+  const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &,
+  const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &);
+
+
+  template
+  bool find_connection_between_subdomains
+  (const Triangulation<2> &,
+   const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &,
+   const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &);
+
+
+   template
+   bool find_connection_between_subdomains
+   (const Triangulation<3> &,
+    const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &,
+    const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &);

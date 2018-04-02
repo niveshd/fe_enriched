@@ -237,4 +237,60 @@ void make_fe_collection_from_colored_enrichments
  const FE_Nothing<dim> &fe_nothing,
  hp::FECollection<dim> &fe_collection);
 
+
+
+/**
+   * Function returns true if there is a connection between subdomains in the
+   * @p mesh i.e the subdomains share at least a vertex. The two subdomains
+   * are defined by predicates provided by @p predicate_1 and @p predicate_2.
+   * Predicates are functions or objects with operator() which take in a
+   * cell in @p mesh and return true if the cell is in subdomain.
+   *
+   * An example of a custom predicate is one that checks distance from a fixed
+   * point. Note that the operator() takes in a cell iterator. Using the
+   * object constructor, the fixed point and the distance can be chosen.
+   * @code
+   * <int dim>
+   * struct predicate
+   * {
+   *     predicate(const Point<dim> p, const int radius)
+   *     :p(p),radius(radius){}
+   *
+   *     template <class Iterator>
+   *     bool operator () (const Iterator &i)
+   *     {
+   *         return ( (i->center() - p).norm() < radius);
+   *     }
+   *
+   * private:
+   *     Point<dim> p;
+   *     int radius;
+   *
+   * };
+   * @endcode
+   * and then the function can be used as follows to find if the subdomains
+   * are connected.
+   * @code
+   * find_connection_between_subdomains
+   * (tria,
+   *  predicate<dim>(Point<dim>(0,0), 1)
+   *  predicate<dim>(Point<dim>(2,2), 1));
+   * @endcode
+   *
+   * @tparam MeshType A type that satisfies the requirements of the
+   * @ref ConceptMeshType "MeshType concept".
+   * @param[in] mesh A mesh (i.e. objects of type Triangulation, DoFHandler,
+   * or hp::DoFHandler).
+   * @param[in] predicate_1 A function  (or object of a type with an operator())
+   * defining the subdomain 1. The function takes in an active cell and returns a boolean.
+   * @param[in] predicate_2 Same as @p predicate_1 but defines subdomain 2.
+   * @return A boolean "true" if the subdomains share atleast a vertex i.e cells including
+   * halo or ghost cells of subdomain 1 overlap with subdomain 2.
+   */
+  template <class MeshType>
+  bool find_connection_between_subdomains
+  (const MeshType                                                              &mesh,
+   const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
+   const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2);
+
 #endif
