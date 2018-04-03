@@ -47,6 +47,7 @@
 #include "support.h"
 #include "paramater_reader.h"
 #include "estimate_enrichment.h"
+#include "helper.h"
 
 
 template <int dim>
@@ -198,7 +199,7 @@ namespace Step1
   protected:
     void initialize();
     void build_fe_space();
-    virtual void make_enrichment_function();
+    virtual void make_enrichment_functions();
     void setup_system ();
 
   private:
@@ -248,21 +249,6 @@ namespace Step1
     std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
     std::vector<cell_function>  color_enrichments;
-
-    //each predicate is assigned a color depending on overlap of vertices.
-    std::vector<unsigned int> predicate_colors;
-    unsigned int num_colors;
-
-    //cell wise mapping of color with enrichment functions
-    //vector size = number of cells;
-    //map:  < color , corresponding predicate_function >
-    //(only one per color acceptable). An assertion checks this
-    std::map<unsigned int,
-        std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
-
-    //vector of size num_colors + 1
-    //different color combinations that a cell can contain
-    std::vector <std::set<unsigned int>> fe_sets;
 
     //output vectors. size triangulation.n_active_cells()
     //change to Vector
@@ -430,22 +416,16 @@ namespace Step1
   {
     pcout << "...building fe space" << std::endl;
 
-    make_enrichment_function();
+    make_enrichment_functions();
 
-    //make a sparsity pattern based on connections between regions
-    if (vec_predicates.size() != 0)
-      num_colors = color_predicates (dof_handler, vec_predicates, predicate_colors);
-    else
-      num_colors = 0;
+    static fe_enriched::helper<dim> fe_space(fe_base,
+                                 fe_enriched,
+                                 vec_predicates,
+                                 vec_enrichments);
+    fe_space.set(dof_handler);
+    fe_collection = fe_space.get_fe_collection();
 
-    {
-      //print color_indices
-      for (unsigned int i=0; i<predicate_colors.size(); ++i)
-        pcout << "predicate " << i << " : " << predicate_colors[i] << std::endl;
-    }
-
-    //build fe table. should be called everytime number of cells change!
-    build_tables();
+    pcout << "size of fe collection" << fe_collection.size() << std::endl;
 
     if (prm.debug_level == 9)
       {
@@ -509,25 +489,8 @@ namespace Step1
     //TODO in parameter file
     //TODO clear so that multiple runs will work
     q_collection.push_back(QGauss<dim>(4));
-    for (unsigned int i=1; i!=fe_sets.size(); ++i)
+    for (unsigned int i=1; i < fe_collection.size(); ++i)
       q_collection.push_back(QGauss<dim>(10));
-
-
-    //setup color wise enrichment functions
-    //i'th function corresponds to (i+1) color!
-    make_colorwise_enrichment_functions (num_colors,
-                                         vec_enrichments,
-                                         cellwise_color_predicate_map,
-                                         color_enrichments);
-
-    //TODO clear fe_collection such that multiple calls will work
-    make_fe_collection_from_colored_enrichments (num_colors,
-                                                 fe_sets,
-                                                 color_enrichments,
-                                                 fe_base,
-                                                 fe_enriched,
-                                                 fe_nothing,
-                                                 fe_collection);
 
     pcout << "...building fe space" << std::endl;
   }
@@ -535,7 +498,7 @@ namespace Step1
 
 
   template <int dim>
-  void LaplaceProblem<dim>::make_enrichment_function()
+  void LaplaceProblem<dim>::make_enrichment_functions()
   {
     pcout << "!!! Make enrichment function called" << std::endl;
 
@@ -594,31 +557,6 @@ namespace Step1
   }
 
 
-  template <int dim>
-  void LaplaceProblem<dim>::build_tables ()
-  {
-    pcout << "...start build tables" << std::endl;
-    set_cellwise_color_set_and_fe_index (dof_handler,
-                                         vec_predicates,
-                                         predicate_colors,
-                                         cellwise_color_predicate_map,
-                                         fe_sets);
-    {
-      //print material table
-      pcout << "\nMaterial table : " << std::endl;
-      for ( unsigned int j=0; j<fe_sets.size(); ++j)
-        {
-          pcout << j << " ( ";
-          for ( auto i = fe_sets[j].begin(); i != fe_sets[j].end(); ++i)
-            pcout << *i << " ";
-          pcout << " ) " << std::endl;
-        }
-    }
-
-    pcout << "...finish build tables" << std::endl;
-
-
-  }
 
   template <int dim>
   void LaplaceProblem<dim>::setup_system ()
@@ -1072,6 +1010,9 @@ namespace Step1
 
     //make color index
     {
+      std::vector<unsigned int> predicate_colors;
+      color_predicates (dof_handler, vec_predicates, predicate_colors);
+
       color_output.reinit(triangulation.n_active_cells());
       for (auto cell : dof_handler.active_cell_iterators())
         for (unsigned int i=0; i<vec_predicates.size(); ++i)

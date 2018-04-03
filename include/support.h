@@ -103,6 +103,7 @@ public:
 
   SplineEnrichmentFunction(SplineEnrichmentFunction &&other)
     :
+    Function<dim>(1),
     origin(other.origin),
     sigma(other.sigma),
     interpolation_points(other.interpolation_points),
@@ -113,6 +114,7 @@ public:
 
   SplineEnrichmentFunction(const SplineEnrichmentFunction &other)
     :
+    Function<dim>(1),
     origin(other.origin),
     sigma(other.sigma),
     interpolation_points(other.interpolation_points),
@@ -287,10 +289,10 @@ void make_fe_collection_from_colored_enrichments
    * @return A boolean "true" if the subdomains share atleast a vertex i.e cells including
    * halo or ghost cells of subdomain 1 overlap with subdomain 2.
    */
-  template <class MeshType>
-  bool find_connection_between_subdomains
-  (const MeshType                                                              &mesh,
-   const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
-   const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2);
+template <class MeshType>
+bool find_connection_between_subdomains
+(const MeshType                                                              &mesh,
+ const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
+ const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2);
 
 #endif

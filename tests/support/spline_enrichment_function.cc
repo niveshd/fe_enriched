@@ -82,14 +82,14 @@ public:
   }
 
 private:
-  void make_enrichment_function();
+  void make_enrichment_functions();
 };
 
 
 
 //modify enrichment function to be used!
 template <int dim>
-void Problem<dim>::make_enrichment_function ()
+void Problem<dim>::make_enrichment_functions ()
 {
   this->pcout << "!!! Inherited make enrichment function called" << std::endl;
 

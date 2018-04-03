@@ -146,16 +146,24 @@ namespace Testing
     static int r[32];
     static int k;
     static bool inited=false;
+
     if (!inited || reseed)
       {
         //srand treats a seed 0 as 1 for some reason
         r[0]=(seed==0)?1:seed;
+        long int word = r[0];
 
         for (int i=1; i<31; i++)
           {
-            r[i] = (16807LL * r[i-1]) % 2147483647;
-            if (r[i] < 0)
-              r[i] += 2147483647;
+            // This does:
+            //   r[i] = (16807 * r[i-1]) % 2147483647;
+            // buit avoids overflowing 31 bits.
+            const long int hi = word / 127773;
+            const long int lo = word % 127773;
+            word = 16807 * lo - 2836 * hi;
+            if (word < 0)
+              word += 2147483647;
+            r[i] = word;
           }
         k=31;
         for (int i=31; i<34; i++)
@@ -180,7 +188,7 @@ namespace Testing
     return (unsigned int)ret >> 1;
   }
 
-// reseed our random number generator
+  // reseed our random number generator
   void srand(const int seed)
   {
     rand(true, seed);
@@ -275,7 +283,7 @@ unsigned int checksum(const IT &begin, const IT &end)
 
 
 /*
- * Replace all occurences of ' &' by '& ' from the given file to hopefully be
+ * Replace all occurrences of ' &' by '& ' from the given file to hopefully be
  * more compiler independent with respect to __PRETTY_FUNCTION__
  *
  * Also, while GCC prepends the name by "virtual " if the function is virtual,
@@ -429,7 +437,7 @@ initlog(bool console=false)
 
 inline
 void
-mpi_initlog(bool console=false)
+mpi_initlog(const bool console=false)
 {
 #ifdef DEAL_II_WITH_MPI
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -612,11 +620,11 @@ struct EnableFPE
 
 namespace internal
 {
-  namespace Vector
+  namespace VectorImplementation
   {
     extern unsigned int minimum_parallel_grain_size;
   }
-  namespace SparseMatrix
+  namespace SparseMatrixImplementation
   {
     extern unsigned int minimum_parallel_grain_size;
   }
@@ -626,8 +634,8 @@ struct SetGrainSizes
 {
   SetGrainSizes ()
   {
-    internal::Vector::minimum_parallel_grain_size = 2;
-    internal::SparseMatrix::minimum_parallel_grain_size = 2;
+    internal::VectorImplementation::minimum_parallel_grain_size = 2;
+    internal::SparseMatrixImplementation::minimum_parallel_grain_size = 2;
   }
 } set_grain_sizes;
 

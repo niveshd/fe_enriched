@@ -427,22 +427,22 @@ bool find_connection_between_subdomains
  const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, hp::DoFHandler<2>>::type &)> &);
 
 
- template
- bool find_connection_between_subdomains
- (const hp::DoFHandler<3> &,
-  const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &,
-  const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &);
+template
+bool find_connection_between_subdomains
+(const hp::DoFHandler<3> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &);
 
 
-  template
-  bool find_connection_between_subdomains
-  (const Triangulation<2> &,
-   const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &,
-   const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &);
+template
+bool find_connection_between_subdomains
+(const Triangulation<2> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &);
 
 
-   template
-   bool find_connection_between_subdomains
-   (const Triangulation<3> &,
-    const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &,
-    const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &);
+template
+bool find_connection_between_subdomains
+(const Triangulation<3> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &,
+ const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &);

@@ -85,8 +85,8 @@ void test ()
       {
         deallog << i << ":" << j << "="
                 << find_connection_between_subdomains (tria,
-                                                                  predicates[i],
-                                                                  predicates[j])
+                                                       predicates[i],
+                                                       predicates[j])
                 << std::endl;
       }
 }
