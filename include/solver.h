@@ -419,9 +419,9 @@ namespace Step1
     make_enrichment_functions();
 
     static fe_enriched::helper<dim> fe_space(fe_base,
-                                 fe_enriched,
-                                 vec_predicates,
-                                 vec_enrichments);
+                                             fe_enriched,
+                                             vec_predicates,
+                                             vec_enrichments);
     fe_space.set(dof_handler);
     fe_collection = fe_space.get_fe_collection();
 
@@ -1011,7 +1011,7 @@ namespace Step1
     //make color index
     {
       std::vector<unsigned int> predicate_colors;
-      color_predicates (dof_handler, vec_predicates, predicate_colors);
+      fe_enriched::internal::color_predicates (dof_handler, vec_predicates, predicate_colors);
 
       color_output.reinit(triangulation.n_active_cells());
       for (auto cell : dof_handler.active_cell_iterators())
