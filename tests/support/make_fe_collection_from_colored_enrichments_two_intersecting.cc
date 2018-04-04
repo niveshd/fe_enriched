@@ -50,6 +50,7 @@
 
 #include "../tests.h"
 #include "support.h"
+#include "helper.h"
 
 #include <map>
 
@@ -154,13 +155,13 @@ int main(int argc, char **argv)
   //find colors for predicates
   predicate_colors.resize(vec_predicates.size());
   unsigned int num_colors
-    = color_predicates (triangulation, vec_predicates, predicate_colors);
+    = ColorEnriched::internal::color_predicates (triangulation, vec_predicates, predicate_colors);
 
   std::map<unsigned int,
       std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
   std::vector <std::set<unsigned int>> fe_sets;
 
-  set_cellwise_color_set_and_fe_index
+  ColorEnriched::internal::set_cellwise_color_set_and_fe_index
   (dof_handler,
    vec_predicates,
    predicate_colors,
@@ -172,7 +173,7 @@ int main(int argc, char **argv)
   (const typename Triangulation<dim>::cell_iterator &)> >
   color_enrichments;
 
-  make_colorwise_enrichment_functions
+  ColorEnriched::internal::make_colorwise_enrichment_functions
   (num_colors,          //needs number of colors
    vec_enrichments,     //enrichment functions based on predicate id
    cellwise_color_predicate_map,
@@ -182,7 +183,7 @@ int main(int argc, char **argv)
   FE_Q<dim> fe_enriched(1);
   FE_Nothing<dim> fe_nothing(1,true);
   hp::FECollection<dim> fe_collection;
-  make_fe_collection_from_colored_enrichments
+  ColorEnriched::internal::make_fe_collection_from_colored_enrichments
   (num_colors,
    fe_sets,         //total list of color sets possible
    color_enrichments,  //color wise enrichment functions

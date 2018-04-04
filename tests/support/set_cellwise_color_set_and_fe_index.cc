@@ -50,6 +50,7 @@
 
 #include "../tests.h"
 #include "support.h"
+#include "helper.h"
 
 #include <map>
 
@@ -83,7 +84,7 @@ int main(int argc, char **argv)
       std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
   std::vector <std::set<unsigned int>> fe_sets;
 
-  set_cellwise_color_set_and_fe_index
+  ColorEnriched::internal::set_cellwise_color_set_and_fe_index
   (dof_handler,
    vec_predicates,
    predicate_colors,

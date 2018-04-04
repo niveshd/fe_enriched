@@ -22,6 +22,7 @@
 #include <deal.II/grid/grid_out.h>
 
 #include "support.h"
+#include "helper.h"
 #include <vector>
 
 using namespace dealii;
@@ -58,7 +59,9 @@ void test ()
   Assert ( dim==2 || dim==3, ExcDimensionMismatch2(dim, 2, 3) );
 
   //Vector of predicates for testing
-  typedef std::function<bool (const typename Triangulation<dim>::active_cell_iterator &)> predicate_function;
+  typedef std::function<bool
+  (const typename Triangulation<dim>::active_cell_iterator &)>
+  predicate_function;
   std::vector<predicate_function> predicates;
   predicates.resize(5);
   if ( dim==2 )
@@ -84,9 +87,10 @@ void test ()
     for (int j = 0; j < 5; ++j)
       {
         deallog << i << ":" << j << "="
-                << find_connection_between_subdomains (tria,
-                                                       predicates[i],
-                                                       predicates[j])
+                << ColorEnriched::internal::
+                find_connection_between_subdomains (tria,
+                                                    predicates[i],
+                                                    predicates[j])
                 << std::endl;
       }
 }

@@ -50,6 +50,7 @@
 
 #include "../tests.h"
 #include "support.h"
+#include "helper.h"
 
 #include <map>
 
@@ -76,7 +77,8 @@ int main(int argc, char **argv)
 
     predicate_colors.resize(vec_predicates.size());
 
-    color_predicates (triangulation, vec_predicates, predicate_colors);
+    ColorEnriched::internal::color_predicates<dim, Triangulation<dim>>
+        (triangulation, vec_predicates, predicate_colors);
 
     deallog << "Case 1" << std::endl;
     for (auto i:predicate_colors)
@@ -94,7 +96,8 @@ int main(int argc, char **argv)
 
     predicate_colors.resize(vec_predicates.size());
 
-    color_predicates (triangulation, vec_predicates, predicate_colors);
+    ColorEnriched::internal::color_predicates
+    (triangulation, vec_predicates, predicate_colors);
 
     deallog << "Case 2" << std::endl;
     for (auto i:predicate_colors)
@@ -116,7 +119,8 @@ int main(int argc, char **argv)
 
     predicate_colors.resize(vec_predicates.size());
 
-    color_predicates (triangulation, vec_predicates, predicate_colors);
+    ColorEnriched::internal::color_predicates
+    (triangulation, vec_predicates, predicate_colors);
 
     deallog << "Case 3" << std::endl;
     for (auto i:predicate_colors)
