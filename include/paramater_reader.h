@@ -8,7 +8,6 @@
 #include <deal.II/base/parameter_handler.h>
 
 
-template <int dimension>
 struct ParameterCollection
 {
   ParameterCollection(const std::string &file_name);
@@ -32,71 +31,24 @@ struct ParameterCollection
    const unsigned int &patches,
    const unsigned int &debug_level,
    const unsigned int &n_enrichments,
-   const std::vector<Point<dimension>> &points_enrichments,
+   const std::vector<double> &points_enrichments,
    const std::vector<double> &radii_predicates,
-   const std::vector<double> &sigmas)
-    :
-    dim(dim),
-    size(size),
-    shape(shape),
-    global_refinement(global_refinement),
-    cycles(cycles),
-    fe_base_degree(fe_base_degree),
-    fe_enriched_degree(fe_enriched_degree),
-    max_iterations(max_iterations),
-    tolerance(tolerance),
-    rhs_value_expr(rhs_value_expr),
-    boundary_value_expr(boundary_value_expr),
-    rhs_radial_problem(rhs_radial_problem),
-    boundary_radial_problem(boundary_radial_problem),
-    exact_soln_expr(exact_soln_expr),
-    estimate_exact_soln(estimate_exact_soln),
-    patches(patches),
-    debug_level(debug_level),
-    n_enrichments(n_enrichments),
-    points_enrichments(points_enrichments),
-    radii_predicates(radii_predicates),
-    sigmas(sigmas)
-  {}
+   const std::vector<double> &sigmas);
 
-  void print()
+  void print();
+
+  void set_enrichment_point(Point <2> &p, const unsigned int i)
   {
-    std::cout << "Dim : " << dim << std::endl
-              << "Size : "<< size << std::endl
-              << "Shape : " << shape << std::endl
-              << "Global refinement : " << global_refinement << std::endl
-              << "Cycles : " << cycles << std::endl
-              << "FE base degree : " << fe_base_degree << std::endl
-              << "FE enriched degree : " << fe_enriched_degree << std::endl
-              << "Max Iterations : " << max_iterations << std::endl
-              << "Tolerance : " << tolerance << std::endl
-              << "rhs - main problem : "
-              << rhs_value_expr << std::endl
-              << "boundary value - main problem : "
-              << boundary_value_expr << std::endl
-              << "rhs of radial problem : "
-              << rhs_radial_problem << std::endl
-              << "boundary value of radial problem : "
-              << boundary_radial_problem << std::endl
-              << "exact solution expr : "
-              << exact_soln_expr << std::endl
-              << "estimate exact solution using radial problem : "
-              << estimate_exact_soln << std::endl
-              << "Patches used for output: " << patches << std::endl
-              << "Debug level: " << debug_level << std::endl
-              << "Number of enrichments: " << n_enrichments << std::endl;
-
-    std::cout << "Enrichment points : " << std::endl;
-    for (auto p:points_enrichments)
-      std::cout << p << std::endl;
-
-    std::cout << "Enrichment radii : " << std::endl;
-    for (auto r:radii_predicates)
-      std::cout << r << std::endl;
-
-    std::cout << "Sigma values of different sources : " << std::endl;
-    for (auto r:sigmas)
-      std::cout << r << std::endl;
+    AssertDimension(dim,2);
+    p(0) = points_enrichments[2*i];
+    p(1) = points_enrichments[2*i + 1];
+  }
+  void set_enrichment_point(Point <3> &p, const unsigned int i)
+  {
+    AssertDimension(dim,3);
+    p(0) = points_enrichments[3*i];
+    p(1) = points_enrichments[3*i + 1];
+    p(2) = points_enrichments[3*i + 2];
   }
 
 
@@ -131,14 +83,14 @@ struct ParameterCollection
   unsigned int debug_level;
   unsigned int n_enrichments;
   //TODO make vector of double and make a function to get points
-  std::vector<Point<dimension>> points_enrichments;
+  std::vector<double> points_enrichments;
   std::vector<double> radii_predicates;
   std::vector<double> sigmas;
 };
 
 
-template <int dim>
-ParameterCollection<dim>::ParameterCollection
+
+ParameterCollection::ParameterCollection
 (const std::string &file_name)
 {
 
@@ -287,17 +239,22 @@ ParameterCollection<dim>::ParameterCollection
       s_stream.clear();
       s_stream.str(line);
 
+      points_enrichments.resize(dim*n_enrichments);
+
       if (dim==2)
         {
           double x,y;
           s_stream >> x >> y;
-          points_enrichments.push_back({x,y});
+          points_enrichments[2*i]=x;
+          points_enrichments[2*i+1]=y;
         }
       else if (dim==3)
         {
           double x,y,z;
           s_stream >> x >> y >> z;
-          points_enrichments.push_back({x,y,z});
+          points_enrichments[3*i]=x;
+          points_enrichments[3*i+1]=y;
+          points_enrichments[3*i+2]=z;
         }
       else
         AssertThrow(false, ExcMessage("Dimension not implemented"));
@@ -326,6 +283,102 @@ ParameterCollection<dim>::ParameterCollection
       s_stream >> r;
       sigmas.push_back(r);
     }
+}
+
+
+
+ParameterCollection::ParameterCollection
+(const int &dim,
+ const double &size,
+ const unsigned int &shape,
+ const unsigned int &global_refinement,
+ const unsigned int &cycles,
+ const unsigned int &fe_base_degree,
+ const unsigned int &fe_enriched_degree,
+ const unsigned int &max_iterations,
+ const double &tolerance,
+ const std::string &rhs_value_expr,
+ const std::string &boundary_value_expr,
+ const std::string &rhs_radial_problem,
+ const std::string &boundary_radial_problem,
+ const std::string &exact_soln_expr,
+ const bool &estimate_exact_soln,
+ const unsigned int &patches,
+ const unsigned int &debug_level,
+ const unsigned int &n_enrichments,
+ const std::vector<double> &points_enrichments,
+ const std::vector<double> &radii_predicates,
+ const std::vector<double> &sigmas)
+  :
+  dim(dim),
+  size(size),
+  shape(shape),
+  global_refinement(global_refinement),
+  cycles(cycles),
+  fe_base_degree(fe_base_degree),
+  fe_enriched_degree(fe_enriched_degree),
+  max_iterations(max_iterations),
+  tolerance(tolerance),
+  rhs_value_expr(rhs_value_expr),
+  boundary_value_expr(boundary_value_expr),
+  rhs_radial_problem(rhs_radial_problem),
+  boundary_radial_problem(boundary_radial_problem),
+  exact_soln_expr(exact_soln_expr),
+  estimate_exact_soln(estimate_exact_soln),
+  patches(patches),
+  debug_level(debug_level),
+  n_enrichments(n_enrichments),
+  points_enrichments(points_enrichments),
+  radii_predicates(radii_predicates),
+  sigmas(sigmas)
+{}
+
+
+
+void ParameterCollection::print()
+{
+  std::cout << "Dim : " << dim << std::endl
+            << "Size : "<< size << std::endl
+            << "Shape : " << shape << std::endl
+            << "Global refinement : " << global_refinement << std::endl
+            << "Cycles : " << cycles << std::endl
+            << "FE base degree : " << fe_base_degree << std::endl
+            << "FE enriched degree : " << fe_enriched_degree << std::endl
+            << "Max Iterations : " << max_iterations << std::endl
+            << "Tolerance : " << tolerance << std::endl
+            << "rhs - main problem : "
+            << rhs_value_expr << std::endl
+            << "boundary value - main problem : "
+            << boundary_value_expr << std::endl
+            << "rhs of radial problem : "
+            << rhs_radial_problem << std::endl
+            << "boundary value of radial problem : "
+            << boundary_radial_problem << std::endl
+            << "exact solution expr : "
+            << exact_soln_expr << std::endl
+            << "estimate exact solution using radial problem : "
+            << estimate_exact_soln << std::endl
+            << "Patches used for output: " << patches << std::endl
+            << "Debug level: " << debug_level << std::endl
+            << "Number of enrichments: " << n_enrichments << std::endl;
+
+  std::cout << "Enrichment points : " << std::endl;
+  for (unsigned int i = 0; i < points_enrichments.size(); ++i)
+    {
+      for (int d = 0; d < dim; ++d)
+        std::cout << points_enrichments[i+d] << " ";
+
+      std::cout << std::endl;
+      i = i + dim;
+    }
+
+  std::cout << "Enrichment radii : " << std::endl;
+  for (auto r:radii_predicates)
+    std::cout << r << std::endl;
+
+  std::cout << "Sigma values of different sources : " << std::endl;
+  for (auto r:sigmas)
+    std::cout << r << std::endl;
 }
 
 #endif

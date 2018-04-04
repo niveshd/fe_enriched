@@ -130,7 +130,7 @@ public:
   {
     Tensor<1,dim> dist = point-origin;
     const double r = dist.norm();
-    return cspline.value(Point<1>(r));
+    return cspline.value(Point<1>(r), component);
   }
 
   virtual Tensor< 1, dim> gradient (const Point<dim > &p,

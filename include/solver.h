@@ -169,31 +169,8 @@ namespace Step1
   {
   public:
     LaplaceProblem ();
-    LaplaceProblem (const ParameterCollection<dim> &prm);
-    LaplaceProblem
-    (const double &size,
-     const unsigned int &shape,
-     const unsigned int &global_refinement,
-     const unsigned int &cycles,
-     const unsigned int &fe_base_degree,
-     const unsigned int &fe_enriched_degree,
-     const unsigned int &max_iterations,
-     const double &tolerance,
-     const std::string &rhs_value_expr,
-     const std::string &boundary_value_expr,
-     const std::string &rhs_radial_problem,
-     const std::string &boundary_radial_problem,
-     const std::string &exact_soln_expr,
-     const bool &estimate_exact_soln,
-     const unsigned int &patches,
-     const unsigned int &debug_level,
-     const unsigned int &n_enrichments,
-     const std::vector<Point<dim>> &points_enrichments,
-     const std::vector<double> &radii_predicates,
-     const std::vector<double> &sigmas);
-
+    LaplaceProblem (const ParameterCollection &prm);
     virtual ~LaplaceProblem();
-
     void run ();
 
   protected:
@@ -212,7 +189,7 @@ namespace Step1
     void process_solution();
 
   protected:
-    ParameterCollection<dim> prm;
+    ParameterCollection prm;
     unsigned int n_enriched_cells;
 
     Triangulation<dim>  triangulation;
@@ -283,7 +260,7 @@ namespace Step1
 
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem
-  (const ParameterCollection<dim> &_par)
+  (const ParameterCollection &_par)
     :
     prm(_par),
     n_enriched_cells(0),
@@ -300,71 +277,10 @@ namespace Step1
     AssertThrow (prm.dim == dim,
                  ExcMessage("parameter file dim != problem dim"));
     prm.print();
-
     pcout << "...parameters set" << std::endl;
   }
 
 
-  template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem
-  (const double &size,
-   const unsigned int &shape,
-   const unsigned int &global_refinement,
-   const unsigned int &cycles,
-   const unsigned int &fe_base_degree,
-   const unsigned int &fe_enriched_degree,
-   const unsigned int &max_iterations,
-   const double &tolerance,
-   const std::string &rhs_value_expr,
-   const std::string &boundary_value_expr,
-   const std::string &rhs_radial_problem,
-   const std::string &boundary_radial_problem,
-   const std::string &exact_soln_expr,
-   const bool &estimate_exact_soln,
-   const unsigned int &patches,
-   const unsigned int &debug_level,
-   const unsigned int &n_enrichments,
-   const std::vector<Point<dim>> &points_enrichments,
-   const std::vector<double> &radii_predicates,
-   const std::vector<double> &sigmas)
-    :
-    prm
-    (dim,
-     size,
-     shape,
-     global_refinement,
-     cycles,
-     fe_base_degree,
-     fe_enriched_degree,
-     max_iterations,
-     tolerance,
-     rhs_value_expr,
-     boundary_value_expr,
-     rhs_radial_problem,
-     boundary_radial_problem,
-     exact_soln_expr,
-     estimate_exact_soln,
-     patches,
-     debug_level,
-     n_enrichments,
-     points_enrichments,
-     radii_predicates,
-     sigmas),
-    n_enriched_cells(0),
-    dof_handler (triangulation),
-    fe_base(prm.fe_base_degree),
-    fe_enriched(prm.fe_enriched_degree),
-    fe_nothing(1,true),
-    mpi_communicator(MPI_COMM_WORLD),
-    n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
-    this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0)  &&(prm.debug_level >= 1))
-
-  {
-    prm.print();
-
-    pcout << "...parameters set" << std::endl;
-  }
 
   template <int dim>
   void LaplaceProblem<dim>::initialize()
@@ -386,7 +302,7 @@ namespace Step1
 
     triangulation.refine_global (prm.global_refinement);
 
-    Assert(prm.points_enrichments.size()==prm.n_enrichments &&
+    Assert(prm.points_enrichments.size()/dim ==prm.n_enrichments &&
            prm.radii_predicates.size()==prm.n_enrichments &&
            prm.sigmas.size()==prm.n_enrichments,
            ExcMessage
@@ -395,7 +311,9 @@ namespace Step1
     //initialize vector of predicate functions, f: assign cell --> 1 or 0
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
-        vec_predicates.push_back( EnrichmentPredicate<dim>(prm.points_enrichments[i],
+        Point<dim> p;
+        prm.set_enrichment_point(p,i);
+        vec_predicates.push_back( EnrichmentPredicate<dim>(p,
                                                            prm.radii_predicates[i]) );
       }
 
@@ -403,7 +321,9 @@ namespace Step1
     vec_rhs.resize(prm.n_enrichments);
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
-        vec_rhs[i].initialize(prm.points_enrichments[i],
+        Point<dim> p;
+        prm.set_enrichment_point(p,i);
+        vec_rhs[i].initialize(p,
                               prm.sigmas[i],
                               prm.rhs_value_expr);
       }
@@ -541,7 +461,9 @@ namespace Step1
 
 
             //construct enrichment function and push
-            SplineEnrichmentFunction<dim> func(prm.points_enrichments[i],
+            Point<dim> p;
+            prm.set_enrichment_point(p,i);
+            SplineEnrichmentFunction<dim> func(p,
                                                prm.radii_predicates[i],
                                                interpolation_points_1D,
                                                interpolation_values_1D);
@@ -584,7 +506,9 @@ namespace Step1
     DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
 
     SigmaFunction<dim> boundary_value_func;
-    boundary_value_func.initialize(prm.points_enrichments[0],
+    Point<dim> p;
+    prm.set_enrichment_point(p,0);
+    boundary_value_func.initialize(p,
                                    prm.sigmas[0],
                                    prm.boundary_value_expr);
 
@@ -885,8 +809,10 @@ namespace Step1
         //Not very accurate estimation
         AssertThrow(prm.shape == 0,
                     ExcMessage("solution only for circular domain can be estimated"));
+        Point<dim> p;
+        prm.set_enrichment_point(p,0);
         AssertThrow(prm.n_enrichments == 1 &&
-                    prm.points_enrichments[0] == Point<dim>(),
+                    p == Point<dim>(),
                     ExcMessage("solution only for single source at origin"));
 
         pcout << "...estimate exact solution for error calculation" << std::endl;

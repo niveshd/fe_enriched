@@ -58,11 +58,10 @@
 #include "support.h"
 #include "estimate_enrichment.h"
 #include "solver.h"
+#include "paramater_reader.h"
 #include "../tests.h"
 
 const unsigned int dim = 2;
-
-
 
 //inherit from solver class to test just the pre-assembly steps
 template <int dim>
@@ -133,7 +132,9 @@ void Problem<dim>::make_enrichment_functions ()
 
 
       //construct enrichment function and push
-      SplineEnrichmentFunction<dim> func(this->prm.points_enrichments[i],
+      Point<dim> p;
+      this->prm.set_enrichment_point(p,i);
+      SplineEnrichmentFunction<dim> func(p,
                                          this->prm.radii_predicates[i],
                                          interpolation_points_1D,
                                          interpolation_values_1D);
@@ -181,45 +182,6 @@ void Problem<dim>::make_enrichment_functions ()
                   << std::endl;
         }
     }
-
-
-  //TODO push these out to separate tests
-//  //2.const enrichment functions!
-//  for (unsigned int i=0; i<this->vec_predicates.size(); ++i)
-//    {
-//      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
-//                                   2,
-//                                   0);  //constant function
-//      this->vec_enrichments.push_back( func );
-//    }
-
-
-
-//  //3.function
-//  for (unsigned int i=0; i<this->vec_predicates.size(); ++i)
-//    {
-//      //formulate a 1d problem with x coordinate and radius (i.e sigma)
-//      double x = this->points_enrichments[i][0];
-//      double sigma = this->radii_enrichments[i];
-
-//      //make points at which solution needs to interpolated
-//      std::vector<double> interpolation_points_1D, interpolation_values_1D;
-//      double factor = 2;
-//      interpolation_points_1D.push_back(0);
-//      for (double x = 0.25; x < 2*sigma; x*=factor)
-//        interpolation_points_1D.push_back(x);
-//      interpolation_points_1D.push_back(2*sigma);
-
-//      for (auto y: interpolation_points_1D)
-//        interpolation_values_1D.push_back(1-y*y);
-
-//      //construct enrichment function and push
-//      SplineEnrichmentFunction<dim> func(this->points_enrichments[i],
-//                                   this->radii_enrichments[i],
-//                                   interpolation_points_1D,
-//                                   interpolation_values_1D);
-//      this->vec_enrichments.push_back(func);
-//    }
 }
 
 
@@ -235,30 +197,34 @@ int main (int argc,char **argv)
    * values are checked.
    */
 
+
+
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPILogInitAll all;
   {
-    Problem<dim> step_test
-    (4,   //domain size
-     1,   //cube shape
-     2,   //global refinement
-     0,
-     1,   //fe base degree
-     1,   //fe enriched degree
-     10000, //max iterations
-     1e-8,  //tolerance
-     "1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))",
-     "0",
-     "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
-     "0",
-     "",
-     true,
-     15,   //patches
-     9,   //debug level
-     1,   //num enrichments
-    {Point<dim>()}, //enrichment points
-    {1},    //predicate radii
-    {0.05}); //sigmas
+    ParameterCollection prm    (2,  //dimension
+                                4,   //domain size
+                                1,   //cube shape
+                                2,   //global refinement
+                                0,
+                                1,   //fe base degree
+                                1,   //fe enriched degree
+                                10000, //max iterations
+                                1e-8,  //tolerance
+                                "1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))",
+                                "0",
+                                "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
+                                "0",
+                                "",
+                                true,
+                                15,   //patches
+                                9,   //debug level
+                                1,   //num enrichments
+                               {0,0}, //enrichment points
+                               {1},    //predicate radii
+                               {0.05}); //sigmas
+
+    Problem<dim> step_test(prm);
 
     step_test.run_pre_solution_steps();
   }

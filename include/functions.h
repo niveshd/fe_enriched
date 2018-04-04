@@ -73,11 +73,11 @@ namespace Step1
 
   template <int dim>
   inline
-  double SigmaFunction<dim>::value (const Point<dim> &p,
-                                    const unsigned int   component) const
+  double SigmaFunction<dim>::value (const Point<dim>    &p,
+                                    const unsigned int  component) const
   {
     const Point<dim> d(p - center);
-    return func.value(d);
+    return func.value(d, component);
   }
 
 
