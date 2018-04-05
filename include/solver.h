@@ -684,6 +684,8 @@ namespace Step1
     for (unsigned int i=0; i < q_collection.size(); ++i)
       q_collection_face.push_back(QGauss<dim-1>(q_collection[i].size()));
 
+    std::cout << dim << std::endl;
+
     KellyErrorEstimator<dim>::estimate (dof_handler,
                                         q_collection_face,
                                         typename FunctionMap<dim>::type(),
@@ -763,7 +765,6 @@ namespace Step1
         data_out.write_vtk (output);
         output.close();
       }
-
     pcout << "...finished output results" << std::endl;
   }
 

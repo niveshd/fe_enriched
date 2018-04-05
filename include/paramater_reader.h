@@ -363,13 +363,12 @@ void ParameterCollection::print()
             << "Number of enrichments: " << n_enrichments << std::endl;
 
   std::cout << "Enrichment points : " << std::endl;
-  for (unsigned int i = 0; i < points_enrichments.size(); ++i)
+  for (unsigned int i = 0; i < points_enrichments.size(); i = i+dim)
     {
       for (int d = 0; d < dim; ++d)
         std::cout << points_enrichments[i+d] << " ";
 
       std::cout << std::endl;
-      i = i + dim;
     }
 
   std::cout << "Enrichment radii : " << std::endl;
