@@ -70,28 +70,24 @@ class SplineEnrichmentFunction : public Function<dim>
 {
 public:
   SplineEnrichmentFunction(const Point<dim> &origin,
-                           const double     &sigma,
                            const std::vector<double> &interpolation_points_1d,
                            const std::vector<double> &interpolation_values_1d)
     : Function<dim>(1),
       origin(origin),
-      sigma(sigma),
       interpolation_points(interpolation_points_1d),
       interpolation_values(interpolation_values_1d),
       cspline(interpolation_points, interpolation_values)
   {}
 
-  //To be used only for debugging
+  //TODO remove
   SplineEnrichmentFunction(const Point<dim> &origin,
-                           const double &sigma,
                            const double &constant)
     :
     Function<dim>(1),
     origin(origin),
-    sigma(sigma),
     interpolation_points({origin[0],
-                         origin[0]+25*sigma,
-                         origin[0]+50*sigma
+                         origin[0]+25*1,
+                         origin[0]+50*1
   }),
   interpolation_values({constant,
                         constant,
@@ -105,7 +101,6 @@ public:
     :
     Function<dim>(1),
     origin(other.origin),
-    sigma(other.sigma),
     interpolation_points(other.interpolation_points),
     interpolation_values(other.interpolation_values),
     cspline(interpolation_points,interpolation_values)
@@ -116,7 +111,6 @@ public:
     :
     Function<dim>(1),
     origin(other.origin),
-    sigma(other.sigma),
     interpolation_points(other.interpolation_points),
     interpolation_values(other.interpolation_values),
     cspline(interpolation_points,interpolation_values)
@@ -150,11 +144,6 @@ private:
    * origin
    */
   const Point<dim> origin;
-  /**
-   * enrichment radius
-   */
-  const double sigma;
-  //
   std::vector<double> interpolation_points;
   std::vector<double> interpolation_values;
   //enrichment function as CSpline based on radius

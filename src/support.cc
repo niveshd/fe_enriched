@@ -135,15 +135,9 @@ namespace ColorEnriched
                              (std::pair <unsigned int, unsigned int> (predicate_colors[i], i));
 
                   color_list.insert(predicate_colors[i]);
-
-                  //TODO check if single color doesn't have multiple predicates!
-
-                  //              pcout << " - " << predicate_colors[i] << "(" << i << ")" ;
                 }
             }
 
-          //         if (!color_list.empty())
-          //                 pcout << std::endl;
 
           /*
            * check if color combination is already added.
@@ -159,7 +153,6 @@ namespace ColorEnriched
                 {
                   if (fe_sets[j] ==  color_list)
                     {
-                      //                     pcout << "color combo set found at " << j << std::endl;
                       found=true;
                       cell->set_active_fe_index(j);
                       break;
@@ -171,12 +164,6 @@ namespace ColorEnriched
                 {
                   fe_sets.push_back(color_list);
                   cell->set_active_fe_index(fe_sets.size()-1);
-                  /*
-                  num_colors+1 = (num_colors+1 > color_list.size())?
-                                         num_colors+1:
-                                         color_list.size();
-                  //                 pcout << "color combo set pushed at " << fe_sets.size()-1 << std::endl;
-                  */
                 }
             }
           ++map_index;
@@ -249,27 +236,23 @@ namespace ColorEnriched
       };
 
       //loop through color sets ignore starting empty sets
-      //TODO remove volatile
-      for (volatile unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
+      for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
         {
           std::vector<const FiniteElement<dim> *> vec_fe_enriched (num_colors, &fe_nothing);
           EnrichmentFunctionArray<dim> functions(num_colors, {dummy_function});
 
-          // FIXME: remove
-          std::set<unsigned int> set_components;
           for (auto it=fe_sets[color_set_id].begin();
                it != fe_sets[color_set_id].end();
                ++it)
             {
               const unsigned int ind = *it-1;
-              set_components.insert(ind);
 
               AssertIndexRange(ind, vec_fe_enriched.size());
+              AssertIndexRange(ind, functions.size());
+              AssertIndexRange(ind, color_enrichments.size());
 
               vec_fe_enriched[ind] = &fe_enriched;
 
-              AssertIndexRange(ind, functions.size());
-              AssertIndexRange(ind, color_enrichments.size());
 
               //color_set_id'th color function is (color_set_id-1) element of color wise enrichments
               functions[ind].assign(1,color_enrichments[ind]);
@@ -280,13 +263,6 @@ namespace ColorEnriched
           FE_Enriched<dim> fe_component(&fe_base,
                                         vec_fe_enriched,
                                         functions);
-
-          {
-            //TODO delete after testing
-            ConditionalOStream pcout
-            (std::cout, (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0));
-          }
-
           fe_collection.push_back (fe_component);
         }
     }
@@ -349,7 +325,6 @@ namespace ColorEnriched
                                                    cellwise_color_predicate_map,
                                                    color_enrichments);
 
-    //TODO clear fe_collection such that multiple calls will work
     internal::make_fe_collection_from_colored_enrichments (num_colors,
                                                            fe_sets,
                                                            color_enrichments,
@@ -357,6 +332,13 @@ namespace ColorEnriched
                                                            fe_enriched,
                                                            fe_nothing,
                                                            fe_collection);
+  }
+
+
+  template<int dim>
+  hp::FECollection<dim> helper<dim>::get_fe_collection() const
+  {
+    return fe_collection;
   }
 }
 

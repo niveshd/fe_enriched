@@ -160,19 +160,12 @@ namespace ColorEnriched
            const FE_Q<dim> &fe_enriched,
            const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
            const std::vector<SplineEnrichmentFunction<dim>> &vec_enrichments);
-
-    //TODO need initialize function
-
     void set(hp::DoFHandler<dim> &dof_handler);
-    hp::FECollection<dim> get_fe_collection() const
-    {
-      return fe_collection;
-    }
+    hp::FECollection<dim> get_fe_collection() const;
 
   private:
     using cell_function = std::function<const Function<dim>*
                           (const typename Triangulation<dim>::cell_iterator &)>;
-
     hp::FECollection<dim> fe_collection;
     const FE_Q<dim> &fe_base;
     const FE_Q<dim> &fe_enriched;

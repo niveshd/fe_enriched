@@ -19,7 +19,7 @@
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-#include <deal.II/lac/solver_cg.h>  //TODO REMOVE
+#include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/numerics/data_out.h>
@@ -35,18 +35,31 @@ using namespace dealii;
 
 namespace Step1
 {
-//TODO remove template and make it for 1d
-  template <int dim>
-  class EstimateEnrichmentFunction : public Function<dim>
+  /*
+   * EstimateEnrichmentFunction is used to estimate enrichment function by
+   * solveing a 1D poisson problem with right hand side and boundary
+   * expression provided as a string of single variable 'x', to be
+   * interpreted as distance from @par center.
+   *
+   * Eg: For a 2D poisson problem with right hand side expression R and boundary
+   * expression B given by functions R( x^2 + y^2) and B( x^2 + y^2 ), an
+   * equivalent radial problem can be solved using this class by setting
+   * @par rhs_expr = R( x^2)
+   * @par boundary_expr = B (x^2)
+   * Note that the original poisson problem is defined by right hand side
+   * and boundary expression dependent on square of distance (x^2 + y^2)
+   * from center.
+   */
+  class EstimateEnrichmentFunction
   {
   public:
-    EstimateEnrichmentFunction (const Point<dim> &center,
+    EstimateEnrichmentFunction (const Point<1> &center,
                                 const double &domain_size,
                                 const double &sigma,
                                 const std::string &rhs_expr,
                                 const std::string &boundary_expr,
                                 const double &refinement=11);
-    EstimateEnrichmentFunction  (const Point<dim> &center,
+    EstimateEnrichmentFunction  (const Point<1> &center,
                                  const double &left_bound,
                                  const double &right_bound,
                                  const double &sigma,
@@ -58,7 +71,7 @@ namespace Step1
     void evaluate_at_x_values
     (std::vector< double >  &interpolation_points,
      std::vector< double >   &interpolation_values);
-    double value (const Point<dim> &p,
+    double value (const Point<1> &p,
                   const unsigned int &component = 0);
   private:
     void make_grid ();
@@ -67,7 +80,7 @@ namespace Step1
     void solve ();
     void refine_grid();
     void output_results () const;
-    Point<dim> center;
+    Point<1> center;
     double domain_size;
     double left_bound, right_bound;
     double sigma;
@@ -77,26 +90,24 @@ namespace Step1
   public:
     unsigned int debug_level;
   private:
-    Triangulation<dim>   triangulation;
+    Triangulation<1>   triangulation;
     unsigned int refinement;
-    FE_Q<dim>            fe;
-    DoFHandler<dim>      dof_handler;
+    FE_Q<1>            fe;
+    DoFHandler<1>      dof_handler;
     SparsityPattern      sparsity_pattern;
     SparseMatrix<double> system_matrix;
     Vector<double>       solution;
     Vector<double>       system_rhs;
   };
 
-  template <int dim>
-  EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
-  (const Point<dim> &center,
+  EstimateEnrichmentFunction::EstimateEnrichmentFunction
+  (const Point<1> &center,
    const double &domain_size,
    const double &sigma,
    const std::string &rhs_expr,
    const std::string &boundary_expr,
    const double &refinement)
     :
-    Function<dim>(1),
     center(center),
     domain_size(domain_size),
     sigma(sigma),
@@ -107,14 +118,13 @@ namespace Step1
     fe (1),
     dof_handler (triangulation)
   {
-    AssertDimension(dim,1);
     left_bound = center[0] - domain_size/2;
     right_bound = center[0] + domain_size/2;
   }
 
-  template <int dim>
-  EstimateEnrichmentFunction<dim>::EstimateEnrichmentFunction
-  (const Point<dim> &center,
+
+  EstimateEnrichmentFunction::EstimateEnrichmentFunction
+  (const Point<1> &center,
    const double &left_bound,
    const double &right_bound,
    const double &sigma,
@@ -122,7 +132,6 @@ namespace Step1
    const std::string &boundary_expr,
    const double &refinement)
     :
-    Function<dim>(1),
     center(center),
     left_bound(left_bound),
     right_bound(right_bound),
@@ -134,22 +143,20 @@ namespace Step1
     fe (1),
     dof_handler (triangulation)
   {
-    AssertDimension(dim,1);
     domain_size = right_bound - left_bound;
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::make_grid ()
+
+  void EstimateEnrichmentFunction::make_grid ()
   {
-    //TODO domain 50 times original radius enough?
     GridGenerator::hyper_cube (triangulation,
                                left_bound,
                                right_bound);
     triangulation.refine_global (refinement);
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::setup_system ()
+
+  void EstimateEnrichmentFunction::setup_system ()
   {
     dof_handler.distribute_dofs (fe);
     DynamicSparsityPattern dsp(dof_handler.n_dofs());
@@ -160,15 +167,15 @@ namespace Step1
     system_rhs.reinit (dof_handler.n_dofs());
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::assemble_system ()
+
+  void EstimateEnrichmentFunction::assemble_system ()
   {
-    QGauss<dim>  quadrature_formula(2);
-    SigmaFunction<dim> rhs;
+    QGauss<1>  quadrature_formula(2);
+    SigmaFunction<1> rhs;
     rhs.initialize(center,sigma,rhs_expr);
-    FEValues<dim> fe_values (fe, quadrature_formula,
-                             update_values   | update_gradients |
-                             update_quadrature_points | update_JxW_values);
+    FEValues<1> fe_values (fe, quadrature_formula,
+                           update_values   | update_gradients |
+                           update_quadrature_points | update_JxW_values);
     const unsigned int   dofs_per_cell = fe.dofs_per_cell;
     const unsigned int   n_q_points    = quadrature_formula.size();
     FullMatrix<double>   cell_matrix (dofs_per_cell, dofs_per_cell);
@@ -183,7 +190,6 @@ namespace Step1
         rhs.value_list (fe_values.get_quadrature_points(),
                         rhs_values);
 
-        AssertDimension(dim,1);
         for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
           {
             double radius = center.distance(fe_values.quadrature_point(q_index));
@@ -213,7 +219,7 @@ namespace Step1
           }
       }
     std::map<types::global_dof_index,double> boundary_values;
-    SigmaFunction<dim> boundary_func;
+    SigmaFunction<1> boundary_func;
     boundary_func.initialize(center,
                              sigma,
                              boundary_expr);
@@ -222,8 +228,6 @@ namespace Step1
                                               0,
                                               boundary_func,
                                               boundary_values);
-    //TODO find a better way to do this!
-    AssertDimension(dim,1);   //Here we assume a 1D problem
     VectorTools::interpolate_boundary_values (dof_handler,
                                               1,
                                               boundary_func,
@@ -235,8 +239,8 @@ namespace Step1
                                         system_rhs);
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::solve ()
+
+  void EstimateEnrichmentFunction::solve ()
   {
     SolverControl           solver_control (50000,1e-12,false,false);
     SolverCG<>              solver (solver_control);
@@ -244,25 +248,25 @@ namespace Step1
                   PreconditionIdentity());
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::refine_grid ()
+
+  void EstimateEnrichmentFunction::refine_grid ()
   {
     Vector<float> estimated_error_per_cell (triangulation.n_active_cells());
-    KellyErrorEstimator<dim>::estimate (dof_handler,
-                                        QGauss<dim-1>(3),
-                                        typename FunctionMap<dim>::type(),
-                                        solution,
-                                        estimated_error_per_cell);
+    KellyErrorEstimator<1>::estimate (dof_handler,
+                                      QGauss<1-1>(3),
+                                      typename FunctionMap<1>::type(),
+                                      solution,
+                                      estimated_error_per_cell);
     GridRefinement::refine_and_coarsen_fixed_number (triangulation,
                                                      estimated_error_per_cell,
                                                      0.2, 0.01);
     triangulation.execute_coarsening_and_refinement ();
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::output_results () const
+
+  void EstimateEnrichmentFunction::output_results () const
   {
-    DataOut<dim> data_out;
+    DataOut<1> data_out;
     data_out.attach_dof_handler (dof_handler);
     data_out.add_data_vector (solution, "solution");
     data_out.build_patches ();
@@ -270,11 +274,11 @@ namespace Step1
     data_out.write_vtk (output);
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::run ()
+
+  void EstimateEnrichmentFunction::run ()
   {
     if (debug_level >= 1)
-      std::cout << "Solving problem in dim.: " << dim
+      std::cout << "Solving problem in 1.: " << 1
                 << " with center: " << center
                 << ", size: " << domain_size
                 << ", sigma: " << sigma
@@ -320,8 +324,8 @@ namespace Step1
       output_results ();
   }
 
-  template <int dim>
-  void EstimateEnrichmentFunction<dim>::evaluate_at_x_values
+
+  void EstimateEnrichmentFunction::evaluate_at_x_values
   (std::vector< double >  &interpolation_points,
    std::vector< double >   &interpolation_values)
   {
@@ -334,21 +338,21 @@ namespace Step1
     for (unsigned int i=0; i!=interpolation_values.size(); ++i)
       {
         double value = VectorTools::point_value(dof_handler, solution,
-                                                Point<dim>(interpolation_points[i]));
+                                                Point<1>(interpolation_points[i]));
         interpolation_values[i] = value;
       }
   }
 
-  template <int dim>
-  double EstimateEnrichmentFunction<dim>::value
-  (const Point<dim> &p,
+
+  double EstimateEnrichmentFunction::value
+  (const Point<1> &p,
    const unsigned int &component)
   {
     return VectorTools::point_value(dof_handler, solution, p);
   }
 
-  template <int dim>
-  EstimateEnrichmentFunction<dim>::~EstimateEnrichmentFunction()
+
+  EstimateEnrichmentFunction::~EstimateEnrichmentFunction()
   {
     triangulation.clear();
   }

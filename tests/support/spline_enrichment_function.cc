@@ -102,14 +102,14 @@ void Problem<dim>::make_enrichment_functions ()
       double center = 0;
       double domain_size = 100;
       double sigma = 0.05;
-      Step1::EstimateEnrichmentFunction<1> problem_1d
+      Step1::EstimateEnrichmentFunction radial_problem
       (Point<1>(center),
        domain_size,
        sigma,
        "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
        "0",
        11);
-      problem_1d.run();
+      radial_problem.run();
 
 
       //make points at which solution needs to interpolated
@@ -125,7 +125,7 @@ void Problem<dim>::make_enrichment_functions ()
         interpolation_points_1D.push_back(p);
       interpolation_points_1D.push_back(right_bound);
 
-      problem_1d.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+      radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
       this->pcout << "solved problem with "
                   << "(x, sigma): "
                   << center << ", " << sigma << std::endl;
@@ -135,7 +135,6 @@ void Problem<dim>::make_enrichment_functions ()
       Point<dim> p;
       this->prm.set_enrichment_point(p,i);
       SplineEnrichmentFunction<dim> func(p,
-                                         this->prm.radii_predicates[i],
                                          interpolation_points_1D,
                                          interpolation_values_1D);
       this->vec_enrichments.push_back(func);
@@ -150,7 +149,7 @@ void Problem<dim>::make_enrichment_functions ()
         for (double x=0; x < right_bound; x+=h)
           {
             double spline_value = func.value(Point<2> (x,0));
-            double solution_value = problem_1d.value(Point<1> (x));
+            double solution_value = radial_problem.value(Point<1> (x));
             double relative_error = (spline_value != 0) ? (spline_value-solution_value)/spline_value :
                                     0;
             file << x

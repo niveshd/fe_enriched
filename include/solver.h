@@ -402,11 +402,11 @@ namespace Step1
          */
         if (prm.radii_predicates[i] != 0)
           {
-            EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                         size,
-                                                         sigma,
-                                                         prm.rhs_radial_problem,
-                                                         prm.boundary_radial_problem);
+            EstimateEnrichmentFunction radial_problem(Point<1>(center),
+                                                      size,
+                                                      sigma,
+                                                      prm.rhs_radial_problem,
+                                                      prm.boundary_radial_problem);
             radial_problem.debug_level = prm.debug_level; //print output
             radial_problem.run();
             pcout << "solved problem with "
@@ -432,7 +432,6 @@ namespace Step1
             Point<dim> p;
             prm.set_enrichment_point(p,i);
             SplineEnrichmentFunction<dim> func(p,
-                                               prm.radii_predicates[i],
                                                interpolation_points_1D,
                                                interpolation_values_1D);
             vec_enrichments.push_back(func);
@@ -440,7 +439,7 @@ namespace Step1
         else
           {
             pcout << "Dummy function added at " << i << std::endl;
-            SplineEnrichmentFunction<dim> func(Point<dim>(),1,0);
+            SplineEnrichmentFunction<dim> func(Point<dim>(),0);
             vec_enrichments.push_back(func);
           }
       }
@@ -865,6 +864,7 @@ namespace Step1
                                                      difference_per_cell,
                                                      VectorTools::H1_norm);
       }
+    //TODO remove this
     else if (prm.estimate_exact_soln)
       {
         //Not very accurate estimation
@@ -885,11 +885,11 @@ namespace Step1
         double size = prm.size;
         //Ensure the radial problem is solved for diagonal incase shape is square
         if (prm.shape==1) size = size*sqrt(dim);
-        EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                     size,
-                                                     sigma,
-                                                     prm.rhs_radial_problem,
-                                                     prm.boundary_radial_problem);
+        EstimateEnrichmentFunction radial_problem(Point<1>(center),
+                                                  size,
+                                                  sigma,
+                                                  prm.rhs_radial_problem,
+                                                  prm.boundary_radial_problem);
         radial_problem.debug_level = prm.debug_level; //print output
         radial_problem.run();
         pcout << "solving radial problem for error calculation "
@@ -913,7 +913,6 @@ namespace Step1
 
         //construct enrichment function and make spline function
         SplineEnrichmentFunction<dim> exact_solution(Point<dim>(),
-                                                     1, //TODO is not need. remove
                                                      interpolation_points_1D,
                                                      interpolation_values_1D);
 

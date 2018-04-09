@@ -62,7 +62,7 @@ int main (int argc, char **argv)
 
 
       //solve 1d problem
-      Step1::EstimateEnrichmentFunction<1> problem_1d
+      Step1::EstimateEnrichmentFunction problem_1d
       (Point<1>(center[i]),
        left_bound[i],
        right_bound[i],
