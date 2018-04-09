@@ -3,7 +3,7 @@ subsection geometry
     set size = 8
     set shape = 1
     set Global refinement = 4
-    set cycles = 3
+    set cycles = 2
 end
 
 subsection solver
@@ -24,7 +24,7 @@ end
 
 subsection output
     set patches = 1
-    set debug level = 3
+    set debug level = 1
 end
 
 #end-of-dealii parser
@@ -33,11 +33,11 @@ end
 5
 
 #points for enrichment functions/predicates
-2 2 2
+1.5 1.5 1.5
 1 1 1
 0 0 0
--2 -2 -2
 -1 -1 -1
+1 -1 -1
 
 
 #radii for predicates

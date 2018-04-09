@@ -50,6 +50,7 @@
 #include "helper.h"
 
 
+
 template <int dim>
 void plot_shape_function
 (hp::DoFHandler<dim> &dof_handler,
@@ -281,12 +282,22 @@ namespace Step1
   }
 
 
-
+  /*
+   * Construct basic grid, vector of predicate functions and
+   * right hand side function of the problem.
+   */
   template <int dim>
   void LaplaceProblem<dim>::initialize()
   {
     pcout << "...Start initializing" << std::endl;
-    //set up basic grid
+
+    /*
+     * set up basic grid which is a hyper cube or hyper ball based on
+     * parameter file. Refine as per the global refinement value in the
+     * parameter file.
+     *
+     * TODO change prm.shape to a enumerator and remove else condition
+     */
     if (prm.shape == 1)
       GridGenerator::hyper_cube (triangulation, -prm.size/2.0, prm.size/2.0);
     else if (prm.shape == 0)
@@ -299,16 +310,26 @@ namespace Step1
       }
     else
       AssertThrow(false,ExcMessage("Shape not implemented."));
-
     triangulation.refine_global (prm.global_refinement);
 
-    Assert(prm.points_enrichments.size()/dim ==prm.n_enrichments &&
-           prm.radii_predicates.size()==prm.n_enrichments &&
-           prm.sigmas.size()==prm.n_enrichments,
+    /*
+     * Ensure that num of radii, sigma and focal points of enrichment domains
+     * provided matches the number of predicates. Since focal points of
+     * enrichment domains are stored as vector of numbers, the dimension of
+     * points_enrichments is dim times the n_enrichments in prm file.
+     */
+    Assert(prm.points_enrichments.size()/dim == prm.n_enrichments &&
+           prm.radii_predicates.size() == prm.n_enrichments &&
+           prm.sigmas.size() == prm.n_enrichments,
            ExcMessage
            ("Number of enrichment points, predicate radii and sigmas should be equal"));
 
-    //initialize vector of predicate functions, f: assign cell --> 1 or 0
+    /*
+     * Construct vector of predicate functions, where a function at index i
+     * returns true for a given cell if it belongs to enrichment domain i.
+     * The decision is based on cell center being at a distance within radius
+     * of the domain from focal point of the domain.
+     */
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
         Point<dim> p;
@@ -317,7 +338,14 @@ namespace Step1
                                                            prm.radii_predicates[i]) );
       }
 
-    //set a vector of right hand side functions
+    /*
+     * Construct a vector of right hand side functions where the actual right hand
+     * side of problem is evaluated through summation of contributions from each
+     * of the functions in the vector. Each function i at a given point is evaluated
+     * with respect to point's position {x_i, y_i, z_i} relative to focal point of
+     * enrichment domain i. The value is then a function of x_i, y_i, z_i and sigmas[i]
+     * given by the rhs_value_expr[i] in parameter file.
+     */
     vec_rhs.resize(prm.n_enrichments);
     for (unsigned int i=0; i != prm.n_enrichments; ++i)
       {
@@ -331,21 +359,123 @@ namespace Step1
     pcout << "...finish initializing" << std::endl;
   }
 
+
+
+  /*
+   * Create a enrichment function associated with each enrichment domain.
+   * Here the approximate solution is assumed to be only dependent on
+   * distance (r) from the focal point of enrichment domain. This is
+   * true for poisson problem (a linear PDE) provided the right hand side is a
+   * radial function and drops exponentially for points farther from focal
+   * point of enrichment domain.
+   */
+  template <int dim>
+  void LaplaceProblem<dim>::make_enrichment_functions()
+  {
+    pcout << "!!! Make enrichment function called" << std::endl;
+
+    for (unsigned int i=0; i<vec_predicates.size(); ++i)
+      {
+        /*
+         * Formulate a 1d/radial problem with center and size appropriate
+         * to cover the enrichment domain. The function determining
+         * right hand side and boundary value of the problem is provided in
+         * parameter file. The sigma governing this function is the same as
+         * sigma provided for the corresponding enrichment domain and predicate
+         * function for which the enrichment function is to be estimated.
+         *
+         * The center is 0 since the function is evaluated with respect to
+         * relative position from focal point anyway.
+         *
+         * For hexahedral cells, dimension can extend upto sqrt(3) < 2 times!
+         * So take a factor of 4 as size of the problem. This ensures that
+         * enrichment function can be evaluated at all points in the enrichment
+         * domain
+         */
+        double center = 0;
+        double sigma = prm.sigmas[i];
+        double size = prm.radii_predicates[i]*4;
+
+        /*
+         * Radial problem is solved only when enrichment domain has a positive
+         * radius and hence non-empty domain.
+         */
+        if (prm.radii_predicates[i] != 0)
+          {
+            EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
+                                                         size,
+                                                         sigma,
+                                                         prm.rhs_radial_problem,
+                                                         prm.boundary_radial_problem);
+            radial_problem.debug_level = prm.debug_level; //print output
+            radial_problem.run();
+            pcout << "solved problem with "
+                  << "x and sigma : "
+                  << center << ", " << sigma << std::endl;
+
+            //make points at which solution needs to interpolated
+            std::vector<double> interpolation_points_1D, interpolation_values_1D;
+            double radius = size/2; //only half side is important
+            unsigned int n = 5;
+            double right_bound(center + radius);
+            double h = radius/n;
+
+            for (double p = center; p < right_bound; p+=h)
+              interpolation_points_1D.push_back(p);
+            interpolation_points_1D.push_back(right_bound);
+
+            //add enrichment function only when predicate radius is non-zero
+            radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+
+
+            //construct enrichment function and push
+            Point<dim> p;
+            prm.set_enrichment_point(p,i);
+            SplineEnrichmentFunction<dim> func(p,
+                                               prm.radii_predicates[i],
+                                               interpolation_points_1D,
+                                               interpolation_values_1D);
+            vec_enrichments.push_back(func);
+          }
+        else
+          {
+            pcout << "Dummy function added at " << i << std::endl;
+            SplineEnrichmentFunction<dim> func(Point<dim>(),1,0);
+            vec_enrichments.push_back(func);
+          }
+      }
+  }
+
+
+
+  /*
+   * Since each enrichment domain has different enrichment function
+   * associated with it and the cells common to different enrichment
+   * domains need to treated differently, we use helper function in
+   * ColorEnriched namespace to construct finite element space and necessary
+   * data structures required by it. The helper function is also used to
+   * set FE indices of dof handler cells. We also set the cell with a unique
+   * material id for now, which is used to map cells with a pairs of
+   * color and corresponding enrichment function. All this is internally
+   * used to figure out the correct set of enrichment functions to be used
+   * for a cell.
+   *
+   * The quadrature point collection, with size equal to FE collection
+   * is also constructed here.
+   */
   template <int dim>
   void LaplaceProblem<dim>::build_fe_space()
   {
     pcout << "...building fe space" << std::endl;
 
     make_enrichment_functions();
-
     static ColorEnriched::helper<dim> fe_space(fe_base,
                                                fe_enriched,
                                                vec_predicates,
                                                vec_enrichments);
     fe_space.set(dof_handler);
     fe_collection = fe_space.get_fe_collection();
-
-    pcout << "size of fe collection" << fe_collection.size() << std::endl;
+    pcout << "size of fe collection: " << fe_collection.size() << std::endl;
 
     if (prm.debug_level == 9)
       {
@@ -407,75 +537,11 @@ namespace Step1
 
     //q collections the same size as different material identities
     //TODO in parameter file
-    //TODO clear so that multiple runs will work
     q_collection.push_back(QGauss<dim>(4));
     for (unsigned int i=1; i < fe_collection.size(); ++i)
       q_collection.push_back(QGauss<dim>(10));
 
     pcout << "...building fe space" << std::endl;
-  }
-
-
-
-  template <int dim>
-  void LaplaceProblem<dim>::make_enrichment_functions()
-  {
-    pcout << "!!! Make enrichment function called" << std::endl;
-
-    for (unsigned int i=0; i<vec_predicates.size(); ++i)
-      {
-        //formulate a 1d/radial problem with x coordinate and radius (i.e sigma)
-        double center = 0;
-        double sigma = prm.sigmas[i];
-        //Actual size is twice the radius. For hexahedral cells, dimension can
-        //extend upto sqrt(3) times! so take a factor of 4 in total.
-        double size = prm.radii_predicates[i]*4;
-
-        if (prm.radii_predicates[i] != 0)
-          {
-            EstimateEnrichmentFunction<1> radial_problem(Point<1>(center),
-                                                         size,
-                                                         sigma,
-                                                         prm.rhs_radial_problem,
-                                                         prm.boundary_radial_problem);
-            radial_problem.debug_level = prm.debug_level; //print output
-            radial_problem.run();
-            pcout << "solved problem with "
-                  << "(x, sigma): "
-                  << center << ", " << sigma << std::endl;
-
-            //make points at which solution needs to interpolated
-            std::vector<double> interpolation_points_1D, interpolation_values_1D;
-            double radius = size/2; //only half side is important
-            unsigned int n = 5;
-            double right_bound(center + radius);
-            double h = radius/n;
-
-            for (double p = center; p < right_bound; p+=h)
-              interpolation_points_1D.push_back(p);
-            interpolation_points_1D.push_back(right_bound);
-
-            //add enrichment function only when predicate radius is non-zero
-
-            radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
-
-
-            //construct enrichment function and push
-            Point<dim> p;
-            prm.set_enrichment_point(p,i);
-            SplineEnrichmentFunction<dim> func(p,
-                                               prm.radii_predicates[i],
-                                               interpolation_points_1D,
-                                               interpolation_values_1D);
-            vec_enrichments.push_back(func);
-          }
-        else
-          {
-            pcout << "Dummy function added at " << i << std::endl;
-            SplineEnrichmentFunction<dim> func(Point<dim>(),1,0);
-            vec_enrichments.push_back(func);
-          }
-      }
   }
 
 
@@ -668,11 +734,7 @@ namespace Step1
     return solver_control.last_step();
   }
 
-  template <int dim>
-  LaplaceProblem<dim>::~LaplaceProblem()
-  {
-    dof_handler.clear ();
-  }
+
 
   template <int dim>
   void LaplaceProblem<dim>::refine_grid ()
@@ -682,9 +744,7 @@ namespace Step1
 
     hp::QCollection<dim-1> q_collection_face;
     for (unsigned int i=0; i < q_collection.size(); ++i)
-      q_collection_face.push_back(QGauss<dim-1>(q_collection[i].size()));
-
-    std::cout << dim << std::endl;
+      q_collection_face.push_back(QGauss<dim-1>(1));
 
     KellyErrorEstimator<dim>::estimate (dof_handler,
                                         q_collection_face,
@@ -1022,7 +1082,7 @@ namespace Step1
         if (this_mpi_process==0)
           {
             pcout << "calculating L2 norm of soln" << std::endl;
-            double norm_soln_new, norm_rel_change_new;
+            double norm_soln_new(0), norm_rel_change_new(0);
             Vector<float> difference_per_cell (triangulation.n_active_cells());
             VectorTools::integrate_difference (dof_handler,
                                                localized_solution,
@@ -1035,13 +1095,15 @@ namespace Step1
                                                               VectorTools::H1_norm);
             //relative change can only be calculated for cycle > 0
             if (cycle > 0)
-              norm_rel_change_new = std::abs((norm_soln_new - norm_soln_old)/norm_soln_old);
-
-            //moniter relative change of norm in later stages
-            if (cycle > 3)
               {
+                norm_rel_change_new = std::abs((norm_soln_new - norm_soln_old)/norm_soln_old);
                 pcout << "relative change of solution norm "
                       << norm_rel_change_new << std::endl;
+              }
+
+            //moniter relative change of norm in later stages
+            if (cycle > 1)
+              {
                 deallog << (norm_rel_change_new < norm_rel_change_old)
                         << std::endl;
               }
@@ -1069,6 +1131,14 @@ namespace Step1
         pcout << "...step run complete" << std::endl;
       }
     pcout << "...finished run problem" << std::endl;
+  }
+
+
+
+  template <int dim>
+  LaplaceProblem<dim>::~LaplaceProblem()
+  {
+    dof_handler.clear ();
   }
 }
 #endif

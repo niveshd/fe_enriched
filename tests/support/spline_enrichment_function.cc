@@ -220,9 +220,9 @@ int main (int argc,char **argv)
                                 15,   //patches
                                 9,   //debug level
                                 1,   //num enrichments
-                               {0,0}, //enrichment points
-                               {1},    //predicate radii
-                               {0.05}); //sigmas
+    {0,0}, //enrichment points
+    {1},    //predicate radii
+    {0.05}); //sigmas
 
     Problem<dim> step_test(prm);
 
