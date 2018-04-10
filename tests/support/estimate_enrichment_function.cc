@@ -67,20 +67,21 @@ int main (int argc, char **argv)
    * Evaluate value of the solution at the sample points
    * and approximate using a spline function
    *
-   * Divide domain into two regions, 0 to cut point;
-   * cut point to boundary. The first region is smaller
+   * Divide domain into two regions, center to center + cut point;
+   * center + cut point to boundary. The first region is smaller
    * but needs to have smaller step size to capture the variation.
    */
   std::vector<double> interpolation_points, interpolation_values;
   double cut_point = 3*sigma;
   unsigned int n1 = 15, n2 = 15;
   double radius = size/2;
+  double right_bound = center + radius;
   double h1 = cut_point/n1, h2 = (radius-cut_point)/n2;
-  for (double p = center; p < cut_point; p+=h1)
+  for (double p = center; p < center + cut_point; p+=h1)
     interpolation_points.push_back(p);
-  for (double p = cut_point; p < radius; p+=h2)
+  for (double p = center + cut_point; p < right_bound; p+=h2)
     interpolation_points.push_back(p);
-  interpolation_points.push_back(radius);
+  interpolation_points.push_back(right_bound);
   radial_problem.evaluate_at_x_values(interpolation_points,interpolation_values);
 
   Step1::SigmaFunction<1> exact_solution;

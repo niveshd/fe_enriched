@@ -414,26 +414,28 @@ namespace Step1
                   << center << ", " << sigma << std::endl;
 
             //make points at which solution needs to interpolated
-            std::vector<double> interpolation_points_1D, interpolation_values_1D;
-            double radius = size/2; //only half side is important
-            unsigned int n = 5;
-            double right_bound(center + radius);
-            double h = radius/n;
-
-            for (double p = center; p < right_bound; p+=h)
-              interpolation_points_1D.push_back(p);
-            interpolation_points_1D.push_back(right_bound);
+            std::vector<double> interpolation_points, interpolation_values;
+            double cut_point = 3*sigma;
+            unsigned int n1 = 15, n2 = 15;
+            double radius = size/2;
+            double right_bound = center + radius;
+            double h1 = cut_point/n1, h2 = (radius-cut_point)/n2;
+            for (double p = center; p < center + cut_point; p+=h1)
+              interpolation_points.push_back(p);
+            for (double p = center + cut_point; p < right_bound; p+=h2)
+              interpolation_points.push_back(p);
+            interpolation_points.push_back(right_bound);
 
             //add enrichment function only when predicate radius is non-zero
-            radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+            radial_problem.evaluate_at_x_values(interpolation_points,interpolation_values);
 
 
             //construct enrichment function and push
             Point<dim> p;
             prm.set_enrichment_point(p,i);
             SplineEnrichmentFunction<dim> func(p,
-                                               interpolation_points_1D,
-                                               interpolation_values_1D);
+                                               interpolation_points,
+                                               interpolation_values);
             vec_enrichments.push_back(func);
           }
         else
@@ -897,24 +899,24 @@ namespace Step1
               << center << ", " << sigma << std::endl;
 
         //make points at which solution needs to interpolated
-        std::vector<double> interpolation_points_1D, interpolation_values_1D;
+        std::vector<double> interpolation_points, interpolation_values;
         double cut_point = 1;
         unsigned int n1 = 10, n2 = 200;
         double right_bound = size/2;
         double h1 = cut_point/n1, h2 = (prm.size-cut_point)/n2;
         for (double p = center; p < cut_point; p+=h1)
-          interpolation_points_1D.push_back(p);
+          interpolation_points.push_back(p);
         for (double p = cut_point; p < right_bound; p+=h2)
-          interpolation_points_1D.push_back(p);
-        interpolation_points_1D.push_back(right_bound);
+          interpolation_points.push_back(p);
+        interpolation_points.push_back(right_bound);
 
-        radial_problem.evaluate_at_x_values(interpolation_points_1D,interpolation_values_1D);
+        radial_problem.evaluate_at_x_values(interpolation_points,interpolation_values);
 
 
         //construct enrichment function and make spline function
         SplineEnrichmentFunction<dim> exact_solution(Point<dim>(),
-                                                     interpolation_points_1D,
-                                                     interpolation_values_1D);
+                                                     interpolation_points,
+                                                     interpolation_values);
 
 
         VectorTools::integrate_difference (dof_handler,
