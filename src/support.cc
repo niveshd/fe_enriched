@@ -134,6 +134,9 @@ namespace ColorEnriched
                   auto ret = cellwise_color_predicate_map[map_index].insert
                              (std::pair <unsigned int, unsigned int> (predicate_colors[i], i));
 
+                  AssertThrow(ret.second == 1,
+                              ExcMessage("Only one enrichment function can be associated to a color"));
+
                   color_list.insert(predicate_colors[i]);
                 }
             }
