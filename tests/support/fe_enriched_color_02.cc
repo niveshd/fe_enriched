@@ -14,6 +14,13 @@
 // ---------------------------------------------------------------------
 
 
+//Test the function ColorEnriched::internal::color_predicates.
+//Check if the function correctly colors vector of predicates
+//using graph coloring.
+//
+//Two predicates are said to be connected if cells belonging to
+//different predicates touch each other.
+
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -48,32 +55,33 @@
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
 
+#include <map>
 #include "../tests.h"
-#include "support.h"
 #include "helper.h"
 
-#include <map>
-
 const unsigned int dim = 2;
+
 
 int main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
+  //Make basic grid
   Triangulation<dim>  triangulation;
   GridGenerator::hyper_cube (triangulation, -20, 20);
   triangulation.refine_global (4);
 
+  //check the coloring function on different set of predicates.
   std::vector<EnrichmentPredicate<dim>> vec_predicates;
   std::vector<unsigned int> predicate_colors;
-
   {
-    //case 1
+    //case 1: predicates are not connected
     vec_predicates.clear();
-    //connections between vec predicates : No connections
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
 
     predicate_colors.resize(vec_predicates.size());
 
@@ -88,11 +96,12 @@ int main(int argc, char **argv)
   }
 
   {
-    //case 2
+    //case 2: Two predicates that are connected.
     vec_predicates.clear();
-    //connections between vec predicates : 0-1 (overlap connection),
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
 
     predicate_colors.resize(vec_predicates.size());
 
@@ -107,15 +116,20 @@ int main(int argc, char **argv)
   }
 
   {
-    //case 3
-    vec_predicates.clear();
-    //connections between vec predicates : 0-1 (overlap connection),
+    //case 3: connections between predicates is as follows -
+    //0-1 (overlap connection),
     //3-4 (edge connection)
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
-    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(12.5,-12.5), 2) );
+    vec_predicates.clear();
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(7.5,-7.5), 2) );
+    vec_predicates.push_back
+    ( EnrichmentPredicate<dim>(Point<dim>(12.5,-12.5), 2) );
 
     predicate_colors.resize(vec_predicates.size());
 
@@ -128,6 +142,5 @@ int main(int argc, char **argv)
         deallog << i << std::endl;
       }
   }
-
   return 0;
 }

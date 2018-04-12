@@ -1,3 +1,19 @@
+// ---------------------------------------------------------------------
+//
+// Copyright (C) 2016 - 2017 by the deal.II authors
+//
+// This file is part of the deal.II library.
+//
+// The deal.II library is free software; you can use it, redistribute
+// it, and/or modify it under the terms of the GNU Lesser General
+// Public License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+// The full text of the license can be found in the file LICENSE at
+// the top level of the deal.II distribution.
+//
+// ---------------------------------------------------------------------
+
+
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/grid_generator.h>
@@ -37,35 +53,42 @@ int main (int argc, char **argv)
   MPILogInitAll all;
 //  deallog.precision(2);
 
-  std::vector<double> v_sigma = {2,0.5,0.05};
-  std::vector<double> v_coeff = {0.25,10,100};
-  double domain_size = 100;
+  double sigma = 0.05;
 
-  //make points at which solution needs to be evaluated
-  std::vector<double> interpolation_points, interpolation_values;
-  for (double x = -domain_size/2; x < domain_size/2; x+=0.1)
-    interpolation_points.push_back(x);
-  interpolation_points.push_back(domain_size/2);
-  interpolation_values.resize(interpolation_points.size());
+  //make vector determining the combinations used
+  std::vector<double> left_bound = {-50,-60,-70,-80};
+  std::vector<double> right_bound = {50,60,70,40};
+  std::vector<double> center = {0,0,0,0};
+  AssertDimension(left_bound.size(), center.size());
+  AssertDimension(left_bound.size(), right_bound.size());
 
-  for (unsigned int i=0; i!=v_sigma.size(); ++i)
+  for (unsigned int i=0; i!=center.size(); ++i)
     {
 
       //calculate vector of points at which solution needs to be interpolated
-      double sigma = v_sigma[i];
-      double coeff = v_coeff[i];
+      //make points at which solution needs to be evaluated
+      std::vector<double> interpolation_points, interpolation_values;
+      for (double x = left_bound[i];
+           x < right_bound[i];
+           x+=0.1)
+        interpolation_points.push_back(x);
+      interpolation_points.push_back(right_bound[i]);
+      interpolation_values.resize(interpolation_points.size());
 
 
 
       //solve 1d problem
       Step1::EstimateEnrichmentFunction problem_1d
-      (Point<1>(0),
-       domain_size,
+      (Point<1>(center[i]),
+       left_bound[i],
+       right_bound[i],
        sigma,
        "1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))",
        "0",
-       11);
-      std::cout << "Solving with sigma,coeff: " << sigma << "," << coeff << std::endl;
+       7);
+      std::cout << "Solving with size,origin: " << left_bound[i]
+                << "," << right_bound[i]
+                << "," << center[i] << std::endl;
       problem_1d.run();
 
       //evaluate solution at values
@@ -75,7 +98,9 @@ int main (int argc, char **argv)
 
       //print points as output with sigma and coefficient
       std::stringstream name;
-      name << "sigma" << sigma << ".csv";
+      name << "left_bound" << left_bound[i]
+           << "right_bound" << right_bound[i]
+           << "center" << center[i] << ".csv";
       std::ofstream file(name.str(), std::ios::out);
       file << "x value" << std::endl;
       for (unsigned int i=0; i!=interpolation_points.size(); ++i)

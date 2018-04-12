@@ -1,3 +1,6 @@
+#ifndef HELPER_H
+#define HELPER_H
+
 #include <set>
 #include <map>
 #include <vector>
@@ -153,10 +156,10 @@ namespace ColorEnriched
 
 
   template<int dim>
-  struct helper
+  struct Helper
   {
 
-    helper(const FE_Q<dim> &fe_base,
+    Helper(const FE_Q<dim> &fe_base,
            const FE_Q<dim> &fe_enriched,
            const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
            const std::vector<SplineEnrichmentFunction<dim>> &vec_enrichments);
@@ -180,3 +183,4 @@ namespace ColorEnriched
     std::vector <std::set<unsigned int>> fe_sets;
   };
 }
+#endif

@@ -13,6 +13,12 @@
 //
 // ---------------------------------------------------------------------
 
+/*
+ * Test function: ColorEnriched::internal
+ * ::make_fe_collection_from_colored_enrichments for a set of predicates.
+ *
+ * The function return FE_Collection which is then printed to test.
+ */
 
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
@@ -49,20 +55,20 @@
 #include <deal.II/lac/slepc_solver.h>
 
 #include "../tests.h"
-#include "support.h"
 #include "helper.h"
-
 #include <map>
 
 const unsigned int dim = 2;
 
 //uncomment when debugging
-// #define DATA_OUT_FE_ENRICHED
+//#define DATA_OUT_FE_ENRICHED
+
+unsigned int patches = 10;
 
 template <int dim>
 void plot_shape_function
 (hp::DoFHandler<dim> &dof_handler,
- unsigned int patches = 5)
+ unsigned int patches=5)
 {
   deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
@@ -127,34 +133,27 @@ int main(int argc, char **argv)
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
+  //Make basic grid
   Triangulation<dim>  triangulation;
   hp::DoFHandler<dim> dof_handler(triangulation);
   GridGenerator::hyper_cube (triangulation, -2, 2);
   triangulation.refine_global (2);
 
+  //Make predicates. Predicate 0 and 1 overlap.
   std::vector<EnrichmentPredicate<dim>> vec_predicates;
-  std::vector<unsigned int> predicate_colors;
-
-  //connections between vec predicates : 0-1 (overlap connection),
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
-
-  //vector of enrichment functions
-  std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
-  vec_enrichments.reserve( vec_predicates.size() );
-  for (unsigned int i=0; i<vec_predicates.size(); ++i)
-    {
-      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
-                                         10+i);  //constant function
-      vec_enrichments.push_back( func );
-    }
+  vec_predicates.push_back
+  ( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
+  vec_predicates.push_back
+  ( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
 
   //find colors for predicates
+  std::vector<unsigned int> predicate_colors;
   predicate_colors.resize(vec_predicates.size());
   unsigned int num_colors
     = ColorEnriched::internal::color_predicates
       (triangulation, vec_predicates, predicate_colors);
 
+  //Make required objects to call function set_cellwise_color_set_and_fe_index
   std::map<unsigned int,
       std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
   std::vector <std::set<unsigned int>> fe_sets;
@@ -166,6 +165,20 @@ int main(int argc, char **argv)
    cellwise_color_predicate_map,
    fe_sets);
 
+  //Construct vector of enrichment functions
+  std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
+  vec_enrichments.reserve( vec_predicates.size() );
+  for (unsigned int i=0; i<vec_predicates.size(); ++i)
+    {
+          //constant function. point and radius chosen
+          //such that they cover whole domain
+      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
+                                         10+i);  //constant function
+      vec_enrichments.push_back( func );
+    }
+
+  //Construct container for color enrichment functions needed
+  //by function make_colorwise_enrichment_functions
   std::vector<
   std::function<const Function<dim>*
   (const typename Triangulation<dim>::cell_iterator &)> >
@@ -177,19 +190,21 @@ int main(int argc, char **argv)
    cellwise_color_predicate_map,
    color_enrichments);
 
+  //Construct object needed to call make_fe_collection_from_colored_enrichments
   FE_Q<dim> fe_base(2);
   FE_Q<dim> fe_enriched(1);
   FE_Nothing<dim> fe_nothing(1,true);
   hp::FECollection<dim> fe_collection;
   ColorEnriched::internal::make_fe_collection_from_colored_enrichments
   (num_colors,
-   fe_sets,         //total list of color sets possible
+   fe_sets,            //total list of color sets possible
    color_enrichments,  //color wise enrichment functions
    fe_base,            //basic fe element
    fe_enriched,        //fe element multiplied by enrichment function
    fe_nothing,
    fe_collection);
 
+  //print all the different fe sets needed by different cells
   deallog << "fe sets:" << std::endl;
   for (auto fe_set : fe_sets)
     {
@@ -199,13 +214,18 @@ int main(int argc, char **argv)
       deallog << std::endl;
     }
 
+  //check if fe_collection is correctly constructed by function
   deallog << "fe_collection[index] mapping:" << std::endl;
   for (unsigned int index = 0; index != fe_collection.size(); ++index)
     {
-      deallog <<"name:"<<fe_collection[index].get_name() << std::endl;
-      deallog <<"n_blocks:"<<fe_collection[index].n_blocks()<<std::endl;
-      deallog <<"n_comp:"<< fe_collection[index].n_components() << std::endl;
-      deallog <<"n_dofs:"<< fe_collection[index].n_dofs_per_cell() << std::endl;
+      deallog << "name:"
+              << fe_collection[index].get_name() << std::endl;
+      deallog << "n_blocks:"
+              << fe_collection[index].n_blocks() << std::endl;
+      deallog << "n_comp:"
+              << fe_collection[index].n_components() << std::endl;
+      deallog << "n_dofs:"
+              << fe_collection[index].n_dofs_per_cell() << std::endl;
     }
 
   GridTools::partition_triangulation

@@ -14,6 +14,9 @@
 // ---------------------------------------------------------------------
 
 
+//Test ColorEnriched::internal::find_connection_between_subdomains(...)
+//function. Check if the function correctly finds if two subdomains
+//share an edge/node.
 
 #include "../tests.h"
 #include <deal.II/grid/tria.h>
@@ -21,13 +24,16 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_out.h>
 
-#include "support.h"
 #include "helper.h"
 #include <vector>
 
 using namespace dealii;
 
-
+/*
+ * Construct a class template which finds if a cell
+ * is within region or not, based on distance of cell
+ * center from region center.
+ */
 template <int dim>
 struct predicate_template
 {
@@ -52,13 +58,13 @@ void test ()
 {
   deallog << "dim = " << dim << std::endl;
 
+  //Construct grid
   Triangulation<dim> tria;
   GridGenerator::hyper_cube(tria, -20, 20);
   tria.refine_global(4);
 
+  //Construct vector of predicates for 2 and 3 dimensions
   Assert ( dim==2 || dim==3, ExcDimensionMismatch2(dim, 2, 3) );
-
-  //Vector of predicates for testing
   typedef std::function<bool
   (const typename Triangulation<dim>::active_cell_iterator &)>
   predicate_function;
@@ -73,7 +79,7 @@ void test ()
       predicates[3] = predicate_template<dim>(Point<dim>(-5,-5), 2);
       predicates[4] = predicate_template<dim>(Point<dim>(-10,-10), 2);
     }
-  else
+  else if (dim==3)
     {
       //Radius set such that every region has 2^3 = 8 cells
       predicates[1] = predicate_template<dim>(Point<dim>(7.5,7.5,7.5), 3);
@@ -83,6 +89,7 @@ void test ()
       predicates[4] = predicate_template<dim>(Point<dim>(-10,-10,-10), 3);
     }
 
+  //Check pair-wise connections between predicate regions
   for (int i = 0; i < 5; ++i)
     for (int j = 0; j < 5; ++j)
       {
@@ -100,8 +107,34 @@ int main ()
 {
   initlog();
 
-  test<2> ();
-  test<3> ();
+  try
+    {
+      test<2> ();
+      test<3> ();
+    }
+  catch (std::exception &exc)
+    {
+      std::cerr << std::endl << std::endl
+                << "----------------------------------------------------"
+                << std::endl;
+      std::cerr << "Exception on processing: " << std::endl
+                << exc.what() << std::endl
+                << "Aborting!" << std::endl
+                << "----------------------------------------------------"
+                << std::endl;
 
+      return 1;
+    }
+  catch (...)
+    {
+      std::cerr << std::endl << std::endl
+                << "----------------------------------------------------"
+                << std::endl;
+      std::cerr << "Unknown exception!" << std::endl
+                << "Aborting!" << std::endl
+                << "----------------------------------------------------"
+                << std::endl;
+      return 1;
+    };
   return 0;
 }

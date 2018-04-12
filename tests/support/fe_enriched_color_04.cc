@@ -14,6 +14,15 @@
 // ---------------------------------------------------------------------
 
 
+/*
+ * Test function: ColorEnriched::internal::make_colorwise_enrichment_functions
+ * for a set of predicates.
+ *
+ * The container of enrichment functions created by the function is
+ * called color_enrichments because they return the correct enrichment
+ * function if cell and color of the function are provided.
+ */
+
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -49,9 +58,7 @@
 #include <deal.II/lac/slepc_solver.h>
 
 #include "../tests.h"
-#include "support.h"
 #include "helper.h"
-
 #include <map>
 
 const unsigned int dim = 2;
@@ -61,40 +68,35 @@ int main(int argc, char **argv)
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
+  //Make basic grid
   Triangulation<dim>  triangulation;
   hp::DoFHandler<dim> dof_handler(triangulation);
   GridGenerator::hyper_cube (triangulation, -2, 2);
   triangulation.refine_global (2);
 
+
+  //Make predicates. Predicate 0 and 1 overlap.
+  //Predicate 2 is connected to 0.
   std::vector<EnrichmentPredicate<dim>> vec_predicates;
+  vec_predicates.push_back
+  ( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
+  vec_predicates.push_back
+  ( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
+  vec_predicates.push_back
+  ( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
+
+  //Do manual coloring since we are not testing coloring function here!
   std::vector<unsigned int> predicate_colors;
-
-  //connections between vec predicates : 0-1 (overlap connection),
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
-  vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(1.5,-1.5), 1) );
-
   predicate_colors.resize(vec_predicates.size());
-
   predicate_colors[0] = 1;
   predicate_colors[1] = 2;
   predicate_colors[2] = 1;
+  unsigned int num_colors = 2;
 
-  //vector of enrichment functions
-  std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
-  vec_enrichments.reserve( vec_predicates.size() );
-  for (unsigned int i=0; i<vec_predicates.size(); ++i)
-    {
-      //constant function. point and radius chosen such that they cover whole domain
-      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
-                                         i);
-      vec_enrichments.push_back( func );
-    }
-
+  //Make required objects to call function set_cellwise_color_set_and_fe_index
   std::map<unsigned int,
       std::map<unsigned int, unsigned int> > cellwise_color_predicate_map;
   std::vector <std::set<unsigned int>> fe_sets;
-
   ColorEnriched::internal::set_cellwise_color_set_and_fe_index
   (dof_handler,
    vec_predicates,
@@ -102,15 +104,28 @@ int main(int argc, char **argv)
    cellwise_color_predicate_map,
    fe_sets);
 
-  std::vector<
-  std::function<const Function<dim>*
+  //Construct vector of enrichment functions
+  std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
+  vec_enrichments.reserve( vec_predicates.size() );
+  for (unsigned int i=0; i<vec_predicates.size(); ++i)
+    {
+      //constant function. point and radius chosen
+      //such that they cover whole domain
+      SplineEnrichmentFunction<dim> func(Point<2> (0,0),
+                                         i);
+      vec_enrichments.push_back( func );
+    }
+
+  //Construct container for color enrichment functions needed
+  //by function make_colorwise_enrichment_functions
+  std::vector<std::function
+  <const Function<dim>*
   (const typename Triangulation<dim>::cell_iterator &)> >
   color_enrichments;
 
-  unsigned int num_colors = 2;
   ColorEnriched::internal::make_colorwise_enrichment_functions
-  (num_colors,          //needs number of colors
-   vec_enrichments,     //enrichment functions based on predicate id
+  (num_colors,
+   vec_enrichments,
    cellwise_color_predicate_map,
    color_enrichments);
 
@@ -120,17 +135,24 @@ int main(int argc, char **argv)
   auto endc = dof_handler.end();
   for (unsigned int cell_index=0; cell != endc; ++cell, ++cell_index)
     {
-      unsigned int cell_id = cell -> index();
+      //Print ids of predicates active in the cell
+      unsigned int cell_id = cell->index();
       deallog << cell_id << ":predicates=";
       for (auto predicate : vec_predicates)
         deallog << predicate(cell) << ":";
 
-
-      if (cellwise_color_predicate_map.count(cell_id) == 1)
-        for (unsigned int color = 0; color != num_colors; ++color)
-          if (cellwise_color_predicate_map.at(cell_id).count(color+1) == 1)
-            deallog << ":color:" << color+1
-                    << ":func_value:" << color_enrichments[color](cell)
+      /*
+       * Check if a color and enrichment index map exists for the cell.
+       * If so print the color and corresponding enrichment functions
+       * value at the cell center. Note that indices of color enrichment
+       * functions starts with zero not one unlike color indices.
+       */
+      if (cellwise_color_predicate_map.count(cell->material_id()) == 1)
+        for (unsigned int color = 1; color <= num_colors; ++color)
+          if (cellwise_color_predicate_map.at
+              (cell->material_id()).count(color) == 1)
+            deallog << ":color:" << color
+                    << ":func_value:" << color_enrichments[color-1](cell)
                     ->value(cell->center());
 
       deallog << std::endl;

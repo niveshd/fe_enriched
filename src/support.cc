@@ -274,7 +274,7 @@ namespace ColorEnriched
 
 
   template<int dim>
-  helper<dim>::helper
+  Helper<dim>::Helper
   (const FE_Q<dim> &fe_base,
    const FE_Q<dim> &fe_enriched,
    const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
@@ -291,7 +291,7 @@ namespace ColorEnriched
 
 
   template<int dim>
-  void helper<dim>::set(hp::DoFHandler<dim> &dof_handler)
+  void Helper<dim>::set(hp::DoFHandler<dim> &dof_handler)
   {
     if (vec_predicates.size() != 0)
       num_colors = internal::color_predicates (dof_handler, vec_predicates, predicate_colors);
@@ -339,7 +339,7 @@ namespace ColorEnriched
 
 
   template<int dim>
-  hp::FECollection<dim> helper<dim>::get_fe_collection() const
+  hp::FECollection<dim> Helper<dim>::get_fe_collection() const
   {
     return fe_collection;
   }
@@ -516,6 +516,6 @@ namespace ColorEnriched
      const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &);
   }
 
-  template struct helper<2>;
-  template struct helper<3>;
+  template struct Helper<2>;
+  template struct Helper<3>;
 }

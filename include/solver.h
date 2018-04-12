@@ -470,7 +470,7 @@ namespace Step1
     pcout << "...building fe space" << std::endl;
 
     make_enrichment_functions();
-    static ColorEnriched::helper<dim> fe_space(fe_base,
+    static ColorEnriched::Helper<dim> fe_space(fe_base,
                                                fe_enriched,
                                                vec_predicates,
                                                vec_enrichments);
