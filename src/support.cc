@@ -236,18 +236,23 @@ namespace ColorEnriched
       cell_function dummy_function;
 
       dummy_function = [=] (const typename Triangulation<dim>::cell_iterator &)
-                       -> const Function<dim>*
+                       -> const Function<dim> *
       {
         AssertThrow(false, ExcMessage("Called enrichment function for FE_Nothing"));
         return nullptr;
       };
 
+
+
+      using EnrichmentFunctions_2DVector = std::vector<std::vector<std::function<const Function<dim>*
+                                           (const typename Triangulation<dim, dim>::cell_iterator &) >>>;
+
       //loop through color sets ignore starting empty sets
       for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
         {
           std::vector<const FiniteElement<dim> *> vec_fe_enriched (num_colors, &fe_nothing);
-          EnrichmentFunctionArray<dim> functions
-              (num_colors, {dummy_function});
+          EnrichmentFunctions_2DVector functions
+          (num_colors, {dummy_function});
 
           for (auto it=fe_sets[color_set_id].begin();
                it != fe_sets[color_set_id].end();

@@ -132,12 +132,6 @@ namespace ColorEnriched
 
 
     template <int dim>
-    using EnrichmentFunctionArray = std::vector<std::vector<std::function<const Function<dim>*
-                                    (const typename Triangulation<dim, dim>::cell_iterator &) >>>;
-
-
-
-    template <int dim>
     void make_fe_collection_from_colored_enrichments
     (const unsigned int &num_colors,
      const std::vector <std::set<unsigned int>>
@@ -168,15 +162,15 @@ namespace ColorEnriched
     hp::FECollection<dim> get_fe_collection() const;
 
   private:
-    using cell_function = std::function<const Function<dim>*
-                          (const typename Triangulation<dim>::cell_iterator &)>;
+    using cell_iterator_function = std::function<const Function<dim>*
+                                   (const typename Triangulation<dim>::cell_iterator &)>;
     hp::FECollection<dim> fe_collection;
     const FE_Q<dim> &fe_base;
     const FE_Q<dim> &fe_enriched;
     const FE_Nothing<dim> fe_nothing;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
     std::vector<std::shared_ptr <Function<dim>> > vec_enrichments;
-    std::vector<cell_function>  color_enrichments;
+    std::vector<cell_iterator_function>  color_enrichments;
     std::vector<unsigned int> predicate_colors;
     unsigned int num_colors;
     std::map<unsigned int,
