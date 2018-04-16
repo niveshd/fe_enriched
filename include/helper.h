@@ -4,6 +4,7 @@
 #include <set>
 #include <map>
 #include <vector>
+#include <memory>
 #include "functions.h"  //TODO remove
 #include "support.h"    //TODO REMOVE
 #include "estimate_enrichment.h"    //TODO REMOVE
@@ -116,7 +117,7 @@ namespace ColorEnriched
     void make_colorwise_enrichment_functions
     (const unsigned int &num_colors,
 
-     const std::vector<SplineEnrichmentFunction<dim>>
+     const std::vector< std::shared_ptr <Function<dim>> >
      &vec_enrichments,
 
      const std::map<unsigned int,
@@ -131,7 +132,7 @@ namespace ColorEnriched
 
 
     template <int dim>
-    using EnrichmentFunctionArray = std::vector<std::vector<std::function<const Function<dim> *
+    using EnrichmentFunctionArray = std::vector<std::vector<std::function<const Function<dim>*
                                     (const typename Triangulation<dim, dim>::cell_iterator &) >>>;
 
 
@@ -143,7 +144,7 @@ namespace ColorEnriched
      &fe_sets,         //total list of color sets possible
 
      const std::vector<
-     std::function<const Function<dim>*
+     std::function< const Function<dim>*
      (const typename Triangulation<dim>::cell_iterator &)> >
      &color_enrichments,  //color wise enrichment functions
 
@@ -162,7 +163,7 @@ namespace ColorEnriched
     Helper(const FE_Q<dim> &fe_base,
            const FE_Q<dim> &fe_enriched,
            const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
-           const std::vector<SplineEnrichmentFunction<dim>> &vec_enrichments);
+           const std::vector<std::shared_ptr <Function<dim>> > &vec_enrichments);
     void set(hp::DoFHandler<dim> &dof_handler);
     hp::FECollection<dim> get_fe_collection() const;
 
@@ -174,7 +175,7 @@ namespace ColorEnriched
     const FE_Q<dim> &fe_enriched;
     const FE_Nothing<dim> fe_nothing;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
-    std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
+    std::vector<std::shared_ptr <Function<dim>> > vec_enrichments;
     std::vector<cell_function>  color_enrichments;
     std::vector<unsigned int> predicate_colors;
     unsigned int num_colors;

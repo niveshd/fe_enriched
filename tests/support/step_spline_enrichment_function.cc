@@ -137,7 +137,7 @@ void Problem<dim>::make_enrichment_functions ()
       SplineEnrichmentFunction<dim> func(p,
                                          interpolation_points_1D,
                                          interpolation_values_1D);
-      this->vec_enrichments.push_back(func);
+      this->vec_enrichments.push_back( std::make_shared<SplineEnrichmentFunction<dim>>(func) );
 
 
       //check how well spline approximates function
@@ -195,9 +195,6 @@ int main (int argc,char **argv)
    * A simple enrichment function is chosen and shape function
    * values are checked.
    */
-
-
-
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   MPILogInitAll all;
   {

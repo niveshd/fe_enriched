@@ -105,7 +105,7 @@ int main(int argc, char **argv)
    fe_sets);
 
   //Construct vector of enrichment functions
-  std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
+  std::vector< std::shared_ptr <Function<dim>> > vec_enrichments;
   vec_enrichments.reserve( vec_predicates.size() );
   for (unsigned int i=0; i<vec_predicates.size(); ++i)
     {
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
       //such that they cover whole domain
       SplineEnrichmentFunction<dim> func(Point<2> (0,0),
                                          i);
-      vec_enrichments.push_back( func );
+      vec_enrichments.push_back( std::make_shared<SplineEnrichmentFunction<dim>>(func) );
     }
 
   //Construct container for color enrichment functions needed

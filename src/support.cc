@@ -179,7 +179,7 @@ namespace ColorEnriched
     void make_colorwise_enrichment_functions
     (const unsigned int &num_colors,          //needs number of colors
 
-     const std::vector<SplineEnrichmentFunction<dim>>
+     const std::vector< std::shared_ptr <Function<dim>> >
      &vec_enrichments,     //enrichment functions based on predicate id
 
      const std::map<unsigned int,
@@ -202,8 +202,12 @@ namespace ColorEnriched
           {
             unsigned int id = cell->material_id();
 
-            //i'th function corresponds to i+1 color
-            return &vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)];
+            /*
+             * i'th function corresponds to i+1 color.
+             * Since fe enriched takes function pointers, we return a
+             * function pointer.
+             */
+            return vec_enrichments[cellwise_color_predicate_map.at(id).at(i+1)].get();
           };
         }
     }
@@ -232,7 +236,7 @@ namespace ColorEnriched
       cell_function dummy_function;
 
       dummy_function = [=] (const typename Triangulation<dim>::cell_iterator &)
-                       -> const Function<dim> *
+                       -> const Function<dim>*
       {
         AssertThrow(false, ExcMessage("Called enrichment function for FE_Nothing"));
         return nullptr;
@@ -242,7 +246,8 @@ namespace ColorEnriched
       for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
         {
           std::vector<const FiniteElement<dim> *> vec_fe_enriched (num_colors, &fe_nothing);
-          EnrichmentFunctionArray<dim> functions(num_colors, {dummy_function});
+          EnrichmentFunctionArray<dim> functions
+              (num_colors, {dummy_function});
 
           for (auto it=fe_sets[color_set_id].begin();
                it != fe_sets[color_set_id].end();
@@ -278,7 +283,7 @@ namespace ColorEnriched
   (const FE_Q<dim> &fe_base,
    const FE_Q<dim> &fe_enriched,
    const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
-   const std::vector<SplineEnrichmentFunction<dim>> &vec_enrichments)
+   const std::vector< std::shared_ptr <Function<dim>> > &vec_enrichments)
     :
     fe_base(fe_base),
     fe_enriched(fe_enriched),
@@ -423,7 +428,7 @@ namespace ColorEnriched
     void make_colorwise_enrichment_functions
     (const unsigned int &num_colors,          //needs number of colors
 
-     const std::vector<SplineEnrichmentFunction<2>>
+     const std::vector< std::shared_ptr <Function<2>> >
      &vec_enrichments,     //enrichment functions based on predicate id
 
      const std::map<unsigned int,
@@ -439,7 +444,7 @@ namespace ColorEnriched
     void make_colorwise_enrichment_functions
     (const unsigned int &num_colors,          //needs number of colors
 
-     const std::vector<SplineEnrichmentFunction<3>>
+     const std::vector< std::shared_ptr <Function<3>> >
      &vec_enrichments,     //enrichment functions based on predicate id
 
      const std::map<unsigned int,

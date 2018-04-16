@@ -221,10 +221,10 @@ namespace Step1
 
     std::vector<SigmaFunction<dim>> vec_rhs;
 
-    using cell_function = std::function<const Function<dim>*
+    using cell_function = std::function< Function<dim>*
                           (const typename Triangulation<dim>::cell_iterator &)>;
 
-    std::vector<SplineEnrichmentFunction<dim>> vec_enrichments;
+    std::vector< std::shared_ptr <Function<dim>> > vec_enrichments;
     std::vector<EnrichmentPredicate<dim>> vec_predicates;
     std::vector<cell_function>  color_enrichments;
 
@@ -436,13 +436,13 @@ namespace Step1
             SplineEnrichmentFunction<dim> func(p,
                                                interpolation_points,
                                                interpolation_values);
-            vec_enrichments.push_back(func);
+            vec_enrichments.push_back( std::make_shared<SplineEnrichmentFunction<dim>>(func) );
           }
         else
           {
             pcout << "Dummy function added at " << i << std::endl;
             SplineEnrichmentFunction<dim> func(Point<dim>(),0);
-            vec_enrichments.push_back(func);
+            vec_enrichments.push_back( std::make_shared<SplineEnrichmentFunction<dim>>(func) );
           }
       }
   }
