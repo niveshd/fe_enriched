@@ -160,6 +160,12 @@ void plot_shape_function
 
 
 
+template <int dim>
+using predicate_function = std::function< bool
+                           (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+
+
+
 namespace Step1
 {
   /**
@@ -221,12 +227,12 @@ namespace Step1
 
     std::vector<SigmaFunction<dim>> vec_rhs;
 
-    using cell_function = std::function< Function<dim>*
-                          (const typename Triangulation<dim>::cell_iterator &)>;
+    using cell_iterator_function = std::function< Function<dim>*
+                                   (const typename Triangulation<dim>::cell_iterator &)>;
 
     std::vector< std::shared_ptr <Function<dim>> > vec_enrichments;
-    std::vector<EnrichmentPredicate<dim>> vec_predicates;
-    std::vector<cell_function>  color_enrichments;
+    std::vector< predicate_function<dim> > vec_predicates;
+    std::vector< cell_iterator_function >  color_enrichments;
 
     //output vectors. size triangulation.n_active_cells()
     //change to Vector

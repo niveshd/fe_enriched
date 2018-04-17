@@ -61,6 +61,9 @@
 
 const unsigned int dim = 2;
 
+template <int dim>
+using predicate_function = std::function< bool
+                           (const typename hp::DoFHandler<dim>::cell_iterator &) >;
 
 int main(int argc, char **argv)
 {
@@ -71,22 +74,21 @@ int main(int argc, char **argv)
   Triangulation<dim>  triangulation;
   GridGenerator::hyper_cube (triangulation, -20, 20);
   triangulation.refine_global (4);
+  hp::DoFHandler<dim> dof_handler(triangulation);
 
   //check the coloring function on different set of predicates.
-  std::vector<EnrichmentPredicate<dim>> vec_predicates;
+  std::vector<predicate_function<dim>> vec_predicates;
   std::vector<unsigned int> predicate_colors;
   {
     //case 1: predicates are not connected
     vec_predicates.clear();
-    vec_predicates.push_back
-    ( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-    vec_predicates.push_back
-    ( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(0,0), 2) );
 
     predicate_colors.resize(vec_predicates.size());
 
-    ColorEnriched::internal::color_predicates<dim, Triangulation<dim>>
-        (triangulation, vec_predicates, predicate_colors);
+    ColorEnriched::internal::color_predicates<dim>
+    (dof_handler, vec_predicates, predicate_colors);
 
     deallog << "Case 1" << std::endl;
     for (auto i:predicate_colors)
@@ -98,15 +100,13 @@ int main(int argc, char **argv)
   {
     //case 2: Two predicates that are connected.
     vec_predicates.clear();
-    vec_predicates.push_back
-    ( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
-    vec_predicates.push_back
-    ( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-10,10), 2) );
+    vec_predicates.push_back( EnrichmentPredicate<dim>(Point<dim>(-7.5,7.5), 2) );
 
     predicate_colors.resize(vec_predicates.size());
 
     ColorEnriched::internal::color_predicates
-    (triangulation, vec_predicates, predicate_colors);
+    (dof_handler, vec_predicates, predicate_colors);
 
     deallog << "Case 2" << std::endl;
     for (auto i:predicate_colors)
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
     predicate_colors.resize(vec_predicates.size());
 
     ColorEnriched::internal::color_predicates
-    (triangulation, vec_predicates, predicate_colors);
+    (dof_handler, vec_predicates, predicate_colors);
 
     deallog << "Case 3" << std::endl;
     for (auto i:predicate_colors)

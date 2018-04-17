@@ -11,6 +11,12 @@
 
 namespace ColorEnriched
 {
+  template <int dim>
+  using predicate_function = std::function< bool
+                             (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+
+
+
   namespace internal
   {
     /**
@@ -75,10 +81,11 @@ namespace ColorEnriched
      * both active on a cell have the same color. Predicates that
      * share cell in this sense are said to be connected.
      */
-    template <int dim, class MeshType>
+    template <int dim>
     unsigned int color_predicates
-    (const MeshType &mesh,
-     const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+    (const hp::DoFHandler<dim> &dof_handler,
+     const std::vector<std::function< bool
+     (const typename hp::DoFHandler<dim>::cell_iterator &)>> &vec_predicates,
      std::vector<unsigned int> &predicate_colors);
 
 
@@ -95,11 +102,10 @@ namespace ColorEnriched
      * cell with active fe index 2 has predicates with color 2,
      * with active fe index 3 has predicates with color 1 and 2.
      */
-    template <int dim, class MeshType>
-    void
-    set_cellwise_color_set_and_fe_index
-    (MeshType &mesh,
-     const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+    template <int dim>
+    void set_cellwise_color_set_and_fe_index
+    (hp::DoFHandler<dim> &dof_handler,
+     const std::vector<predicate_function<dim>> &vec_predicates,
      const std::vector<unsigned int> &predicate_colors,
      std::map<unsigned int,
      std::map<unsigned int, unsigned int> >
@@ -156,7 +162,7 @@ namespace ColorEnriched
 
     Helper(const FE_Q<dim> &fe_base,
            const FE_Q<dim> &fe_enriched,
-           const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+           const std::vector<predicate_function<dim>> &vec_predicates,
            const std::vector<std::shared_ptr <Function<dim>> > &vec_enrichments);
     void set(hp::DoFHandler<dim> &dof_handler);
     hp::FECollection<dim> get_fe_collection() const;
@@ -168,7 +174,7 @@ namespace ColorEnriched
     const FE_Q<dim> &fe_base;
     const FE_Q<dim> &fe_enriched;
     const FE_Nothing<dim> fe_nothing;
-    std::vector<EnrichmentPredicate<dim>> vec_predicates;
+    std::vector<predicate_function<dim>> vec_predicates;
     std::vector<std::shared_ptr <Function<dim>> > vec_enrichments;
     std::vector<cell_iterator_function>  color_enrichments;
     std::vector<unsigned int> predicate_colors;

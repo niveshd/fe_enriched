@@ -128,6 +128,13 @@ void plot_shape_function
 }
 
 
+
+template <int dim>
+using predicate_function = std::function< bool
+                           (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+
+
+
 int main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
@@ -140,7 +147,7 @@ int main(int argc, char **argv)
   triangulation.refine_global (2);
 
   //Make predicates. Predicate 0 and 1 overlap.
-  std::vector<EnrichmentPredicate<dim>> vec_predicates;
+  std::vector<predicate_function<dim>> vec_predicates;
   vec_predicates.push_back
   ( EnrichmentPredicate<dim>(Point<dim>(-1,1), 1) );
   vec_predicates.push_back
@@ -151,7 +158,7 @@ int main(int argc, char **argv)
   predicate_colors.resize(vec_predicates.size());
   unsigned int num_colors
     = ColorEnriched::internal::color_predicates
-      (triangulation, vec_predicates, predicate_colors);
+      (dof_handler, vec_predicates, predicate_colors);
 
   //Make required objects to call function set_cellwise_color_set_and_fe_index
   std::map<unsigned int,

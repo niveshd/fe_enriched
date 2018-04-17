@@ -38,10 +38,10 @@ namespace ColorEnriched
 
 
 
-    template <int dim, class MeshType>
+    template <int dim>
     unsigned int color_predicates
-    (const MeshType &mesh,
-     const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+    (const hp::DoFHandler<dim> &mesh,
+     const std::vector<predicate_function<dim>> &vec_predicates,
      std::vector<unsigned int> &predicate_colors)
     {
       const unsigned int num_indices = vec_predicates.size();
@@ -71,11 +71,11 @@ namespace ColorEnriched
 
 
 
-    template <int dim, class MeshType>
+    template <int dim>
     void
     set_cellwise_color_set_and_fe_index
-    (MeshType &mesh,
-     const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+    (hp::DoFHandler<dim> &dof_handler,
+     const std::vector<predicate_function<dim>> &vec_predicates,
      const std::vector<unsigned int> &predicate_colors,
      std::map<unsigned int,
      std::map<unsigned int, unsigned int> >
@@ -112,8 +112,8 @@ namespace ColorEnriched
        * predicate since predicates with the same color are disjoint domains.
        */
       unsigned int map_index(0);
-      auto cell = mesh.begin_active();
-      auto endc = mesh.end();
+      auto cell = dof_handler.begin_active();
+      auto endc = dof_handler.end();
       for (;
            cell != endc; ++cell)
         {
@@ -287,7 +287,7 @@ namespace ColorEnriched
   Helper<dim>::Helper
   (const FE_Q<dim> &fe_base,
    const FE_Q<dim> &fe_enriched,
-   const std::vector<EnrichmentPredicate<dim>> &vec_predicates,
+   const std::vector< predicate_function<dim> > &vec_predicates,
    const std::vector< std::shared_ptr <Function<dim>> > &vec_enrichments)
     :
     fe_base(fe_base),
@@ -363,27 +363,22 @@ namespace ColorEnriched
   namespace internal
   {
     template unsigned int color_predicates
-    (const Triangulation<2,2> &mesh,
-     const std::vector<EnrichmentPredicate<2>> &,
-     std::vector<unsigned int> &);
-
-    template unsigned int color_predicates
-    (const hp::DoFHandler<2,2> &mesh,
-     const std::vector<EnrichmentPredicate<2>> &,
+    (const hp::DoFHandler<2> &dof_handler,
+     const std::vector<predicate_function<2>> &,
      std::vector<unsigned int> &);
 
 
     template unsigned int color_predicates
-    (const hp::DoFHandler<3,3> &mesh,
-     const std::vector<EnrichmentPredicate<3>> &,
+    (const hp::DoFHandler<3> &dof_handler,
+     const std::vector<predicate_function<3>> &,
      std::vector<unsigned int> &);
 
 
     template
     void
     set_cellwise_color_set_and_fe_index
-    (hp::DoFHandler<2,2> &mesh,
-     const std::vector<EnrichmentPredicate<2>> &vec_predicates,
+    (hp::DoFHandler<2> &dof_handler,
+     const std::vector<predicate_function<2>> &vec_predicates,
      const std::vector<unsigned int> &predicate_colors,
      std::map<unsigned int,
      std::map<unsigned int, unsigned int> >
@@ -394,33 +389,8 @@ namespace ColorEnriched
     template
     void
     set_cellwise_color_set_and_fe_index
-    (hp::DoFHandler<3,3> &mesh,
-     const std::vector<EnrichmentPredicate<3>> &vec_predicates,
-     const std::vector<unsigned int> &predicate_colors,
-     std::map<unsigned int,
-     std::map<unsigned int, unsigned int> >
-     &cellwise_color_predicate_map,
-     std::vector <std::set<unsigned int>> &fe_sets);
-
-
-
-    template
-    void
-    set_cellwise_color_set_and_fe_index
-    (DoFHandler<2,2> &mesh,
-     const std::vector<EnrichmentPredicate<2>> &vec_predicates,
-     const std::vector<unsigned int> &predicate_colors,
-     std::map<unsigned int,
-     std::map<unsigned int, unsigned int> >
-     &cellwise_color_predicate_map,
-     std::vector <std::set<unsigned int>> &fe_sets);
-
-
-    template
-    void
-    set_cellwise_color_set_and_fe_index
-    (DoFHandler<3,3> &mesh,
-     const std::vector<EnrichmentPredicate<3>> &vec_predicates,
+    (hp::DoFHandler<3> &dof_handler,
+     const std::vector<predicate_function<3>> &vec_predicates,
      const std::vector<unsigned int> &predicate_colors,
      std::map<unsigned int,
      std::map<unsigned int, unsigned int> >

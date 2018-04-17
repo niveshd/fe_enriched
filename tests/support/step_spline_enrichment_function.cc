@@ -184,9 +184,6 @@ void Problem<dim>::make_enrichment_functions ()
 }
 
 
-//change right hand side value function
-
-//change what 1d problem solves
 
 int main (int argc,char **argv)
 {

@@ -63,6 +63,10 @@
 
 const unsigned int dim = 2;
 
+template <int dim>
+using predicate_function = std::function< bool
+                           (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+
 int main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
@@ -77,7 +81,7 @@ int main(int argc, char **argv)
 
   //Make predicates. Predicate 0 and 1 overlap.
   //Predicate 2 is connected to 0.
-  std::vector<EnrichmentPredicate<dim>> vec_predicates;
+  std::vector<predicate_function<dim>> vec_predicates;
   vec_predicates.push_back
   ( EnrichmentPredicate<dim>(Point<dim>(0,1), 1) );
   vec_predicates.push_back
