@@ -250,12 +250,12 @@ int main(int argc, char **argv)
               << fe_collection[index].n_dofs_per_cell() << std::endl;
     }
 
+#ifdef DATA_OUT_FE_ENRICHED
   GridTools::partition_triangulation
   (Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD),
    triangulation);
   dof_handler.distribute_dofs(fe_collection);
 
-#ifdef DATA_OUT_FE_ENRICHED
   plot_shape_function<dim>(dof_handler,5);
 #endif
 
