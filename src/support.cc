@@ -1,34 +1,32 @@
-#include "support.h"
+#include <deal.II/lac/sparsity_tools.h>
+
 #include "helper.h"
+
+DEAL_II_NAMESPACE_OPEN
 
 namespace ColorEnriched
 {
   namespace internal
   {
-    template <class MeshType>
+    template <int dim>
     bool find_connection_between_subdomains
-    (const MeshType                                                              &mesh,
-     const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
-     const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2
-    )
+    (const hp::DoFHandler<dim>  &dof_handler,
+     const predicate_function<dim> &predicate_1,
+     const predicate_function<dim> &predicate_2)
     {
-      std::vector<bool> locally_active_vertices_on_subdomain (mesh.get_triangulation().n_vertices(),
+      std::vector<bool> locally_active_vertices_on_subdomain (dof_handler.get_triangulation().n_vertices(),
                                                               false);
 
       //Mark vertices in subdomain (1) defined by predicate 1
-      for (typename MeshType::active_cell_iterator
-           cell = mesh.begin_active();
-           cell != mesh.end(); ++cell)
+      for (auto cell : dof_handler.active_cell_iterators())
         if (predicate_1(cell)) // True predicate --> Part of region 1
-          for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
+          for (unsigned int v=0; v<GeometryInfo<dim>::vertices_per_cell; ++v)
             locally_active_vertices_on_subdomain[cell->vertex_index(v)] = true;
 
       //Find if cells in subdomain (2) defined by predicate 2 share vertices with region 1.
-      for (typename MeshType::active_cell_iterator
-           cell = mesh.begin_active();
-           cell != mesh.end(); ++cell)
+      for (auto cell : dof_handler.active_cell_iterators())
         if (predicate_2(cell)) // True predicate --> Potential connection between subdomains
-          for (unsigned int v=0; v<GeometryInfo<MeshType::dimension>::vertices_per_cell; ++v)
+          for (unsigned int v=0; v<GeometryInfo<dim>::vertices_per_cell; ++v)
             if (locally_active_vertices_on_subdomain[cell->vertex_index(v)] == true)
               {
                 return true;
@@ -362,6 +360,19 @@ namespace ColorEnriched
 {
   namespace internal
   {
+    template
+    bool find_connection_between_subdomains
+    (const hp::DoFHandler<2>  &dof_handler,
+     const predicate_function<2> &predicate_1,
+     const predicate_function<2> &predicate_2);
+
+    template
+    bool find_connection_between_subdomains
+    (const hp::DoFHandler<3>  &dof_handler,
+     const predicate_function<3> &predicate_1,
+     const predicate_function<3> &predicate_2);
+
+
     template unsigned int color_predicates
     (const hp::DoFHandler<2> &dof_handler,
      const std::vector<predicate_function<2>> &,
@@ -466,36 +477,10 @@ namespace ColorEnriched
       const FE_Q<3> &fe_enriched,        //fe element multiplied by enrichment function
       const FE_Nothing<3> &fe_nothing,
       hp::FECollection<3> &fe_collection);
-
-
-    template
-    bool find_connection_between_subdomains
-    (const hp::DoFHandler<2> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, hp::DoFHandler<2>>::type &)> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, hp::DoFHandler<2>>::type &)> &);
-
-
-    template
-    bool find_connection_between_subdomains
-    (const hp::DoFHandler<3> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, hp::DoFHandler<3>>::type &)> &);
-
-
-    template
-    bool find_connection_between_subdomains
-    (const Triangulation<2> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<2, 2, Triangulation<2>>::type &)> &);
-
-
-    template
-    bool find_connection_between_subdomains
-    (const Triangulation<3> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &,
-     const std::function<bool (const dealii::internal::ActiveCellIterator<3, 3, Triangulation<3>>::type &)> &);
   }
 
   template struct Helper<2>;
   template struct Helper<3>;
 }
+
+DEAL_II_NAMESPACE_CLOSE

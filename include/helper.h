@@ -1,13 +1,21 @@
 #ifndef HELPER_H
 #define HELPER_H
 
+#include <deal.II/hp/dof_handler.h>
+#include <deal.II/hp/q_collection.h>
+#include <deal.II/hp/fe_collection.h>
+
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_nothing.h>
+#include <deal.II/fe/fe_system.h>
+#include <deal.II/fe/fe_enriched.h>
+
 #include <set>
 #include <map>
 #include <vector>
 #include <memory>
-#include "functions.h"  //TODO remove
-#include "support.h"    //TODO REMOVE
-#include "estimate_enrichment.h"    //TODO REMOVE
+
+DEAL_II_NAMESPACE_OPEN
 
 namespace ColorEnriched
 {
@@ -20,11 +28,11 @@ namespace ColorEnriched
   namespace internal
   {
     /**
-       * Function returns true if there is a connection between subdomains in the
-       * @p mesh i.e the subdomains share at least a vertex. The two subdomains
-       * are defined by predicates provided by @p predicate_1 and @p predicate_2.
-       * Predicates are functions or objects with operator() which take in a
-       * cell in @p mesh and return true if the cell is in subdomain.
+       * Function returns true if there is a connection between subdomains in the mesh
+       * associated with @p dof_handler i.e the subdomains share at least a vertex.
+       * The two subdomains are defined by predicates provided by @p predicate_1 and
+       * @p predicate_2. Predicates are functions or objects with operator() which take in a
+       * cell iterator of hp::DoFHandler and return true if the cell is in subdomain.
        *
        * An example of a custom predicate is one that checks distance from a fixed
        * point. Note that the operator() takes in a cell iterator. Using the
@@ -52,27 +60,23 @@ namespace ColorEnriched
        * are connected.
        * @code
        * find_connection_between_subdomains
-       * (tria,
+       * (dof_handler,
        *  predicate<dim>(Point<dim>(0,0), 1)
        *  predicate<dim>(Point<dim>(2,2), 1));
        * @endcode
        *
-       * @tparam MeshType A type that satisfies the requirements of the
-       * @ref ConceptMeshType "MeshType concept".
-       * @param[in] mesh A mesh (i.e. objects of type Triangulation, DoFHandler,
-       * or hp::DoFHandler).
+       * @param hp::DoFHandler object
        * @param[in] predicate_1 A function  (or object of a type with an operator())
        * defining the subdomain 1. The function takes in an active cell and returns a boolean.
        * @param[in] predicate_2 Same as @p predicate_1 but defines subdomain 2.
        * @return A boolean "true" if the subdomains share atleast a vertex i.e cells including
        * halo or ghost cells of subdomain 1 overlap with subdomain 2.
        */
-    template <class MeshType>
+    template <int dim>
     bool find_connection_between_subdomains
-    (const MeshType                                                              &mesh,
-     const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_1,
-     const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate_2
-    );
+    (const hp::DoFHandler<dim>  &dof_handler,
+     const predicate_function<dim> &predicate_1,
+     const predicate_function<dim> &predicate_2);
 
 
 
@@ -184,4 +188,7 @@ namespace ColorEnriched
     std::vector <std::set<unsigned int>> fe_sets;
   };
 }
+
+DEAL_II_NAMESPACE_CLOSE
+
 #endif

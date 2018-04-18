@@ -20,10 +20,6 @@
  * The function return FE_Collection which is then printed to test.
  */
 
-#include <deal.II/base/utilities.h>
-#include <deal.II/base/function.h>
-#include <deal.II/base/conditional_ostream.h>
-
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_renumbering.h>
 
@@ -33,44 +29,70 @@
 
 #include <deal.II/numerics/data_postprocessor.h>
 #include <deal.II/numerics/data_out.h>
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/error_estimator.h>
 
 #include <deal.II/hp/dof_handler.h>
-#include <deal.II/hp/fe_values.h>
-#include <deal.II/hp/q_collection.h>
 #include <deal.II/hp/fe_collection.h>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_enriched.h>
-#include <deal.II/fe/fe_values.h>
-
-#include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/petsc_parallel_vector.h>
-#include <deal.II/lac/petsc_parallel_sparse_matrix.h>
-#include <deal.II/lac/petsc_solver.h>
-#include <deal.II/lac/petsc_precondition.h>
-#include <deal.II/lac/slepc_solver.h>
 
 #include "../tests.h"
 #include "helper.h"
 #include <map>
 
-const unsigned int dim = 2;
-
 //uncomment when debugging
 //#define DATA_OUT_FE_ENRICHED
 
-unsigned int patches = 10;
+/*
+ * Predicate function needed by ColorEnriched::internal::color_predicates
+ * implemented using a struct.
+ */
+template <int dim>
+struct EnrichmentPredicate
+{
+  EnrichmentPredicate(const Point<dim> origin, const double radius)
+    :origin(origin),radius(radius) {}
+
+  template <class Iterator>
+  bool operator () (const Iterator &i) const
+  {
+    return ( (i->center() - origin).norm_square() < radius*radius);
+  }
+
+  const Point<dim> &get_origin()
+  {
+    return origin;
+  }
+  const double &get_radius()
+  {
+    return radius;
+  }
+
+private:
+  const Point<dim> origin;
+  const double radius;
+};
+
+
+
+/*
+ * Type used to defined vector of predicates needed by the function
+ * ColorEnriched::internal::color_predicates.
+ */
+template <int dim>
+using predicate_function = std::function< bool
+                           (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+
+
 
 template <int dim>
 void plot_shape_function
 (hp::DoFHandler<dim> &dof_handler,
  unsigned int patches=5)
 {
-  deallog << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
+  std::cout << "n_cells: "<< dof_handler.get_triangulation().n_active_cells()<<std::endl;
 
   ConstraintMatrix constraints;
   constraints.clear();
@@ -129,18 +151,13 @@ void plot_shape_function
 
 
 
-template <int dim>
-using predicate_function = std::function< bool
-                           (const typename hp::DoFHandler<dim>::cell_iterator &) >;
-
-
-
 int main(int argc, char **argv)
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv);
   MPILogInitAll all;
 
   //Make basic grid
+  const unsigned int dim = 2;
   Triangulation<dim>  triangulation;
   hp::DoFHandler<dim> dof_handler(triangulation);
   GridGenerator::hyper_cube (triangulation, -2, 2);

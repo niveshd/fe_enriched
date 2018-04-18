@@ -13,57 +13,65 @@
 //
 // ---------------------------------------------------------------------
 
+/*
+ * Test the function ColorEnriched::internal::color_predicates.
+ * Check if the function correctly colors vector of predicates
+ * using graph coloring.
+ *
+ * Two predicates are said to be connected if cells belonging to
+ * different predicates touch each other.
+ */
 
-//Test the function ColorEnriched::internal::color_predicates.
-//Check if the function correctly colors vector of predicates
-//using graph coloring.
-//
-//Two predicates are said to be connected if cells belonging to
-//different predicates touch each other.
-
-#include <deal.II/base/utilities.h>
-#include <deal.II/base/function.h>
-#include <deal.II/base/conditional_ostream.h>
-
-#include <deal.II/dofs/dof_tools.h>
-#include <deal.II/dofs/dof_renumbering.h>
-
+#include "../tests.h"
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_refinement.h>
 
-#include <deal.II/numerics/data_postprocessor.h>
-#include <deal.II/numerics/data_out.h>
-#include <deal.II/numerics/vector_tools.h>
-#include <deal.II/numerics/error_estimator.h>
-
 #include <deal.II/hp/dof_handler.h>
-#include <deal.II/hp/fe_values.h>
-#include <deal.II/hp/q_collection.h>
-#include <deal.II/hp/fe_collection.h>
 
-#include <deal.II/fe/fe_q.h>
-#include <deal.II/fe/fe_nothing.h>
-#include <deal.II/fe/fe_system.h>
-#include <deal.II/fe/fe_enriched.h>
-#include <deal.II/fe/fe_values.h>
-
-#include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/petsc_parallel_vector.h>
-#include <deal.II/lac/petsc_parallel_sparse_matrix.h>
-#include <deal.II/lac/petsc_solver.h>
-#include <deal.II/lac/petsc_precondition.h>
-#include <deal.II/lac/slepc_solver.h>
-
-#include <map>
-#include "../tests.h"
 #include "helper.h"
 
-const unsigned int dim = 2;
+/*
+ * Predicate function needed by ColorEnriched::internal::color_predicates
+ * implemented using a struct.
+ */
+template <int dim>
+struct EnrichmentPredicate
+{
+  EnrichmentPredicate(const Point<dim> origin, const double radius)
+    :origin(origin),radius(radius) {}
 
+  template <class Iterator>
+  bool operator () (const Iterator &i) const
+  {
+    return ( (i->center() - origin).norm_square() < radius*radius);
+  }
+
+  const Point<dim> &get_origin()
+  {
+    return origin;
+  }
+  const double &get_radius()
+  {
+    return radius;
+  }
+
+private:
+  const Point<dim> origin;
+  const double radius;
+};
+
+
+
+/*
+ * Type used to defined vector of predicates needed by the function
+ * ColorEnriched::internal::color_predicates.
+ */
 template <int dim>
 using predicate_function = std::function< bool
                            (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+
+
 
 int main(int argc, char **argv)
 {
@@ -71,6 +79,7 @@ int main(int argc, char **argv)
   MPILogInitAll all;
 
   //Make basic grid
+  const unsigned int dim = 2;
   Triangulation<dim>  triangulation;
   GridGenerator::hyper_cube (triangulation, -20, 20);
   triangulation.refine_global (4);
