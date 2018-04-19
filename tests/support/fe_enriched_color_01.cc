@@ -23,8 +23,8 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/fe/fe_enriched.templates.h>
 
-#include "helper.h"
 #include <vector>
 
 using namespace dealii;

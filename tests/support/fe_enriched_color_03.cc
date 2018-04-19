@@ -30,8 +30,8 @@
 #include <deal.II/grid/grid_refinement.h>
 
 #include <deal.II/hp/dof_handler.h>
+#include <deal.II/fe/fe_enriched.templates.h>
 
-#include "helper.h"
 #include <map>
 
 /*

@@ -4,7 +4,11 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-namespace ColorEnriched
+void func(){
+
+}
+
+namespace Test_ColorEnriched
 {
   namespace internal
   {
@@ -243,7 +247,7 @@ namespace ColorEnriched
 
 
       using EnrichmentFunctions_2DVector = std::vector<std::vector<std::function<const Function<dim>*
-                                           (const typename Triangulation<dim, dim>::cell_iterator &) >>>;
+                                           (const typename Triangulation<dim>::cell_iterator &) >>>;
 
       //loop through color sets ignore starting empty sets
       for (unsigned int color_set_id=0; color_set_id!=fe_sets.size(); ++color_set_id)
@@ -356,7 +360,7 @@ namespace ColorEnriched
 
 
 //template instantiations
-namespace ColorEnriched
+namespace Test_ColorEnriched
 {
   namespace internal
   {

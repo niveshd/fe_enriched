@@ -37,9 +37,8 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_system.h>
-#include <deal.II/fe/fe_enriched.h>
+#include <deal.II/fe/fe_enriched.templates.h>
 
-#include "helper.h"
 #include <map>
 
 //uncomment when debugging

@@ -17,7 +17,7 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-namespace ColorEnriched
+namespace Test_ColorEnriched
 {
   template <int dim>
   using predicate_function = std::function< bool

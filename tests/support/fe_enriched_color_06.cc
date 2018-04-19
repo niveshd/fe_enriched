@@ -39,7 +39,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_enriched.h>
 
-#include "helper.h"
 #include <map>
 
 /*

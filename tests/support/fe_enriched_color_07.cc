@@ -72,7 +72,6 @@
 #include <vector>
 #include <map>
 #include <math.h>
-#include "helper.h"
 
 template <int dim>
 class SigmaFunction :  public Function<dim>
@@ -1088,7 +1087,6 @@ protected:
 
 private:
   void build_tables ();
-  void output_cell_attributes (const unsigned int &cycle);  //change to const later
   void assemble_system ();
   unsigned int solve ();
   void refine_grid ();
@@ -1731,89 +1729,6 @@ void LaplaceProblem<dim>::output_results (const unsigned int cycle)
 
 
 
-template <int dim>
-void LaplaceProblem<dim>::output_cell_attributes (const unsigned int &cycle)
-{
-  pcout << "...output pre-solution" << std::endl;
-
-  std::string file_name = "pre_solution_" + Utilities::to_string(cycle);
-
-  //find number of enriched cells and set active fe index
-  vec_fe_index.reinit(triangulation.n_active_cells());
-  typename hp::DoFHandler<dim>::active_cell_iterator
-  cell = dof_handler.begin_active(),
-  endc = dof_handler.end();
-  n_enriched_cells = 0;
-  for (unsigned int index=0; cell!=endc; ++cell, ++index)
-    {
-      vec_fe_index[index] = cell->active_fe_index();
-      if (vec_fe_index[index] != 0)
-        ++n_enriched_cells;
-    }
-  pcout << "Number of enriched cells: " << n_enriched_cells << std::endl;
-
-  /*
-   * set predicate vector. This will change with each refinement.
-   * But since the fe indices, fe mapping and enrichment functions don't
-   * change with refinement, we are not changing the enriched space.
-   * Enrichment functions don't change because color map, fe indices and
-   * material id don't change.
-   */
-  {
-    predicate_output.resize(vec_predicates.size());
-    for (unsigned int i = 0; i < vec_predicates.size(); ++i)
-      {
-        predicate_output[i].reinit(triangulation.n_active_cells());
-      }
-
-    for (auto cell : dof_handler.active_cell_iterators())
-      {
-        for (unsigned int i=0; i<vec_predicates.size(); ++i)
-          if ( vec_predicates[i](cell) )
-            predicate_output[i][cell->active_cell_index()] = i+1;
-      }
-  }
-
-  //make color index
-  {
-    std::vector<unsigned int> predicate_colors;
-    ColorEnriched::internal::color_predicates
-    (dof_handler, vec_predicates, predicate_colors);
-
-    color_output.reinit(triangulation.n_active_cells());
-    for (auto cell : dof_handler.active_cell_iterators())
-      for (unsigned int i=0; i<vec_predicates.size(); ++i)
-        if ( vec_predicates[i](cell) )
-          color_output[cell->active_cell_index()] = predicate_colors[i];
-  }
-
-  //make material id
-  mat_id.reinit(triangulation.n_active_cells());
-  {
-    for (auto cell : dof_handler.active_cell_iterators())
-      mat_id[cell->active_cell_index()] = cell->material_id();
-  }
-
-  // print fe_index, colors and predicate
-  if (this_mpi_process==0)
-    {
-      file_name += ".vtk";
-      std::ofstream output (file_name.c_str());
-      DataOut<dim,hp::DoFHandler<dim> > data_out;
-      data_out.attach_dof_handler (dof_handler);
-      data_out.add_data_vector (vec_fe_index, "fe_index");
-      data_out.add_data_vector (color_output, "colors");
-      data_out.add_data_vector (mat_id, "mat_id");
-      for (unsigned int i = 0; i < predicate_output.size(); ++i)
-        data_out.add_data_vector (predicate_output[i], "predicate_" + std::to_string(i));
-      data_out.build_patches ();
-      data_out.write_vtk (output);
-    }
-  pcout << "...finished output pre-solution" << std::endl;
-}
-
-
-
 //use this only when exact solution is known
 template <int dim>
 void LaplaceProblem<dim>::process_solution()
@@ -1878,9 +1793,6 @@ LaplaceProblem<dim>::run()
   for (unsigned int cycle = 0; cycle <= prm.cycles; ++cycle)
     {
       pcout << "Cycle "<< cycle <<std::endl;
-
-      if (prm.debug_level >= 3)
-        output_cell_attributes(cycle);
 
       setup_system ();
 

@@ -27,7 +27,7 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_system.h>
-#include <deal.II/fe/fe_enriched.h>
+#include <deal.II/fe/fe_enriched.templates.h>
 #include <deal.II/fe/fe_values.h>
 
 #include <deal.II/lac/sparsity_tools.h>
@@ -47,7 +47,7 @@
 #include "support.h"
 #include "paramater_reader.h"
 #include "estimate_enrichment.h"
-#include "helper.h"
+#include <deal.II/fe/fe_enriched.templates.h>
 
 
 
