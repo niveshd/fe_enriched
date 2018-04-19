@@ -68,7 +68,7 @@ private:
  */
 template <int dim>
 using predicate_function = std::function< bool
-                           (const typename hp::DoFHandler<dim>::active_cell_iterator &) >;
+                           (const typename Triangulation<dim>::cell_iterator &) >;
 
 
 
