@@ -19,7 +19,6 @@ subsection expressions
 
     set rhs value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
     set boundary value radial problem = 0
-    set estimate exact solution = false
 end
 
 subsection output

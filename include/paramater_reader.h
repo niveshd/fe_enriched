@@ -27,7 +27,6 @@ struct ParameterCollection
    const std::string &rhs_radial_problem,
    const std::string &boundary_radial_problem,
    const std::string &exact_soln_expr,
-   const bool &estimate_exact_soln,
    const unsigned int &patches,
    const unsigned int &debug_level,
    const unsigned int &n_enrichments,
@@ -51,8 +50,6 @@ struct ParameterCollection
     p(2) = points_enrichments[3*i + 2];
   }
 
-
-  //TODO remove template paramter and use this
   int dim;
   double size;
   unsigned int shape; //0 = ball, 1 = cube
@@ -72,7 +69,6 @@ struct ParameterCollection
   std::string boundary_radial_problem;
 
   std::string exact_soln_expr;
-  bool estimate_exact_soln;
 
   unsigned int patches;
   //debug level = 0(output nothing),
@@ -82,7 +78,6 @@ struct ParameterCollection
   //9 (+ shape functions as well)
   unsigned int debug_level;
   unsigned int n_enrichments;
-  //TODO make vector of double and make a function to get points
   std::vector<double> points_enrichments;
   std::vector<double> radii_predicates;
   std::vector<double> sigmas;
@@ -191,7 +186,6 @@ ParameterCollection::ParameterCollection
   rhs_radial_problem = prm.get("rhs value radial problem");
   boundary_radial_problem = prm.get("boundary value radial problem");
   exact_soln_expr = prm.get("exact solution expression");
-  estimate_exact_soln = prm.get_bool("estimate exact solution");
   prm.leave_subsection();
 
   prm.enter_subsection("output");
@@ -302,7 +296,6 @@ ParameterCollection::ParameterCollection
  const std::string &rhs_radial_problem,
  const std::string &boundary_radial_problem,
  const std::string &exact_soln_expr,
- const bool &estimate_exact_soln,
  const unsigned int &patches,
  const unsigned int &debug_level,
  const unsigned int &n_enrichments,
@@ -324,7 +317,6 @@ ParameterCollection::ParameterCollection
   rhs_radial_problem(rhs_radial_problem),
   boundary_radial_problem(boundary_radial_problem),
   exact_soln_expr(exact_soln_expr),
-  estimate_exact_soln(estimate_exact_soln),
   patches(patches),
   debug_level(debug_level),
   n_enrichments(n_enrichments),
@@ -357,7 +349,6 @@ void ParameterCollection::print()
             << "exact solution expr : "
             << exact_soln_expr << std::endl
             << "estimate exact solution using radial problem : "
-            << estimate_exact_soln << std::endl
             << "Patches used for output: " << patches << std::endl
             << "Debug level: " << debug_level << std::endl
             << "Number of enrichments: " << n_enrichments << std::endl;

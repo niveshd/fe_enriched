@@ -21,7 +21,7 @@ namespace ColorEnriched
 {
   template <int dim>
   using predicate_function = std::function< bool
-                             (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+                             (const typename hp::DoFHandler<dim>::active_cell_iterator &) >;
 
 
 
@@ -89,7 +89,7 @@ namespace ColorEnriched
     unsigned int color_predicates
     (const hp::DoFHandler<dim> &dof_handler,
      const std::vector<std::function< bool
-     (const typename hp::DoFHandler<dim>::cell_iterator &)>> &vec_predicates,
+     (const typename hp::DoFHandler<dim>::active_cell_iterator &)>> &vec_predicates,
      std::vector<unsigned int> &predicate_colors);
 
 

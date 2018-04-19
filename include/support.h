@@ -79,24 +79,6 @@ public:
       cspline(interpolation_points, interpolation_values)
   {}
 
-  //TODO remove
-  SplineEnrichmentFunction(const Point<dim> &origin,
-                           const double &constant)
-    :
-    Function<dim>(1),
-    origin(origin),
-    interpolation_points({origin[0],
-                         origin[0]+25*1,
-                         origin[0]+50*1
-  }),
-  interpolation_values({constant,
-                        constant,
-                        constant
-                       }),
-  cspline(interpolation_points,
-          interpolation_values)
-  {}
-
   SplineEnrichmentFunction(SplineEnrichmentFunction &&other)
     :
     Function<dim>(1),

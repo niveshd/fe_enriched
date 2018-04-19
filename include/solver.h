@@ -162,7 +162,7 @@ void plot_shape_function
 
 template <int dim>
 using predicate_function = std::function< bool
-                           (const typename hp::DoFHandler<dim>::cell_iterator &) >;
+                           (const typename hp::DoFHandler<dim>::active_cell_iterator &) >;
 
 
 
@@ -228,7 +228,7 @@ namespace Step1
     std::vector<SigmaFunction<dim>> vec_rhs;
 
     using cell_iterator_function = std::function< Function<dim>*
-                                   (const typename Triangulation<dim>::cell_iterator &)>;
+                                   (const typename hp::DoFHandler<dim>::active_cell_iterator &)>;
 
     std::vector< std::shared_ptr <Function<dim>> > vec_enrichments;
     std::vector< predicate_function<dim> > vec_predicates;
@@ -302,7 +302,6 @@ namespace Step1
      * parameter file. Refine as per the global refinement value in the
      * parameter file.
      *
-     * TODO change prm.shape to a enumerator and remove else condition
      */
     if (prm.shape == 1)
       GridGenerator::hyper_cube (triangulation, -prm.size/2.0, prm.size/2.0);
@@ -447,8 +446,8 @@ namespace Step1
         else
           {
             pcout << "Dummy function added at " << i << std::endl;
-            SplineEnrichmentFunction<dim> func(Point<dim>(),0);
-            vec_enrichments.push_back( std::make_shared<SplineEnrichmentFunction<dim>>(func) );
+            ConstantFunction<dim> func(0);
+            vec_enrichments.push_back( std::make_shared<ConstantFunction<dim>>(func) );
           }
       }
   }
@@ -543,7 +542,6 @@ namespace Step1
       }
 
     //q collections the same size as different material identities
-    //TODO in parameter file
     q_collection.push_back(QGauss<dim>(4));
     for (unsigned int i=1; i < fe_collection.size(); ++i)
       q_collection.push_back(QGauss<dim>(10));
@@ -562,18 +560,13 @@ namespace Step1
 
     dof_handler.distribute_dofs (fe_collection);
 
-    //TODO renumbering screws up numbering of cell ids?
     DoFRenumbering::subdomain_wise (dof_handler);
-    //...
-    //?
     std::vector<IndexSet> locally_owned_dofs_per_proc
       = DoFTools::locally_owned_dofs_per_subdomain (dof_handler);
     locally_owned_dofs = locally_owned_dofs_per_proc[this_mpi_process];
     locally_relevant_dofs.clear();
     DoFTools::extract_locally_relevant_dofs (dof_handler,
                                              locally_relevant_dofs);
-    //?
-
     constraints.clear();
     constraints.reinit (locally_relevant_dofs);
     DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
@@ -836,7 +829,8 @@ namespace Step1
   }
 
 
-  //use this only when exact solution is known or can be solved
+
+  //use this only when exact solution is known
   template <int dim>
   void LaplaceProblem<dim>::process_solution()
   {
@@ -872,84 +866,6 @@ namespace Step1
                                                      difference_per_cell,
                                                      VectorTools::H1_norm);
       }
-    //TODO remove this
-    else if (prm.estimate_exact_soln)
-      {
-        //Not very accurate estimation
-        AssertThrow(prm.shape == 0,
-                    ExcMessage("solution only for circular domain can be estimated"));
-        Point<dim> p;
-        prm.set_enrichment_point(p,0);
-        AssertThrow(prm.n_enrichments == 1 &&
-                    p == Point<dim>(),
-                    ExcMessage("solution only for single source at origin"));
-
-        pcout << "...estimate exact solution for error calculation" << std::endl;
-
-        //Make enrichment function with spline ranging over whole domain.
-        //Gradient of enrichment function is related to gradient of the spline.
-        double center = 0;
-        double sigma = prm.sigmas[0];
-        double size = prm.size;
-        //Ensure the radial problem is solved for diagonal incase shape is square
-        if (prm.shape==1) size = size*sqrt(dim);
-        EstimateEnrichmentFunction radial_problem(Point<1>(center),
-                                                  size,
-                                                  sigma,
-                                                  prm.rhs_radial_problem,
-                                                  prm.boundary_radial_problem);
-        radial_problem.debug_level = prm.debug_level; //print output
-        radial_problem.run();
-        pcout << "solving radial problem for error calculation "
-              << "(x, sigma): "
-              << center << ", " << sigma << std::endl;
-
-        //make points at which solution needs to interpolated
-        std::vector<double> interpolation_points, interpolation_values;
-        double cut_point = 1;
-        unsigned int n1 = 10, n2 = 200;
-        double right_bound = size/2;
-        double h1 = cut_point/n1, h2 = (prm.size-cut_point)/n2;
-        for (double p = center; p < cut_point; p+=h1)
-          interpolation_points.push_back(p);
-        for (double p = cut_point; p < right_bound; p+=h2)
-          interpolation_points.push_back(p);
-        interpolation_points.push_back(right_bound);
-
-        radial_problem.evaluate_at_x_values(interpolation_points,interpolation_values);
-
-
-        //construct enrichment function and make spline function
-        SplineEnrichmentFunction<dim> exact_solution(Point<dim>(),
-                                                     interpolation_points,
-                                                     interpolation_values);
-
-
-        VectorTools::integrate_difference (dof_handler,
-                                           solution,
-                                           exact_solution,
-                                           difference_per_cell,
-                                           q_collection,
-                                           VectorTools::L2_norm);
-        L2_error = VectorTools::compute_global_error(triangulation,
-                                                     difference_per_cell,
-                                                     VectorTools::L2_norm);
-
-        VectorTools::integrate_difference (dof_handler,
-                                           solution,
-                                           exact_solution,
-                                           difference_per_cell,
-                                           q_collection,
-                                           VectorTools::H1_norm);
-        H1_error = VectorTools::compute_global_error(triangulation,
-                                                     difference_per_cell,
-                                                     VectorTools::H1_norm);
-      }
-    else
-      {
-        pcout << "...error can't be calculated" << std::endl;
-        return;
-      }
 
     pcout << "refinement h_smallest Dofs L2_norm H1_norm" << std::endl;
     pcout << prm.global_refinement << " "
@@ -958,6 +874,8 @@ namespace Step1
           << L2_error << " "
           << H1_error << std::endl;
   }
+
+
 
   template <int dim>
   void LaplaceProblem<dim>::output_cell_attributes (const unsigned int &cycle)
@@ -1052,7 +970,6 @@ namespace Step1
     initialize();
     build_fe_space();
 
-    //TODO need cyles?
     for (unsigned int cycle = 0; cycle <= prm.cycles; ++cycle)
       {
         pcout << "Cycle "<< cycle <<std::endl;
@@ -1124,7 +1041,7 @@ namespace Step1
             pcout << "End of L2 calculation" << std::endl;
           }
 
-        if ((prm.exact_soln_expr != "" || prm.estimate_exact_soln==true) &&
+        if ((prm.exact_soln_expr != "") &&
             this_mpi_process == 0)
           process_solution();
 
