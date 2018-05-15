@@ -1,17 +1,18 @@
 subsection geometry
     set dim = 2
-    set size = 2
+    set size = 1
     set shape = 1
-    set Global refinement = 3
-    set cycles = 5
+    set Global refinement = 1
+    set cycles = 0
 end
 
 subsection solver
     set fe base degree = 1
     set fe enriched degree = 1
-    set max iterations = 50000
+    set max iterations = 20000
     set tolerance = 1e-9
     set solver = 1
+    set solve problem = false
 end
 
 subsection expressions
@@ -26,7 +27,7 @@ end
 
 subsection output
     set patches = 1
-    set debug level = 1
+    set debug level = 2
 end
 
 #end-of-dealii parser

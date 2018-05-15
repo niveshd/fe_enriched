@@ -15,17 +15,36 @@ namespace Step1
   class SigmaFunction :  public Function<dim>
   {
     Point<dim> center;
+    double sigma;
+    std::string func_expr;
     FunctionParser<dim> func;
   public:
     SigmaFunction():
       Function<dim>(),
       func(1) {}
 
+    SigmaFunction(SigmaFunction &other)
+      :
+      Function<dim>(),
+      center(other.center),
+      sigma(other.sigma),
+      func_expr(other.func_expr) {
+      this->initialize(center,
+                       sigma,
+                       func_expr);
+    }
+
     //to help with resize function. doesn't copy function parser(func)!
     SigmaFunction(SigmaFunction &&other)
       :
       center(other.center),
-      func(1) {}
+      sigma(other.sigma),
+      func_expr(other.func_expr)
+      {
+      this->initialize(center,
+                       sigma,
+                       func_expr);
+    }
 
     void initialize (const Point<dim> &center,
                      const double &sigma,
@@ -40,10 +59,12 @@ namespace Step1
 
   template <int dim>
   void SigmaFunction<dim>::initialize (const Point<dim> &_center,
-                                       const double &sigma,
-                                       const std::string &func_expr)
+                                       const double &_sigma,
+                                       const std::string &_func_expr)
   {
     center = _center;
+    sigma = _sigma;
+    func_expr = _func_expr;
     std::string variables;
     std::map<std::string,double> constants =
     {

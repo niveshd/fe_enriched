@@ -4,7 +4,8 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-void func(){
+void func()
+{
 
 }
 

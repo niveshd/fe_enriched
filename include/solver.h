@@ -36,6 +36,9 @@
 #include <deal.II/lac/petsc_solver.h>
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
+#include <deal.II/lac/utilities.h>
+#include <deal.II/lac/slepc_solver.h>
+
 #include <deal.II/base/parameter_handler.h>
 
 #include <deal.II/numerics/vector_tools.h>
@@ -48,6 +51,8 @@
 #include "paramater_reader.h"
 #include "estimate_enrichment.h"
 #include <deal.II/fe/fe_enriched.templates.h>
+
+#include "../tests/tests.h"
 
 
 
@@ -162,7 +167,7 @@ void plot_shape_function
 
 template <int dim>
 using predicate_function = std::function< bool
-                           (const typename hp::DoFHandler<dim>::active_cell_iterator &) >;
+                           (const typename Triangulation<dim>::cell_iterator &) >;
 
 
 
@@ -194,6 +199,7 @@ namespace Step1
     void refine_grid ();
     void output_results (const unsigned int cycle);
     void process_solution();
+    double calculate_cond_num();
 
   protected:
     ParameterCollection prm;
@@ -228,7 +234,7 @@ namespace Step1
     std::vector<SigmaFunction<dim>> vec_rhs;
 
     using cell_iterator_function = std::function< Function<dim>*
-                                   (const typename hp::DoFHandler<dim>::active_cell_iterator &)>;
+                                   (const typename Triangulation<dim>::cell_iterator &)>;
 
     std::vector< std::shared_ptr <Function<dim>> > vec_enrichments;
     std::vector< predicate_function<dim> > vec_predicates;
@@ -278,7 +284,7 @@ namespace Step1
     mpi_communicator(MPI_COMM_WORLD),
     n_mpi_processes(Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process(Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, (this_mpi_process == 0)   &&(prm.debug_level >= 1))
+    pcout (std::cout, (this_mpi_process == 0)  &&(prm.debug_level >= 1))
   {
 
     AssertThrow (prm.dim == dim,
@@ -315,7 +321,9 @@ namespace Step1
       }
     else
       AssertThrow(false,ExcMessage("Shape not implemented."));
-    triangulation.refine_global (prm.global_refinement);
+
+    if (prm.global_refinement > 0)
+      triangulation.refine_global (prm.global_refinement);
 
     /*
      * Ensure that num of radii, sigma and focal points of enrichment domains
@@ -407,17 +415,6 @@ namespace Step1
          */
         if (prm.radii_predicates[i] != 0)
           {
-            EstimateEnrichmentFunction radial_problem(Point<1>(center),
-                                                      size,
-                                                      sigma,
-                                                      prm.rhs_radial_problem,
-                                                      prm.boundary_radial_problem);
-            radial_problem.debug_level = prm.debug_level; //print output
-            radial_problem.run();
-            pcout << "solved problem with "
-                  << "x and sigma : "
-                  << center << ", " << sigma << std::endl;
-
             //make points at which solution needs to interpolated
             std::vector<double> interpolation_points, interpolation_values;
             double cut_point = 3*sigma;
@@ -431,17 +428,44 @@ namespace Step1
               interpolation_points.push_back(p);
             interpolation_points.push_back(right_bound);
 
-            //add enrichment function only when predicate radius is non-zero
-            radial_problem.evaluate_at_x_values(interpolation_points,interpolation_values);
+            if (prm.exact_soln_expr.size() == 0)
+              {
+                pcout << "...esimating enrichment function" << std::endl;
+                EstimateEnrichmentFunction radial_problem(Point<1>(center),
+                                                          size,
+                                                          sigma,
+                                                          prm.rhs_radial_problem,
+                                                          prm.boundary_radial_problem);
+                radial_problem.debug_level = prm.debug_level; //print output
+                radial_problem.run();
+                pcout << "solved problem with "
+                      << "x and sigma : "
+                      << center << ", " << sigma << std::endl;
 
+                //add enrichment function only when predicate radius is non-zero
+                radial_problem.evaluate_at_x_values(interpolation_points,interpolation_values);
 
-            //construct enrichment function and push
-            Point<dim> p;
-            prm.set_enrichment_point(p,i);
-            SplineEnrichmentFunction<dim> func(p,
-                                               interpolation_points,
-                                               interpolation_values);
-            vec_enrichments.push_back( std::make_shared<SplineEnrichmentFunction<dim>>(func) );
+                //construct enrichment function and push
+                Point<dim> p;
+                prm.set_enrichment_point(p,i);
+                SplineEnrichmentFunction<dim> func(p,
+                                                   interpolation_points,
+                                                   interpolation_values);
+                vec_enrichments.push_back( std::make_shared<SplineEnrichmentFunction<dim>>(func) );
+              }
+            else
+              {
+                pcout << "...using exact enrichment expression" << std::endl;
+                SigmaFunction<dim> enr;
+                Point<dim> p;
+                prm.set_enrichment_point(p,0);
+                //take only x coordinate
+                enr.initialize(p,
+                               prm.sigmas[0],
+                               prm.exact_soln_expr);
+
+                vec_enrichments.push_back(std::make_shared<SigmaFunction<dim>> (enr));
+              }
           }
         else
           {
@@ -713,18 +737,28 @@ namespace Step1
                                 mpi_communicator);
 
     //choose preconditioner
-#define amg
-#ifdef amg
-    PETScWrappers::PreconditionBoomerAMG::AdditionalData additional_data;
-    additional_data.symmetric_operator = true;
-    PETScWrappers::PreconditionBoomerAMG preconditioner(system_matrix,
-                                                        additional_data);
-#else
-    PETScWrappers::PreconditionJacobi preconditioner(system_matrix);
-#endif
+    if (prm.solver == prm.amg)
+      {
+        PETScWrappers::PreconditionBoomerAMG::AdditionalData additional_data;
+        additional_data.symmetric_operator = true;
+        PETScWrappers::PreconditionBoomerAMG preconditioner(system_matrix,
+                                                            additional_data);
+        cg.solve (system_matrix, solution, system_rhs,
+                  preconditioner);
+      }
+    else if (prm.solver == prm.jacobi)
+      {
+        PETScWrappers::PreconditionJacobi preconditioner(system_matrix);
+        cg.solve (system_matrix, solution, system_rhs,
+                  preconditioner);
+      }
+    else
+      {
+        AssertThrow(false,
+                    ExcMessage("Improper preconditioner. Value given "+prm.solver));
+      }
 
-    cg.solve (system_matrix, solution, system_rhs,
-              preconditioner);
+
 
     Vector<double> local_soln (solution);
 
@@ -830,7 +864,7 @@ namespace Step1
 
 
 
-  //use this only when exact solution is known
+//use this only when exact solution is known
   template <int dim>
   void LaplaceProblem<dim>::process_solution()
   {
@@ -959,6 +993,45 @@ namespace Step1
   }
 
 
+
+  template <int dim>
+  double LaplaceProblem<dim>::calculate_cond_num()
+  {
+    pcout << "...calculating eigen functions" << std::endl;
+    std::vector<PETScWrappers::MPI::Vector> eigenfunctions;
+    std::vector<double>                     eigenvalues;
+
+    IndexSet eigenfunction_index_set = dof_handler.locally_owned_dofs ();
+    eigenfunctions.resize (1);
+    eigenfunctions[0].reinit (eigenfunction_index_set, MPI_COMM_WORLD);
+    eigenvalues.resize (eigenfunctions.size ());
+
+    SolverControl solver_control (100000, 1e-9);
+    SLEPcWrappers::SolverKrylovSchur eigensolver (solver_control);
+
+    eigensolver.set_which_eigenpairs (EPS_LARGEST_REAL);
+    eigensolver.set_problem_type (EPS_HEP);
+    eigensolver.solve (system_matrix,
+                       eigenvalues, eigenfunctions,
+                       eigenfunctions.size());
+    double eig_large = eigenvalues[0];
+
+    pcout << "large eig calcuated" << std::endl;
+
+    eigensolver.set_which_eigenpairs (EPS_SMALLEST_REAL);
+    eigensolver.set_problem_type (EPS_HEP);
+    eigensolver.set_target_eigenvalue(0);
+    eigensolver.solve (system_matrix,
+                       eigenvalues, eigenfunctions,
+                       eigenfunctions.size());
+    double eig_small = eigenvalues[0];
+
+    pcout << "eigen values " << eig_large << " "
+          << eig_small << std::endl;
+
+    return eig_large/eig_small;
+  }
+
   template <int dim>
   void
   LaplaceProblem<dim>::run()
@@ -974,7 +1047,7 @@ namespace Step1
       {
         pcout << "Cycle "<< cycle <<std::endl;
 
-        if (prm.debug_level >= 3)
+        if (prm.debug_level >= 5)
           output_cell_attributes(cycle);
 
         setup_system ();
@@ -990,68 +1063,85 @@ namespace Step1
           plot_shape_function<dim>(dof_handler);
 
         assemble_system ();
-        auto n_iterations = solve ();
-        pcout << "Number of iterations: " << n_iterations << std::endl;
-        localized_solution.reinit(dof_handler.n_dofs());
-        localized_solution = solution;
-        double value = VectorTools::point_value(dof_handler,
-                                                localized_solution,
-                                                Point<dim>());
-        pcout << "Solution at origin:   "
-              << value
-              << std::endl;
 
+        if (prm.debug_level >=2)
+          try
+            {
+              auto cond = calculate_cond_num();
+              pcout << "h: "    << prm.size/pow(2,prm.global_refinement)
+                    << " Cond: " << cond
+                    << std::endl;
+            }
+          catch (const std::exception &e)
+            {
+              pcout << e.what();
+            }
 
-        //calculate L2 norm of solution
-        if (this_mpi_process==0)
+        if (prm.solve_problem)
           {
-            pcout << "calculating L2 norm of soln" << std::endl;
-            double norm_soln_new(0), norm_rel_change_new(0);
-            Vector<float> difference_per_cell (triangulation.n_active_cells());
-            VectorTools::integrate_difference (dof_handler,
-                                               localized_solution,
-                                               ZeroFunction<dim>(),
-                                               difference_per_cell,
-                                               q_collection,
-                                               VectorTools::H1_norm);
-            norm_soln_new = VectorTools::compute_global_error(triangulation,
-                                                              difference_per_cell,
-                                                              VectorTools::H1_norm);
-            //relative change can only be calculated for cycle > 0
-            if (cycle > 0)
+            auto n_iterations = solve ();
+            pcout << "Number of iterations: " << n_iterations << std::endl;
+            localized_solution.reinit(dof_handler.n_dofs());
+            localized_solution = solution;
+            double value = VectorTools::point_value(dof_handler,
+                                                    localized_solution,
+                                                    Point<dim>());
+            pcout << "Solution at origin:   "
+                  << value
+                  << std::endl;
+
+
+            //calculate L2 norm of solution
+            if (this_mpi_process==0)
               {
-                norm_rel_change_new = std::abs((norm_soln_new - norm_soln_old)/norm_soln_old);
-                pcout << "relative change of solution norm "
-                      << norm_rel_change_new << std::endl;
+                pcout << "calculating L2 norm of soln" << std::endl;
+                double norm_soln_new(0), norm_rel_change_new(0);
+                Vector<float> difference_per_cell (triangulation.n_active_cells());
+                VectorTools::integrate_difference (dof_handler,
+                                                   localized_solution,
+                                                   ZeroFunction<dim>(),
+                                                   difference_per_cell,
+                                                   q_collection,
+                                                   VectorTools::H1_norm);
+                norm_soln_new = VectorTools::compute_global_error(triangulation,
+                                                                  difference_per_cell,
+                                                                  VectorTools::H1_norm);
+                //relative change can only be calculated for cycle > 0
+                if (cycle > 0)
+                  {
+                    norm_rel_change_new = std::abs((norm_soln_new - norm_soln_old)/norm_soln_old);
+                    pcout << "relative change of solution norm "
+                          << norm_rel_change_new << std::endl;
+                  }
+
+                //moniter relative change of norm in later stages
+                if (cycle > 1)
+                  {
+                    deallog << (norm_rel_change_new < norm_rel_change_old)
+                            << std::endl;
+                  }
+
+                norm_soln_old = norm_soln_new;
+
+                //first sample of relative change of norm comes only cycle = 1
+                if (cycle > 0)
+                  norm_rel_change_old = norm_rel_change_new;
+
+                pcout << "End of L2 calculation" << std::endl;
               }
 
-            //moniter relative change of norm in later stages
-            if (cycle > 1)
-              {
-                deallog << (norm_rel_change_new < norm_rel_change_old)
-                        << std::endl;
-              }
+            if ((prm.exact_soln_expr != "") &&
+                this_mpi_process == 0 &&
+                prm.debug_level >= 3)
+              process_solution();
 
-            norm_soln_old = norm_soln_new;
+            if (prm.debug_level >= 5  && this_mpi_process==0)
+              output_results(cycle);
 
-            //first sample of relative change of norm comes only cycle = 1
-            if (cycle > 0)
-              norm_rel_change_old = norm_rel_change_new;
-
-            pcout << "End of L2 calculation" << std::endl;
+            //Donot refine if loop is at the end
+            if (cycle != prm.cycles)
+              refine_grid ();
           }
-
-        if ((prm.exact_soln_expr != "") &&
-            this_mpi_process == 0)
-          process_solution();
-
-        if (prm.debug_level >= 2  && this_mpi_process==0)
-          output_results(cycle);
-
-        //Donot refine if loop is at the end
-        if (cycle != prm.cycles)
-          refine_grid ();
-
         pcout << "...step run complete" << std::endl;
       }
     pcout << "...finished run problem" << std::endl;

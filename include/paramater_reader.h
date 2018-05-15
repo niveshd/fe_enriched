@@ -36,18 +36,18 @@ struct ParameterCollection
 
   void print();
 
-  void set_enrichment_point(Point <2> &p, const unsigned int i)
+  void set_enrichment_point(Point <2> &point, const unsigned int point_index)
   {
     AssertDimension(dim,2);
-    p(0) = points_enrichments[2*i];
-    p(1) = points_enrichments[2*i + 1];
+    point(0) = points_enrichments[2*point_index];
+    point(1) = points_enrichments[2*point_index + 1];
   }
-  void set_enrichment_point(Point <3> &p, const unsigned int i)
+  void set_enrichment_point(Point <3> &p, const unsigned int point_index)
   {
     AssertDimension(dim,3);
-    p(0) = points_enrichments[3*i];
-    p(1) = points_enrichments[3*i + 1];
-    p(2) = points_enrichments[3*i + 2];
+    p(0) = points_enrichments[3*point_index];
+    p(1) = points_enrichments[3*point_index + 1];
+    p(2) = points_enrichments[3*point_index + 2];
   }
 
   int dim;
@@ -81,6 +81,15 @@ struct ParameterCollection
   std::vector<double> points_enrichments;
   std::vector<double> radii_predicates;
   std::vector<double> sigmas;
+
+  enum Solver
+  {
+    amg=1,
+    jacobi
+  };
+
+  Solver solver;
+  bool solve_problem;
 };
 
 
@@ -105,8 +114,8 @@ ParameterCollection::ParameterCollection
                     "1",
                     Patterns::Integer(0));
   prm.declare_entry("Global refinement",
-                    "1",
-                    Patterns::Integer(1));
+                    "0",
+                    Patterns::Integer(0));
   prm.declare_entry("cycles",
                     "0",
                     Patterns::Integer(0));
@@ -126,6 +135,12 @@ ParameterCollection::ParameterCollection
   prm.declare_entry("tolerance",
                     "1e-8",
                     Patterns::Double(0));
+  prm.declare_entry("solver",
+                    "1",
+                    Patterns::Integer(1));
+  prm.declare_entry("solve problem",
+                    "true",
+                    Patterns::Bool());
   prm.leave_subsection();
 
 
@@ -178,6 +193,8 @@ ParameterCollection::ParameterCollection
   fe_enriched_degree = prm.get_integer("fe enriched degree");
   max_iterations = prm.get_integer("max iterations");
   tolerance = prm.get_double("tolerance");
+  solver = (Solver)prm.get_integer("solver");
+  solve_problem = prm.get_bool("solve problem");
   prm.leave_subsection();
 
   prm.enter_subsection("expressions");
@@ -338,6 +355,8 @@ void ParameterCollection::print()
             << "FE enriched degree : " << fe_enriched_degree << std::endl
             << "Max Iterations : " << max_iterations << std::endl
             << "Tolerance : " << tolerance << std::endl
+            << "Solver: " << solver << std::endl
+            << "solving " << solve_problem << std::endl
             << "rhs - main problem : "
             << rhs_value_expr << std::endl
             << "boundary value - main problem : "
