@@ -3,14 +3,15 @@ subsection geometry
     set size = 2
     set shape = 1
     set Global refinement = 3
-    set cycles = 5
+    set cycles = 7
 end
 
 subsection solver
-    set fe base degree = 1
+    set fe base degree = 1 
     set fe enriched degree = 1
     set max iterations = 50000
     set tolerance = 1e-9
+    set amg threshold = .25
     set solver = 1
 end
 

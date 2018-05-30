@@ -84,11 +84,13 @@ struct ParameterCollection
 
   enum Solver
   {
-    amg=1,
+    trilinos_amg=1,
+    petsc_amg,
     jacobi
   };
 
   Solver solver;
+  double threshold_amg;
   bool solve_problem;
 };
 
@@ -138,6 +140,9 @@ ParameterCollection::ParameterCollection
   prm.declare_entry("solver",
                     "1",
                     Patterns::Integer(1));
+  prm.declare_entry("amg threshold",
+                    "0.25",
+                    Patterns::Double(0,1));
   prm.declare_entry("solve problem",
                     "true",
                     Patterns::Bool());
@@ -194,6 +199,7 @@ ParameterCollection::ParameterCollection
   max_iterations = prm.get_integer("max iterations");
   tolerance = prm.get_double("tolerance");
   solver = (Solver)prm.get_integer("solver");
+  threshold_amg = prm.get_double("amg threshold");
   solve_problem = prm.get_bool("solve problem");
   prm.leave_subsection();
 
@@ -371,6 +377,9 @@ void ParameterCollection::print()
             << "Patches used for output: " << patches << std::endl
             << "Debug level: " << debug_level << std::endl
             << "Number of enrichments: " << n_enrichments << std::endl;
+
+  if (solver == trilinos_amg)
+    std::cout << "Threshold for amg: " << threshold_amg << std::endl;
 
   std::cout << "Enrichment points : " << std::endl;
   for (unsigned int i = 0; i < points_enrichments.size(); i = i+dim)

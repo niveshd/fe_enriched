@@ -1,5 +1,5 @@
-#ifndef SOLVER_H
-#define SOLVER_H
+#ifndef SOLVER_TRILINOS_H
+#define SOLVER_TRILINOS_H
 
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
@@ -31,13 +31,13 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/petsc_parallel_vector.h>
-#include <deal.II/lac/petsc_parallel_sparse_matrix.h>
-#include <deal.II/lac/petsc_solver.h>
-#include <deal.II/lac/petsc_precondition.h>
+#include <deal.II/lac/trilinos_vector.h>
+#include <deal.II/lac/trilinos_sparse_matrix.h>
+#include <deal.II/lac/trilinos_precondition.h>
 #include <deal.II/lac/slepc_solver.h>
 #include <deal.II/lac/utilities.h>
 #include <deal.II/lac/slepc_solver.h>
+#include <deal.II/lac/generic_linear_algebra.h>
 
 #include <deal.II/base/parameter_handler.h>
 
@@ -54,122 +54,14 @@
 
 #include "../tests/tests.h"
 
-
-
-template <int dim>
-void plot_shape_function
-(hp::DoFHandler<dim> &dof_handler,
- unsigned int patches=5)
+namespace LA
 {
-  std::cout << "...start plotting shape function" << std::endl;
-  std::cout << "Patches for output: " << patches << std::endl;
-
-  ConstraintMatrix constraints;
-  constraints.clear();
-  dealii::DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
-  constraints.close ();
-
-  //find set of dofs which belong to enriched cells
-  std::set<unsigned int> enriched_cell_dofs;
-  for (auto cell : dof_handler.active_cell_iterators())
-    if (cell->active_fe_index() != 0)
-      {
-        unsigned int dofs_per_cell = cell->get_fe().dofs_per_cell;
-        std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
-        cell->get_dof_indices(local_dof_indices);
-        enriched_cell_dofs.insert(local_dof_indices.begin(), local_dof_indices.end());
-      }
-
-  // output to check if all is good:
-  std::vector<Vector<double>> shape_functions;
-  std::vector<std::string> names;
-  for (auto dof : enriched_cell_dofs)
-    {
-      Vector<double> shape_function;
-      shape_function.reinit(dof_handler.n_dofs());
-      shape_function[dof] = 1.0;
-
-      // if the dof is constrained, first output unconstrained vector
-      names.push_back(std::string("C_") +
-                      dealii::Utilities::int_to_string(dof,2));
-      shape_functions.push_back(shape_function);
-
-//      names.push_back(std::string("UC_") +
-//                      dealii::Utilities::int_to_string(s,2));
-
-//      // make continuous/constraint:
-//      constraints.distribute(shape_function);
-//      shape_functions.push_back(shape_function);
-    }
-
-  if (dof_handler.n_dofs() < 100)
-    {
-      std::cout << "...start printing support points" << std::endl;
-
-      std::map<types::global_dof_index, Point<dim> > support_points;
-      MappingQ1<dim> mapping;
-      hp::MappingCollection<dim> hp_mapping;
-      for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
-        hp_mapping.push_back(mapping);
-      DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler, support_points);
-
-      const std::string base_filename =
-        "DOFs" + dealii::Utilities::int_to_string(dim) + "_p" + dealii::Utilities::int_to_string(0);
-
-      const std::string filename = base_filename + ".gp";
-      std::ofstream f(filename.c_str());
-
-      f << "set terminal png size 400,410 enhanced font \"Helvetica,8\"" << std::endl
-        << "set output \"" << base_filename << ".png\"" << std::endl
-        << "set size square" << std::endl
-        << "set view equal xy" << std::endl
-        << "unset xtics                                                                                   " << std::endl
-        << "unset ytics" << std::endl
-        << "unset grid" << std::endl
-        << "unset border" << std::endl
-        << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 offset 1,1 notitle" << std::endl;
-      GridOut grid_out;
-      grid_out.write_gnuplot (dof_handler.get_triangulation(), f);
-      f << "e" << std::endl;
-
-      DoFTools::write_gnuplot_dof_support_point_info(f,
-                                                     support_points);
-
-      f << "e" << std::endl;
-
-      std::cout << "...finished printing support points" << std::endl;
-    }
-
-  DataOut<dim,hp::DoFHandler<dim>> data_out;
-  data_out.attach_dof_handler (dof_handler);
-
-  // get material ids:
-  Vector<float> fe_index(dof_handler.get_triangulation().n_active_cells());
-  for (auto cell : dof_handler.active_cell_iterators())
-    {
-      fe_index[cell->active_cell_index()] = cell->active_fe_index();
-    }
-  data_out.add_data_vector(fe_index, "fe_index");
-
-  for (unsigned int i = 0; i < shape_functions.size(); i++)
-    data_out.add_data_vector (shape_functions[i], names[i]);
-
-  data_out.build_patches(patches);
-
-  std::string filename = "shape_functions.vtu";
-  std::ofstream output (filename.c_str ());
-  data_out.write_vtu (output);
-
-  std::cout << "...finished plotting shape functions" << std::endl;
+  using namespace dealii::LinearAlgebraTrilinos;
 }
-
-
 
 template <int dim>
 using predicate_function = std::function< bool
                            (const typename Triangulation<dim>::cell_iterator &) >;
-
-
 
 namespace Step1
 {
@@ -177,12 +69,12 @@ namespace Step1
    * Main class
    */
   template <int dim>
-  class LaplaceProblem
+  class LaplaceProblem_t
   {
   public:
-    LaplaceProblem ();
-    LaplaceProblem (const ParameterCollection &prm);
-    virtual ~LaplaceProblem();
+    LaplaceProblem_t ();
+    LaplaceProblem_t (const ParameterCollection &prm);
+    virtual ~LaplaceProblem_t();
     void run ();
 
   protected:
@@ -199,7 +91,6 @@ namespace Step1
     void refine_grid ();
     void output_results (const unsigned int cycle);
     void process_solution();
-    double calculate_cond_num();
 
   protected:
     ParameterCollection prm;
@@ -207,6 +98,9 @@ namespace Step1
 
     Triangulation<dim>  triangulation;
     hp::DoFHandler<dim> dof_handler;
+
+    typedef LA::MPI::SparseMatrix matrix_t;
+    typedef LA::MPI::Vector       vector_t;
 
     std::shared_ptr<const hp::FECollection<dim>> fe_collection;
     hp::QCollection<dim> q_collection;
@@ -218,10 +112,10 @@ namespace Step1
     IndexSet locally_owned_dofs;
     IndexSet locally_relevant_dofs;
 
-    PETScWrappers::MPI::SparseMatrix        system_matrix;
-    PETScWrappers::MPI::Vector              solution;
+    matrix_t        system_matrix;
+    vector_t              solution;
     Vector<double>                          localized_solution;
-    PETScWrappers::MPI::Vector              system_rhs;
+    vector_t             system_rhs;
 
     ConstraintMatrix constraints;
 
@@ -251,7 +145,7 @@ namespace Step1
 
 
   template <int dim>
-  LaplaceProblem<dim>:: LaplaceProblem ()
+  LaplaceProblem_t<dim>:: LaplaceProblem_t ()
     :
     prm(),
     n_enriched_cells(0),
@@ -272,7 +166,7 @@ namespace Step1
 
 
   template <int dim>
-  LaplaceProblem<dim>::LaplaceProblem
+  LaplaceProblem_t<dim>::LaplaceProblem_t
   (const ParameterCollection &_par)
     :
     prm(_par),
@@ -299,7 +193,7 @@ namespace Step1
    * right hand side function of the problem.
    */
   template <int dim>
-  void LaplaceProblem<dim>::initialize()
+  void LaplaceProblem_t<dim>::initialize()
   {
     pcout << "...Start initializing" << std::endl;
 
@@ -383,7 +277,7 @@ namespace Step1
    * point of enrichment domain.
    */
   template <int dim>
-  void LaplaceProblem<dim>::make_enrichment_functions()
+  void LaplaceProblem_t<dim>::make_enrichment_functions()
   {
     pcout << "!!! Make enrichment function called" << std::endl;
 
@@ -494,7 +388,7 @@ namespace Step1
    * is also constructed here.
    */
   template <int dim>
-  void LaplaceProblem<dim>::build_fe_space()
+  void LaplaceProblem_t<dim>::build_fe_space()
   {
     pcout << "...building fe space" << std::endl;
 
@@ -575,7 +469,7 @@ namespace Step1
 
 
   template <int dim>
-  void LaplaceProblem<dim>::setup_system ()
+  void LaplaceProblem_t<dim>::setup_system ()
   {
     pcout << "...start setup system" << std::endl;
 
@@ -637,7 +531,7 @@ namespace Step1
 
   template <int dim>
   void
-  LaplaceProblem<dim>::assemble_system()
+  LaplaceProblem_t<dim>::assemble_system()
   {
     pcout << "...assemble system" << std::endl;
 
@@ -725,30 +619,32 @@ namespace Step1
   }
 
   template <int dim>
-  unsigned int LaplaceProblem<dim>::solve()
+  unsigned int LaplaceProblem_t<dim>::solve()
   {
     pcout << "...solving" << std::endl;
     SolverControl           solver_control (prm.max_iterations,
                                             prm.tolerance,
                                             false,
                                             false);
-    PETScWrappers::SolverCG cg (solver_control,
-                                mpi_communicator);
+    SolverCG<vector_t> cg (solver_control);
 
     //choose preconditioner
     if (prm.solver == prm.trilinos_amg)
       {
-        PETScWrappers::PreconditionBoomerAMG::AdditionalData additional_data;
-        additional_data.symmetric_operator = true;
-        additional_data.strong_threshold = prm.threshold_amg;
-        PETScWrappers::PreconditionBoomerAMG preconditioner(system_matrix,
-                                                            additional_data);
+        TrilinosWrappers::PreconditionAMG::AdditionalData Amg_data;
+        Amg_data.elliptic = true;
+        Amg_data.higher_order_elements = true;
+        Amg_data.smoother_sweeps = 2;
+        Amg_data.aggregation_threshold = prm.threshold_amg;
+        TrilinosWrappers::PreconditionAMG preconditioner;
+        preconditioner.initialize(system_matrix, Amg_data);
         cg.solve (system_matrix, solution, system_rhs,
                   preconditioner);
       }
     else if (prm.solver == prm.jacobi)
       {
-        PETScWrappers::PreconditionJacobi preconditioner(system_matrix);
+        TrilinosWrappers::PreconditionJacobi preconditioner;
+        preconditioner.initialize(system_matrix);
         cg.solve (system_matrix, solution, system_rhs,
                   preconditioner);
       }
@@ -771,7 +667,7 @@ namespace Step1
 
 
   template <int dim>
-  void LaplaceProblem<dim>::refine_grid ()
+  void LaplaceProblem_t<dim>::refine_grid ()
   {
     const Vector<double> localized_solution (solution);
     Vector<float> local_error_per_cell (triangulation.n_active_cells());
@@ -811,7 +707,7 @@ namespace Step1
 
 
   template <int dim>
-  void LaplaceProblem<dim>::output_results (const unsigned int cycle)
+  void LaplaceProblem_t<dim>::output_results (const unsigned int cycle)
   {
     pcout << "...output results" << std::endl;
     pcout << "Patches used: " << prm.patches << std::endl;
@@ -866,7 +762,7 @@ namespace Step1
 
 //use this only when exact solution is known
   template <int dim>
-  void LaplaceProblem<dim>::process_solution()
+  void LaplaceProblem_t<dim>::process_solution()
   {
     Vector<float> difference_per_cell (triangulation.n_active_cells());
     double L2_error, H1_error;
@@ -912,7 +808,7 @@ namespace Step1
 
 
   template <int dim>
-  void LaplaceProblem<dim>::output_cell_attributes (const unsigned int &cycle)
+  void LaplaceProblem_t<dim>::output_cell_attributes (const unsigned int &cycle)
   {
     pcout << "...output pre-solution" << std::endl;
 
@@ -995,46 +891,8 @@ namespace Step1
 
 
   template <int dim>
-  double LaplaceProblem<dim>::calculate_cond_num()
-  {
-    pcout << "...calculating eigen functions" << std::endl;
-    std::vector<PETScWrappers::MPI::Vector> eigenfunctions;
-    std::vector<double>                     eigenvalues;
-
-    IndexSet eigenfunction_index_set = dof_handler.locally_owned_dofs ();
-    eigenfunctions.resize (1);
-    eigenfunctions[0].reinit (eigenfunction_index_set, MPI_COMM_WORLD);
-    eigenvalues.resize (eigenfunctions.size ());
-
-    SolverControl solver_control (100000, 1e-9);
-    SLEPcWrappers::SolverKrylovSchur eigensolver (solver_control);
-
-    eigensolver.set_which_eigenpairs (EPS_LARGEST_REAL);
-    eigensolver.set_problem_type (EPS_HEP);
-    eigensolver.solve (system_matrix,
-                       eigenvalues, eigenfunctions,
-                       eigenfunctions.size());
-    double eig_large = eigenvalues[0];
-
-    pcout << "large eig calcuated" << std::endl;
-
-    eigensolver.set_which_eigenpairs (EPS_SMALLEST_REAL);
-    eigensolver.set_problem_type (EPS_HEP);
-    eigensolver.set_target_eigenvalue(0);
-    eigensolver.solve (system_matrix,
-                       eigenvalues, eigenfunctions,
-                       eigenfunctions.size());
-    double eig_small = eigenvalues[0];
-
-    pcout << "eigen values " << eig_large << " "
-          << eig_small << std::endl;
-
-    return eig_large/eig_small;
-  }
-
-  template <int dim>
   void
-  LaplaceProblem<dim>::run()
+  LaplaceProblem_t<dim>::run()
   {
     pcout << "...run problem" << std::endl;
     double norm_soln_old(0), norm_rel_change_old(1);
@@ -1064,29 +922,11 @@ namespace Step1
 
         assemble_system ();
 
-        if (prm.debug_level >=2)
-          try
-            {
-              auto cond = calculate_cond_num();
-              pcout << "h: "    << prm.size/pow(2,prm.global_refinement)
-                    << " Cond: " << cond
-                    << std::endl;
-            }
-          catch (const std::exception &e)
-            {
-              pcout << e.what();
-            }
-
         if (prm.solve_problem)
           {
             auto n_iterations = solve ();
 
-            if (prm.solver == prm.trilinos_amg)
-              pcout << "threshold: " << prm.threshold_amg
-                    << " iterations: " << n_iterations
-                    << std::endl;
-            else
-              pcout << "iterations: " << n_iterations << std::endl;
+            pcout << "iterations: " << n_iterations << std::endl;
 
             localized_solution.reinit(dof_handler.n_dofs());
             localized_solution = solution;
@@ -1156,7 +996,7 @@ namespace Step1
 
 
   template <int dim>
-  LaplaceProblem<dim>::~LaplaceProblem()
+  LaplaceProblem_t<dim>::~LaplaceProblem_t()
   {
     dof_handler.clear ();
   }
