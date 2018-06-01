@@ -19,6 +19,8 @@ subsection expressions
 
     set rhs value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
     set boundary value radial problem = 0
+    set sigma = 0.1
+    set predicate radius = 0.45
 end
 
 subsection output
@@ -37,18 +39,3 @@ end
 0 0 0
 -1 -1 -1
 1 -1 -1
-
-
-#radii for predicates
-0.45
-0.45
-0.45
-0.45
-0.45
-
-#sigma for enrichment functions
-0.1
-0.1
-0.1
-0.1
-0.1

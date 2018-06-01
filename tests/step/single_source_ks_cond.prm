@@ -23,6 +23,8 @@ subsection expressions
     set boundary value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
 
     set exact solution expression = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
+    set sigma = 0.1
+    set predicate radius = 0
 end
 
 subsection output
@@ -39,10 +41,3 @@ end
 #-1 0
 #0 1
 0 0
-
-#radii for predicates
-0 #0.4=enrichment, 0=no_enrichment
-
-#sigma for enrichment functions
-#1
-0.1
