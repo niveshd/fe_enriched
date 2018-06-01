@@ -296,7 +296,9 @@ namespace Step1
 
             if (prm.exact_soln_expr.size() == 0)
               {
-                pcout << "...esimating enrichment function" << std::endl;
+                pcout << "...esimating enrichment function for predicate: "
+                      << i
+                      << std::endl;
                 std::map<std::string,double> constants({{"c",prm.coefficients[i]}});
                 EstimateEnrichmentFunction radial_problem(Point<1>(0),
                                                           prm.size,
@@ -740,6 +742,8 @@ namespace Step1
         vec_fe_index[index] = cell->active_fe_index();
       }
 
+
+    int n_pred_outputs = (10 <= vec_predicates.size())?10:vec_predicates.size();
     /*
      * set predicate vector. This will change with each refinement.
      * But since the fe indices, fe mapping and enrichment functions don't
@@ -748,15 +752,16 @@ namespace Step1
      * material id don't change.
      */
     {
-      predicate_output.resize(vec_predicates.size());
-      for (unsigned int i = 0; i < vec_predicates.size(); ++i)
+
+      predicate_output.resize(n_pred_outputs);
+      for (unsigned int i = 0; i < n_pred_outputs; ++i)
         {
           predicate_output[i].reinit(triangulation.n_active_cells());
         }
 
       for (auto cell : dof_handler.active_cell_iterators())
         {
-          for (unsigned int i = 0; i < vec_predicates.size(); ++i)
+          for (unsigned int i = 0; i < n_pred_outputs; ++i)
             if (vec_predicates[i](cell))
               predicate_output[i][cell->active_cell_index()] = i + 1;
         }
@@ -792,6 +797,7 @@ namespace Step1
         data_out.add_data_vector(vec_fe_index, "fe_index");
         data_out.add_data_vector(color_output, "colors");
         data_out.add_data_vector(mat_id, "mat_id");
+
         for (unsigned int i = 0; i < predicate_output.size(); ++i)
           data_out.add_data_vector(predicate_output[i],
                                    "predicate_" + std::to_string(i));
