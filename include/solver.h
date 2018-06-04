@@ -283,7 +283,7 @@ namespace Step1
    */
   template <int dim> void LaplaceProblem<dim>::initialize()
   {
-    pcout << "...Start initializing" << std::endl;
+    pcout << "...Start initializing petsc solver" << std::endl;
 
     /*
      * set up basic grid which is a hyper cube or hyper ball based on

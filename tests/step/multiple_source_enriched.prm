@@ -1,8 +1,8 @@
 subsection geometry
     set dim = 3
-    set size = 8
+    set size = 32
     set shape = 1
-    set Global refinement = 4
+    set Global refinement = 6
     set cycles = 2
 end
 
@@ -22,7 +22,7 @@ subsection expressions
     set rhs value radial problem = -c*4*pi/(pi^(3/2)*sigma^3)*exp(-(x*x)/(sigma*sigma))
     set boundary value radial problem = 0
 
-    set sigma = 0.5
+    set sigma = 0.1
     set predicate radius = 0.44
 end
 

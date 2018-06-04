@@ -118,6 +118,8 @@ namespace Step1
 
     ConstraintMatrix constraints;
 
+    std::shared_ptr<ColorEnriched::Helper<dim>> fe_space;
+
     MPI_Comm mpi_communicator;
     const unsigned int n_mpi_processes;
     const unsigned int this_mpi_process;
@@ -176,7 +178,7 @@ namespace Step1
    */
   template <int dim> void LaplaceProblem_t<dim>::initialize()
   {
-    pcout << "...Start initializing" << std::endl;
+    pcout << "...Start initializing trilinos solver" << std::endl;
 
     /*
      * set up basic grid which is a hyper cube or hyper ball based on
@@ -296,7 +298,7 @@ namespace Step1
 
             if (prm.exact_soln_expr.size() == 0)
               {
-                pcout << "...esimating enrichment function for predicate: "
+                pcout << "...estimating enrichment function for predicate: "
                       << i
                       << std::endl;
                 std::map<std::string,double> constants({{"c",prm.coefficients[i]}});
@@ -366,11 +368,12 @@ namespace Step1
     pcout << "...building fe space" << std::endl;
 
     make_enrichment_functions();
-    static ColorEnriched::Helper<dim> fe_space(fe_base, fe_enriched,
-                                               vec_predicates, vec_enrichments);
+    fe_space = std::make_shared<ColorEnriched::Helper<dim>>
+                   (ColorEnriched::Helper<dim>(fe_base, fe_enriched,
+                                               vec_predicates, vec_enrichments));
     fe_collection = std::make_shared<const hp::FECollection<dim>>(
-                      fe_space.build_fe_collection(dof_handler));
-    pcout << "size of fe collection: " << fe_collection->size() << std::endl;
+                      fe_space->build_fe_collection(dof_handler));
+    std::cout << "size of fe collection: " << fe_collection->size() << std::endl;
 
     if (prm.debug_level == 9)
       {
@@ -853,7 +856,7 @@ namespace Step1
             timer.start();
             auto n_iterations = solve();
             timer.stop();
-            std::cout << "time: " << timer.wall_time() << std::endl;
+            pcout << "time: " << timer.wall_time() << std::endl;
             timer.reset();
 
             pcout << "iterations: " << n_iterations << std::endl;

@@ -273,7 +273,7 @@ namespace Step1
       std::cout << "Radial solution at origin = " << value
                 << " after global refinement " << refinement << std::endl;
 
-    if (debug_level >= 1)
+    if (debug_level >= 6)
       output_results();
   }
 
