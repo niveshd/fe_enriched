@@ -127,6 +127,7 @@ namespace Step1
     ConditionalOStream pcout;
 
     std::vector<SigmaFunction<dim>> vec_rhs;
+    std::vector<SigmaFunction<dim>> vec_bnd;
 
     using cell_iterator_function = std::function<Function<dim> *(
                                      const typename Triangulation<dim>::cell_iterator &)>;
@@ -239,7 +240,11 @@ namespace Step1
       {
         Point<dim> p;
         prm.set_enrichment_point(p, i);
-        std::map<std::string,double> constants({{"c",prm.coefficients[i]}});
+        std::map<std::string,double> constants;
+
+        if (prm.coefficients.size() != 0)
+          constants.insert({"c",prm.coefficients[i]});
+
         vec_rhs[i].initialize(p, prm.sigma, prm.rhs_value_expr, constants);
       }
 
@@ -301,7 +306,11 @@ namespace Step1
                 pcout << "...estimating enrichment function for predicate: "
                       << i
                       << std::endl;
-                std::map<std::string,double> constants({{"c",prm.coefficients[i]}});
+                std::map<std::string,double> constants;
+
+                if (prm.coefficients.size() != 0)
+                  constants.insert({"c",prm.coefficients[i]});
+
                 EstimateEnrichmentFunction radial_problem(Point<1>(0),
                                                           prm.size,
                                                           prm.sigma,
@@ -333,7 +342,9 @@ namespace Step1
                 Point<dim> p;
                 prm.set_enrichment_point(p, 0);
                 // take only x coordinate
-                std::map<std::string,double> constants({{"c",2}});
+                std::map<std::string,double> constants;
+                if (prm.coefficients.size() != 0)
+                  constants.insert({"c",prm.coefficients[i]});
                 enr.initialize(p, prm.sigma, prm.exact_soln_expr,constants);
 
                 vec_enrichments.push_back(std::make_shared<SigmaFunction<dim>>(enr));
@@ -470,7 +481,11 @@ namespace Step1
     SigmaFunction<dim> boundary_value_func;
     Point<dim> p;
     prm.set_enrichment_point(p, 0);
-    std::map<std::string,double> constants({{"c",2}});
+
+    //TODO add boundary as a vector sum. use lambda functions?
+    std::map<std::string,double> constants;
+    if (prm.coefficients.size() != 0)
+      constants.insert({"c",1});
     boundary_value_func.initialize(p, prm.sigma, prm.boundary_value_expr,constants);
 
     VectorTools::interpolate_boundary_values(dof_handler, 0, boundary_value_func,
@@ -659,7 +674,12 @@ namespace Step1
       {
         // create exact solution vector
         exact_soln_vector.reinit(dof_handler.n_dofs());
-        std::map<std::string,double> constants({{"c",2}});
+        std::map<std::string,double> constants;
+
+        //TODO exact solution as a sum of vectors
+        if (prm.coefficients.size() != 0)
+          constants.insert({"c",1});
+
         exact_solution.initialize(Point<dim>(), prm.sigma, prm.exact_soln_expr,constants);
         VectorTools::project(dof_handler, constraints, q_collection, exact_solution,
                              exact_soln_vector);
@@ -705,7 +725,12 @@ namespace Step1
         pcout << "...using exact solution for error calculation" << std::endl;
 
         SigmaFunction<dim> exact_solution;
-        std::map<std::string,double> constants({{"c",2}});
+        std::map<std::string,double> constants;
+
+        //TODO exact solution as a sum of vectors
+        if (prm.coefficients.size() != 0)
+          constants.insert({"c",1});
+
         exact_solution.initialize(Point<dim>(), prm.sigma, prm.exact_soln_expr,constants);
 
         VectorTools::integrate_difference(dof_handler, localized_solution,

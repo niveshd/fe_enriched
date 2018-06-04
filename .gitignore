@@ -1,0 +1,13 @@
+build
+.cproject
+.project
+.settings
+BUILD
+CMakeCache.txt
+CMakeFiles
+Makefile
+step-1
+*.vtk
+*.cmake
+*.user
+tests/step/Testing/*

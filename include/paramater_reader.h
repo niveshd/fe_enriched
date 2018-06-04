@@ -361,15 +361,14 @@ void ParameterCollection::print()
   if (solver == trilinos_amg)
     std::cout << "Threshold for amg: " << threshold_amg << std::endl;
 
-  std::cout << "q(if any) and enrichment points : " << std::endl;
+  std::cout << "enrichment points and q (if any): " << std::endl;
   for (unsigned int i = 0, q = 0; i < points_enrichments.size(); i = i + dim, ++q)
     {
-      std::cout << q << " ";
-      if (coefficients.size() != 0)
-        std::cout << coefficients[q] << " ";
-
       for (int d = 0; d < dim; ++d)
         std::cout << points_enrichments[i + d] << " ";
+
+      if (coefficients.size() != 0)
+        std::cout << "q: " << coefficients[q];
 
       std::cout << std::endl;
     }
