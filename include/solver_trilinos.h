@@ -127,7 +127,6 @@ namespace Step1
     ConditionalOStream pcout;
 
     std::vector<SigmaFunction<dim>> vec_rhs;
-    std::vector<SigmaFunction<dim>> vec_bnd;
 
     using cell_iterator_function = std::function<Function<dim> *(
                                      const typename Triangulation<dim>::cell_iterator &)>;
@@ -142,6 +141,10 @@ namespace Step1
     Vector<float> color_output;
     Vector<float> vec_fe_index;
     Vector<float> mat_id;
+
+    //required functions
+    Vec_SigmaFunction<dim> v_sol_func;
+    SigmaFunction<dim> sol_func;
   };
 
   template <int dim>
@@ -301,7 +304,8 @@ namespace Step1
               interpolation_points.push_back(p);
             interpolation_points.push_back(radius);
 
-            if (prm.exact_soln_expr.size() == 0)
+            // if exact solution is available use it for enrichment function
+            if (prm.estimate_exact_soln)
               {
                 pcout << "...estimating enrichment function for predicate: "
                       << i
@@ -340,12 +344,12 @@ namespace Step1
                 pcout << "...using exact enrichment expression" << std::endl;
                 SigmaFunction<dim> enr;
                 Point<dim> p;
-                prm.set_enrichment_point(p, 0);
+                prm.set_enrichment_point(p, i);
                 // take only x coordinate
                 std::map<std::string,double> constants;
                 if (prm.coefficients.size() != 0)
                   constants.insert({"c",prm.coefficients[i]});
-                enr.initialize(p, prm.sigma, prm.exact_soln_expr,constants);
+                enr.initialize(p, prm.sigma, prm.boundary_value_expr,constants);
 
                 vec_enrichments.push_back(std::make_shared<SigmaFunction<dim>>(enr));
               }
@@ -380,8 +384,8 @@ namespace Step1
 
     make_enrichment_functions();
     fe_space = std::make_shared<ColorEnriched::Helper<dim>>
-                   (ColorEnriched::Helper<dim>(fe_base, fe_enriched,
-                                               vec_predicates, vec_enrichments));
+               (ColorEnriched::Helper<dim>(fe_base, fe_enriched,
+                                           vec_predicates, vec_enrichments));
     fe_collection = std::make_shared<const hp::FECollection<dim>>(
                       fe_space->build_fe_collection(dof_handler));
     std::cout << "size of fe collection: " << fe_collection->size() << std::endl;
@@ -453,9 +457,9 @@ namespace Step1
       }
 
     // q collections the same size as different material identities
-    q_collection.push_back(QGauss<dim>(4));
+    q_collection.push_back(QGauss<dim>(prm.q_degree));
     for (unsigned int i = 1; i < fe_collection->size(); ++i)
-      q_collection.push_back(QGauss<dim>(10));
+      q_collection.push_back(QGauss<dim>(prm.q_degree));
 
     pcout << "...building fe space" << std::endl;
   }
@@ -478,18 +482,43 @@ namespace Step1
     constraints.reinit(locally_relevant_dofs);
     DoFTools::make_hanging_node_constraints(dof_handler, constraints);
 
-    SigmaFunction<dim> boundary_value_func;
-    Point<dim> p;
-    prm.set_enrichment_point(p, 0);
-
-    //TODO add boundary as a vector sum. use lambda functions?
-    std::map<std::string,double> constants;
+    // if the coefficent 'c' in the input expressions are read
+    // boundary function is a sum of functions since c depends on
+    // the sub-domain
     if (prm.coefficients.size() != 0)
-      constants.insert({"c",1});
-    boundary_value_func.initialize(p, prm.sigma, prm.boundary_value_expr,constants);
+      {
+        std::vector<SigmaFunction<dim>> vec_bnd_func;
+        vec_bnd_func.resize(prm.n_enrichments);
 
-    VectorTools::interpolate_boundary_values(dof_handler, 0, boundary_value_func,
-                                             constraints);
+        AssertDimension(vec_bnd_func.size(), prm.coefficients.size());
+
+        for (unsigned int i = 0; i < vec_bnd_func.size(); ++i)
+          {
+            Point<dim> p;
+            prm.set_enrichment_point(p, i);
+            std::map<std::string,double> constants;
+            constants.insert({"c",prm.coefficients[i]});
+            vec_bnd_func[i].initialize(p, prm.sigma, prm.boundary_value_expr,constants);
+          }
+
+        v_sol_func.initialize(vec_bnd_func);
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 0,
+                                                 v_sol_func,
+                                                 constraints);
+      }
+    else
+      {
+        Point<dim> p;
+        prm.set_enrichment_point(p, 0);
+        sol_func.initialize(p, prm.sigma, prm.boundary_value_expr);
+        VectorTools::interpolate_boundary_values(dof_handler, 0,
+                                                 sol_func,
+                                                 constraints);
+      }
+
+
+
     constraints.close();
 
     // Initialise the stiffness and mass matrices
@@ -668,21 +697,26 @@ namespace Step1
     pcout << "Patches used: " << prm.patches << std::endl;
 
     Vector<double> exact_soln_vector, error_vector;
-    SigmaFunction<dim> exact_solution;
 
-    if (prm.exact_soln_expr != "")
+
+    if (prm.estimate_exact_soln)
       {
+
         // create exact solution vector
         exact_soln_vector.reinit(dof_handler.n_dofs());
-        std::map<std::string,double> constants;
 
-        //TODO exact solution as a sum of vectors
+        // if the exact solution is a sum of functions
+        // evaluate function using v_sol_func
         if (prm.coefficients.size() != 0)
-          constants.insert({"c",1});
-
-        exact_solution.initialize(Point<dim>(), prm.sigma, prm.exact_soln_expr,constants);
-        VectorTools::project(dof_handler, constraints, q_collection, exact_solution,
-                             exact_soln_vector);
+          {
+            VectorTools::project(dof_handler, constraints, q_collection, v_sol_func,
+                                 exact_soln_vector);
+          }
+        else
+          {
+            VectorTools::project(dof_handler, constraints, q_collection, sol_func,
+                                 exact_soln_vector);
+          }
 
         // create error vector
         error_vector.reinit(dof_handler.n_dofs());
@@ -702,7 +736,7 @@ namespace Step1
         DataOut<dim, hp::DoFHandler<dim>> data_out;
         data_out.attach_dof_handler(dof_handler);
         data_out.add_data_vector(localized_solution, "solution");
-        if (prm.exact_soln_expr != "")
+        if (prm.estimate_exact_soln)
           {
             data_out.add_data_vector(exact_soln_vector, "exact_solution");
             data_out.add_data_vector(error_vector, "error_vector");
@@ -720,30 +754,37 @@ namespace Step1
     Vector<float> difference_per_cell(triangulation.n_active_cells());
     double L2_error, H1_error;
 
-    if (!prm.exact_soln_expr.empty())
+    if (prm.estimate_exact_soln)
       {
         pcout << "...using exact solution for error calculation" << std::endl;
 
-        SigmaFunction<dim> exact_solution;
-        std::map<std::string,double> constants;
-
         //TODO exact solution as a sum of vectors
-        if (prm.coefficients.size() != 0)
-          constants.insert({"c",1});
-
-        exact_solution.initialize(Point<dim>(), prm.sigma, prm.exact_soln_expr,constants);
-
+        if (prm.coefficients.size() != 0){
         VectorTools::integrate_difference(dof_handler, localized_solution,
-                                          exact_solution, difference_per_cell,
+                                          v_sol_func, difference_per_cell,
                                           q_collection, VectorTools::L2_norm);
         L2_error = VectorTools::compute_global_error(
                      triangulation, difference_per_cell, VectorTools::L2_norm);
 
         VectorTools::integrate_difference(dof_handler, localized_solution,
-                                          exact_solution, difference_per_cell,
+                                          v_sol_func, difference_per_cell,
                                           q_collection, VectorTools::H1_norm);
         H1_error = VectorTools::compute_global_error(
                      triangulation, difference_per_cell, VectorTools::H1_norm);
+          }
+        else {
+            VectorTools::integrate_difference(dof_handler, localized_solution,
+                                              sol_func, difference_per_cell,
+                                              q_collection, VectorTools::L2_norm);
+            L2_error = VectorTools::compute_global_error(
+                         triangulation, difference_per_cell, VectorTools::L2_norm);
+
+            VectorTools::integrate_difference(dof_handler, localized_solution,
+                                              sol_func, difference_per_cell,
+                                              q_collection, VectorTools::H1_norm);
+            H1_error = VectorTools::compute_global_error(
+                         triangulation, difference_per_cell, VectorTools::H1_norm);
+          }
       }
 
     pcout << "refinement h_smallest Dofs L2_norm H1_norm" << std::endl;
@@ -770,8 +811,7 @@ namespace Step1
         vec_fe_index[index] = cell->active_fe_index();
       }
 
-
-    int n_pred_outputs = (10 <= vec_predicates.size())?10:vec_predicates.size();
+    unsigned int n_pred_outputs = (10 <= vec_predicates.size())?10:vec_predicates.size();
     /*
      * set predicate vector. This will change with each refinement.
      * But since the fe indices, fe mapping and enrichment functions don't
@@ -927,7 +967,7 @@ namespace Step1
                 pcout << "End of L2 calculation" << std::endl;
               }
 
-            if ((prm.exact_soln_expr != "") && this_mpi_process == 0)
+            if (prm.estimate_exact_soln && this_mpi_process == 0)
               process_solution();
 
             if (prm.debug_level >= 5 && this_mpi_process == 0)

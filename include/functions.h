@@ -20,7 +20,9 @@ namespace Step1
     FunctionParser<dim> func;
 
   public:
-    SigmaFunction() : Function<dim>(), func(1) {}
+    SigmaFunction() : Function<dim>(),
+      func(1)
+    {}
 
     SigmaFunction(SigmaFunction &other)
       : Function<dim>(), center(other.center), sigma(other.sigma),
@@ -30,16 +32,25 @@ namespace Step1
       this->initialize(center, sigma, func_expr, constants);
     }
 
+    void operator=(const SigmaFunction &other)
+    {
+      center = other.center;
+      sigma = other.sigma;
+      constants = other.constants;
+      func_expr = other.func_expr;
+      this->initialize(center, sigma, func_expr, constants);
+    }
+
     // to help with resize function. doesn't copy function parser(func)!
     SigmaFunction(SigmaFunction &&other)
-      : center(other.center), sigma(other.sigma), func_expr(other.func_expr)
+      : center(other.center), sigma(other.sigma), constants(other.constants), func_expr(other.func_expr)
     {
       this->initialize(center, sigma, func_expr, constants);
     }
 
     void initialize(const Point<dim> &center, const double &sigma,
                     const std::string &func_expr,
-                    const std::map<std::string, double>&constants={});
+                    const std::map<std::string, double> &constants = {});
     double value(const Point<dim> &p, const unsigned int component = 0) const;
     Tensor<1, dim> gradient(const Point<dim> &p,
                             const unsigned int component = 0) const;
@@ -51,17 +62,14 @@ namespace Step1
   void SigmaFunction<dim>::initialize(const Point<dim> &_center,
                                       const double &_sigma,
                                       const std::string &_func_expr,
-                                      const std::map<std::string, double>& _constants)
+                                      const std::map<std::string, double> & _constants)
   {
     center = _center;
     sigma = _sigma;
     func_expr = _func_expr;
     std::string variables;
-    std::map<std::string, double> constants =
-    {{"sigma", sigma},
-      {"pi", numbers::PI}
-    };
-
+    constants.insert({"sigma",sigma});
+    constants.insert({"pi",numbers::PI});
     constants.insert(_constants.begin(), _constants.end());
 
     AssertThrow(dim == 1 || dim == 2 || dim == 3,
@@ -109,6 +117,49 @@ namespace Step1
 
     for (unsigned int p = 0; p < n_points; ++p)
       value_list[p] = value(points[p]);
+  }
+
+
+
+  template <int dim> struct Vec_SigmaFunction : public Function<dim>
+  {
+    Vec_SigmaFunction() : Function<dim>() {}
+    void initialize(const std::vector<SigmaFunction<dim>>& _vec_func)
+    {
+      vec_func.resize(_vec_func.size());
+      for (unsigned int i=0; i<vec_func.size(); ++i)
+          vec_func[i] = _vec_func[i];
+    }
+    double value(const Point<dim> &p, const unsigned int component = 0) const;
+    Tensor<1, dim> gradient(const Point<dim> &p, const unsigned int component=0) const;
+
+  private:
+     std::vector<SigmaFunction<dim>> vec_func;
+  };
+
+  template <int dim>
+  inline double Vec_SigmaFunction<dim>::value(const Point<dim> &p,
+                                              const unsigned int component) const
+  {
+    double res=0;
+    for (unsigned int i=0; i<vec_func.size(); ++i)
+      {
+        res += vec_func[i].value(p,component);
+      }
+    return res;
+  }
+
+  template <int dim>
+  inline Tensor<1, dim>
+  Vec_SigmaFunction<dim>::gradient(const Point<dim> &p,
+                               const unsigned int component) const
+  {
+    Tensor<1, dim> grad;
+    for (unsigned int i=0; i<vec_func.size(); ++i)
+      {
+        grad += vec_func[i].gradient(p,component);
+      }
+    return grad;
   }
 
 } // namespace Step1

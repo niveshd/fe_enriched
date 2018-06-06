@@ -56,13 +56,13 @@ namespace Step1
     EstimateEnrichmentFunction(const Point<1> &center, const double &domain_size,
                                const double &sigma, const std::string &rhs_expr,
                                const std::string &boundary_expr,
-                               const std::map<std::string,double> &constants={},
+                               const std::map<std::string,double> &constants= {},
                                const double &refinement = 11);
     EstimateEnrichmentFunction(const Point<1> &center, const double &left_bound,
                                const double &right_bound, const double &sigma,
                                const std::string &rhs_expr,
                                const std::string &boundary_expr,
-                               const std::map<std::string,double> &constants={},
+                               const std::map<std::string,double> &constants= {},
                                const double &refinement = 11);
     ~EstimateEnrichmentFunction();
     void run();

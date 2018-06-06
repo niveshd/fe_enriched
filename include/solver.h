@@ -403,7 +403,7 @@ namespace Step1
               interpolation_points.push_back(p);
             interpolation_points.push_back(right_bound);
 
-            if (prm.exact_soln_expr.size() == 0)
+            if (prm.estimate_exact_soln)
               {
                 pcout << "...esimating enrichment function" << std::endl;
                 EstimateEnrichmentFunction radial_problem(Point<1>(center), size, sigma,
@@ -433,7 +433,7 @@ namespace Step1
                 Point<dim> p;
                 prm.set_enrichment_point(p, 0);
                 // take only x coordinate
-                enr.initialize(p, prm.sigma, prm.exact_soln_expr);
+                enr.initialize(p, prm.sigma, prm.boundary_value_expr);
 
                 vec_enrichments.push_back(std::make_shared<SigmaFunction<dim>>(enr));
               }
@@ -749,11 +749,11 @@ namespace Step1
     Vector<double> exact_soln_vector, error_vector;
     SigmaFunction<dim> exact_solution;
 
-    if (prm.exact_soln_expr != "")
+    if (prm.estimate_exact_soln)
       {
         // create exact solution vector
         exact_soln_vector.reinit(dof_handler.n_dofs());
-        exact_solution.initialize(Point<dim>(), prm.sigma, prm.exact_soln_expr);
+        exact_solution.initialize(Point<dim>(), prm.sigma, prm.boundary_value_expr);
         VectorTools::project(dof_handler, constraints, q_collection, exact_solution,
                              exact_soln_vector);
 
@@ -775,7 +775,7 @@ namespace Step1
         DataOut<dim, hp::DoFHandler<dim>> data_out;
         data_out.attach_dof_handler(dof_handler);
         data_out.add_data_vector(localized_solution, "solution");
-        if (prm.exact_soln_expr != "")
+        if (prm.estimate_exact_soln)
           {
             data_out.add_data_vector(exact_soln_vector, "exact_solution");
             data_out.add_data_vector(error_vector, "error_vector");
@@ -793,12 +793,12 @@ namespace Step1
     Vector<float> difference_per_cell(triangulation.n_active_cells());
     double L2_error, H1_error;
 
-    if (!prm.exact_soln_expr.empty())
+    if (prm.estimate_exact_soln)
       {
         pcout << "...using exact solution for error calculation" << std::endl;
 
         SigmaFunction<dim> exact_solution;
-        exact_solution.initialize(Point<dim>(), prm.sigma, prm.exact_soln_expr);
+        exact_solution.initialize(Point<dim>(), prm.sigma, prm.boundary_value_expr);
 
         VectorTools::integrate_difference(dof_handler, localized_solution,
                                           exact_solution, difference_per_cell,
@@ -1032,7 +1032,7 @@ namespace Step1
                 pcout << "End of L2 calculation" << std::endl;
               }
 
-            if ((prm.exact_soln_expr != "") && this_mpi_process == 0)
+            if (prm.estimate_exact_soln && this_mpi_process == 0)
               process_solution();
 
             if (prm.debug_level >= 5 && this_mpi_process == 0)

@@ -3,7 +3,7 @@ subsection geometry
     set size = 32
     set shape = 1
     set Global refinement = 6
-    set cycles = 2
+    set cycles = 4
 end
 
 subsection solver
@@ -12,23 +12,25 @@ subsection solver
     set max iterations = 50000
     set tolerance = 1e-9
     set amg threshold = 0.02
+    set quadrature degree = 10
     set solver = 1
 end
 
 subsection expressions
     set rhs value = -c*4*pi/(pi^(3/2)*sigma^3)*exp(-(x*x + y*y + z*z)/(sigma*sigma))
-    set boundary value = 0
+    set boundary value = -c*(1-erfc(sqrt(x*x + y*y + z*z)))/sqrt(x*x + y*y + z*z)
 
     set rhs value radial problem = -c*4*pi/(pi^(3/2)*sigma^3)*exp(-(x*x)/(sigma*sigma))
-    set boundary value radial problem = 0
+    set boundary value radial problem = -c*(1-erfc(x))/x
 
+    set estimate exact solution = true
     set sigma = 0.1
-    set predicate radius = 0.44
+    set predicate radius = 0 #0.44
 end
 
 subsection output
     set patches = 1
-    set debug level = 5
+    set debug level = 1
 end
 
 #end-of-dealii parser

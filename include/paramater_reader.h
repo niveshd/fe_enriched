@@ -20,7 +20,7 @@ struct ParameterCollection
     const std::string &rhs_value_expr, const std::string &boundary_value_expr,
     const std::string &rhs_radial_problem,
     const std::string &boundary_radial_problem,
-    const std::string &exact_soln_expr, const unsigned int &patches,
+    const bool &estimate_exact_soln, const unsigned int &patches,
     const unsigned int &debug_level, const unsigned int &n_enrichments,
     const std::vector<double> &points_enrichments,
     const double &predicate_radius,
@@ -52,6 +52,7 @@ struct ParameterCollection
   unsigned int cycles;
   unsigned int fe_base_degree;
   unsigned int fe_enriched_degree;
+  unsigned int q_degree;
   unsigned int max_iterations;
   double tolerance;
 
@@ -59,11 +60,10 @@ struct ParameterCollection
   std::string rhs_value_expr;
   std::string boundary_value_expr;
 
-  // value = true ==> estimate exact solution from radial problem
   std::string rhs_radial_problem;
   std::string boundary_radial_problem;
 
-  std::string exact_soln_expr;
+  bool estimate_exact_soln;
 
   unsigned int patches;
   // debug level = 0(output nothing),
@@ -107,6 +107,7 @@ void ParameterCollection::initialize(const std::string &file_name,
   prm.declare_entry("max iterations", "1000", Patterns::Integer(1));
   prm.declare_entry("tolerance", "1e-8", Patterns::Double(0));
   prm.declare_entry("solver", "1", Patterns::Integer(1));
+  prm.declare_entry("quadrature degree", "4", Patterns::Integer(1));
   prm.declare_entry("amg threshold", "0.25", Patterns::Double(0, 1));
   prm.declare_entry("solve problem", "true", Patterns::Bool());
   prm.leave_subsection();
@@ -116,7 +117,6 @@ void ParameterCollection::initialize(const std::string &file_name,
   prm.declare_entry("boundary value", "0", Patterns::Anything());
   prm.declare_entry("rhs value radial problem", "0", Patterns::Anything());
   prm.declare_entry("boundary value radial problem", "0", Patterns::Anything());
-  prm.declare_entry("exact solution expression", "", Patterns::Anything());
   prm.declare_entry("estimate exact solution", "false", Patterns::Bool());
   prm.declare_entry("sigma", "1", Patterns::Double(0));
   prm.declare_entry("predicate radius", "1", Patterns::Double(0));
@@ -144,6 +144,7 @@ void ParameterCollection::initialize(const std::string &file_name,
   fe_enriched_degree = prm.get_integer("fe enriched degree");
   max_iterations = prm.get_integer("max iterations");
   tolerance = prm.get_double("tolerance");
+  q_degree = prm.get_integer("quadrature degree");
   solver = (Solver)prm.get_integer("solver");
   threshold_amg = prm.get_double("amg threshold");
   solve_problem = prm.get_bool("solve problem");
@@ -154,7 +155,7 @@ void ParameterCollection::initialize(const std::string &file_name,
   boundary_value_expr = prm.get("boundary value");
   rhs_radial_problem = prm.get("rhs value radial problem");
   boundary_radial_problem = prm.get("boundary value radial problem");
-  exact_soln_expr = prm.get("exact solution expression");
+  estimate_exact_soln = prm.get_bool("estimate exact solution");
   sigma = prm.get_double("sigma");
   predicate_radius = prm.get_double("predicate radius");
   prm.leave_subsection();
@@ -315,7 +316,7 @@ ParameterCollection::ParameterCollection(
   const std::string &rhs_value_expr, const std::string &boundary_value_expr,
   const std::string &rhs_radial_problem,
   const std::string &boundary_radial_problem,
-  const std::string &exact_soln_expr, const unsigned int &patches,
+  const bool &estimate_exact_soln, const unsigned int &patches,
   const unsigned int &debug_level, const unsigned int &n_enrichments,
   const std::vector<double> &points_enrichments,
   const double &predicate_radius,
@@ -327,7 +328,7 @@ ParameterCollection::ParameterCollection(
     boundary_value_expr(boundary_value_expr),
     rhs_radial_problem(rhs_radial_problem),
     boundary_radial_problem(boundary_radial_problem),
-    exact_soln_expr(exact_soln_expr), patches(patches),
+    estimate_exact_soln(estimate_exact_soln), patches(patches),
     debug_level(debug_level), n_enrichments(n_enrichments),
     points_enrichments(points_enrichments),
     predicate_radius(predicate_radius), sigma(sigma) {}
@@ -351,7 +352,7 @@ void ParameterCollection::print()
             << "rhs of radial problem : " << rhs_radial_problem << std::endl
             << "boundary value of radial problem : " << boundary_radial_problem
             << std::endl
-            << "exact solution expr : " << exact_soln_expr << std::endl
+            << "exact solution expr : " << estimate_exact_soln << std::endl
             << "sigma: " << sigma << std::endl
             << "predicate radius: " << predicate_radius << std::endl
             << "Patches used for output: " << patches << std::endl
