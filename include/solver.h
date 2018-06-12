@@ -12,7 +12,6 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_refinement.h>
 #include <deal.II/grid/grid_tools.h>
-
 #include <deal.II/grid/grid_out.h>
 
 #include <deal.II/numerics/data_out.h>
@@ -25,7 +24,7 @@
 #include <deal.II/hp/fe_values.h>
 #include <deal.II/hp/q_collection.h>
 
-#include <deal.II/fe/fe_enriched.templates.h>
+#include <deal.II/fe/fe_enriched.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
@@ -48,7 +47,7 @@
 #include "functions.h"
 #include "paramater_reader.h"
 #include "support.h"
-#include <deal.II/fe/fe_enriched.templates.h>
+#include <deal.II/fe/fe_enriched.h>
 #include <math.h>
 #include <set>
 

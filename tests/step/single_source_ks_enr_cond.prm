@@ -22,7 +22,7 @@ subsection expressions
     set rhs value radial problem = -(exp(-(x*x)/(2*sigma*sigma))*(- 2*sigma*sigma + x*x))/(2*sigma*sigma*sigma*sigma*sigma*sigma*pi)
     set boundary value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
 
-    set exact solution expression = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
+    set estimate exact solution = true
     set sigma = 0.1
     set predicate radius = 100
 end
