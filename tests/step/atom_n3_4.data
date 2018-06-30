@@ -8,14 +8,14 @@ LAMMPS Description
 
      2  atom types
 
-  0.0 3.0 xlo xhi
-  0.0 3.0 ylo yhi
-  0.0 3.0 zlo zhi
+  -4 4 xlo xhi
+  -4 4 ylo yhi
+  -4 4 zlo zhi
 
 Masses
 
-      1		22.989
-      2 	35.453
+      1	1	
+      2 2
 
 Atoms # full
 

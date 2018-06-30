@@ -11,21 +11,24 @@ subsection solver
     set fe enriched degree = 1
     set max iterations = 50000
     set tolerance = 1e-9
+    set solver = 1
 end
 
 subsection expressions
-    set rhs value = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
-    set boundary value = 0
+    set rhs value = -(exp(-(x*x + y*y)/(2*sigma*sigma))*(- 2*sigma*sigma + x*x + y*y))/(2*sigma*sigma*sigma*sigma*sigma*sigma*pi)
+    set boundary value = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
 
-    set rhs value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
-    set boundary value radial problem = 0
+    set rhs value radial problem = -(exp(-(x*x)/(2*sigma*sigma))*(- 2*sigma*sigma + x*x))/(2*sigma*sigma*sigma*sigma*sigma*sigma*pi)
+    set boundary value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
+    
+    set estimate exact solution = true
     set sigma = 0.1
     set predicate radius = 0.4
 end
 
 subsection output
     set patches = 1
-    set debug level = 1
+    set debug level = 5
 end
 
 #end-of-dealii parser

@@ -482,22 +482,19 @@ namespace Step1
     constraints.reinit(locally_relevant_dofs);
     DoFTools::make_hanging_node_constraints(dof_handler, constraints);
 
-    // if the coefficent 'c' in the input expressions are read
-    // boundary function is a sum of functions since c depends on
-    // the sub-domain
-    if (prm.coefficients.size() != 0)
+    // if multiple sources are present
+    if (prm.n_enrichments > 1)
       {
         std::vector<SigmaFunction<dim>> vec_bnd_func;
         vec_bnd_func.resize(prm.n_enrichments);
-
-        AssertDimension(vec_bnd_func.size(), prm.coefficients.size());
 
         for (unsigned int i = 0; i < vec_bnd_func.size(); ++i)
           {
             Point<dim> p;
             prm.set_enrichment_point(p, i);
             std::map<std::string,double> constants;
-            constants.insert({"c",prm.coefficients[i]});
+            if (prm.coefficients.size() > 0)
+              constants.insert({"c",prm.coefficients[i]});
             vec_bnd_func[i].initialize(p, prm.sigma, prm.boundary_value_expr,constants);
           }
 
@@ -698,7 +695,6 @@ namespace Step1
 
     Vector<double> exact_soln_vector, error_vector;
 
-
     if (prm.estimate_exact_soln)
       {
 
@@ -707,7 +703,7 @@ namespace Step1
 
         // if the exact solution is a sum of functions
         // evaluate function using v_sol_func
-        if (prm.coefficients.size() != 0)
+        if (prm.n_enrichments > 1)
           {
             VectorTools::project(dof_handler, constraints, q_collection, v_sol_func,
                                  exact_soln_vector);
@@ -759,7 +755,7 @@ namespace Step1
         pcout << "...using exact solution for error calculation" << std::endl;
 
         //TODO exact solution as a sum of vectors
-        if (prm.coefficients.size() != 0){
+        if (prm.n_enrichments > 1){
         VectorTools::integrate_difference(dof_handler, localized_solution,
                                           v_sol_func, difference_per_cell,
                                           q_collection, VectorTools::L2_norm);

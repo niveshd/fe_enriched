@@ -3,7 +3,7 @@ subsection geometry
     set size = 2
     set shape = 1
     set Global refinement = 2
-    set cycles = 7
+    set cycles = 5
 end
 
 subsection solver
@@ -28,7 +28,7 @@ end
 
 subsection output
     set patches = 1
-    set debug level = 2
+    set debug level = 1
 end
 
 #end-of-dealii parser
