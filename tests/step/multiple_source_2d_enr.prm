@@ -1,9 +1,9 @@
 subsection geometry
-    set dim = 3
+    set dim = 2
     set size = 8
     set shape = 1
     set Global refinement = 4
-    set cycles = 3
+    set cycles = 5
 end
 
 subsection solver
@@ -17,20 +17,20 @@ subsection solver
 end
 
 subsection expressions
-    set rhs value = -c*4*pi/(pi^(3/2)*sigma^3)*exp(-(x*x + y*y + z*z)/(sigma*sigma))
-    set boundary value = -c*(1-erfc(sqrt(x*x + y*y + z*z)))/sqrt(x*x + y*y + z*z)
+    set rhs value = -(exp(-(x*x + y*y)/(2*sigma*sigma))*(- 2*sigma*sigma + x*x + y*y))/(2*sigma*sigma*sigma*sigma*sigma*sigma*pi)
+    set boundary value = 1.0/(2*pi*sigma*sigma)*exp(-(x*x + y*y)/(2*sigma*sigma))
 
-    set rhs value radial problem = -c*4*pi/(pi^(3/2)*sigma^3)*exp(-(x*x)/(sigma*sigma))
-    set boundary value radial problem = -c*(1-erfc(x))/x
+    set rhs value radial problem = -(exp(-(x*x)/(2*sigma*sigma))*(- 2*sigma*sigma + x*x))/(2*sigma*sigma*sigma*sigma*sigma*sigma*pi)
+    set boundary value radial problem = 1.0/(2*pi*sigma*sigma)*exp(-(x*x)/(2*sigma*sigma))
 
     set estimate exact solution = true
     set sigma = 0.1
-    set predicate radius = 0.44
+    set predicate radius = 0.4
 end
 
 subsection output
     set patches = 1
-    set debug level = 5
+    set debug level = 1
 end
 
 #end-of-dealii parser
