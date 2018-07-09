@@ -518,7 +518,7 @@ namespace Step1
     {
       pcout << "print cells with dof" << std::endl;
       //set dof id
-      unsigned int match_dof = 1200;
+      unsigned int match_dof = 8617;
 
       Vector<float> cells_match_dof;
       cells_match_dof.reinit(triangulation.n_active_cells());
@@ -544,8 +544,8 @@ namespace Step1
         for (auto dof:dof_indices)
           if (dof == match_dof){
              std::string fe_name(cell->get_fe().get_name());
-             replace(fe_name, "FE_Q<2>(1)", "1");
-             replace(fe_name, "FE_Nothing<2>(dominating)", "0");
+             replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
+             replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
 
              cells_match_dof[cell->active_cell_index()] = ++i;
 
