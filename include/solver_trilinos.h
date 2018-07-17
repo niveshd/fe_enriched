@@ -144,7 +144,6 @@ namespace Step1
 
     //required functions
     Vec_SigmaFunction<dim> v_sol_func;
-    SigmaFunction<dim> sol_func;
   };
 
   template <int dim>
@@ -483,8 +482,6 @@ namespace Step1
     DoFTools::make_hanging_node_constraints(dof_handler, constraints);
 
     // if multiple sources are present
-    if (prm.n_enrichments > 1)
-      {
         std::vector<SigmaFunction<dim>> vec_bnd_func;
         vec_bnd_func.resize(prm.n_enrichments);
 
@@ -503,16 +500,6 @@ namespace Step1
                                                  0,
                                                  v_sol_func,
                                                  constraints);
-      }
-    else
-      {
-        Point<dim> p;
-        prm.set_enrichment_point(p, 0);
-        sol_func.initialize(p, prm.sigma, prm.boundary_value_expr);
-        VectorTools::interpolate_boundary_values(dof_handler, 0,
-                                                 sol_func,
-                                                 constraints);
-      }
 
     if (prm.debug_level >= 1)
     {
@@ -745,31 +732,21 @@ namespace Step1
 
     Vector<double> exact_soln_vector, error_vector;
 
-    if (prm.estimate_exact_soln)
-      {
+    AssertThrow(prm.estimate_exact_soln == true,
+                ExcMessage("Error norms cannot be calculated"));
 
-        // create exact solution vector
-        exact_soln_vector.reinit(dof_handler.n_dofs());
+    // create exact solution vector
+    exact_soln_vector.reinit(dof_handler.n_dofs());
 
-        // if the exact solution is a sum of functions
-        // evaluate function using v_sol_func
-        if (prm.n_enrichments > 1)
-          {
-            VectorTools::project(dof_handler, constraints, q_collection, v_sol_func,
-                                 exact_soln_vector);
-          }
-        else
-          {
-            VectorTools::project(dof_handler, constraints, q_collection, sol_func,
-                                 exact_soln_vector);
-          }
-
-        // create error vector
-        error_vector.reinit(dof_handler.n_dofs());
-        Vector<double> full_solution(localized_solution);
-        error_vector += full_solution;
-        error_vector -= exact_soln_vector;
-      }
+    // if the exact solution is a sum of functions
+    // evaluate function using v_sol_func
+    VectorTools::project(dof_handler, constraints, q_collection, v_sol_func,
+                         exact_soln_vector);
+    // create error vector
+    error_vector.reinit(dof_handler.n_dofs());
+    Vector<double> full_solution(localized_solution);
+    error_vector += full_solution;
+    error_vector -= exact_soln_vector;
 
     Assert(cycle < 10, ExcNotImplemented());
     if (this_mpi_process == 0)
@@ -804,8 +781,6 @@ namespace Step1
       {
         pcout << "...using exact solution for error calculation" << std::endl;
 
-        //TODO exact solution as a sum of vectors
-        if (prm.n_enrichments > 1){
         VectorTools::integrate_difference(dof_handler, localized_solution,
                                           v_sol_func, difference_per_cell,
                                           q_collection, VectorTools::L2_norm);
@@ -817,20 +792,6 @@ namespace Step1
                                           q_collection, VectorTools::H1_norm);
         H1_error = VectorTools::compute_global_error(
                      triangulation, difference_per_cell, VectorTools::H1_norm);
-          }
-        else {
-            VectorTools::integrate_difference(dof_handler, localized_solution,
-                                              sol_func, difference_per_cell,
-                                              q_collection, VectorTools::L2_norm);
-            L2_error = VectorTools::compute_global_error(
-                         triangulation, difference_per_cell, VectorTools::L2_norm);
-
-            VectorTools::integrate_difference(dof_handler, localized_solution,
-                                              sol_func, difference_per_cell,
-                                              q_collection, VectorTools::H1_norm);
-            H1_error = VectorTools::compute_global_error(
-                         triangulation, difference_per_cell, VectorTools::H1_norm);
-          }
       }
 
     pcout << "refinement h_smallest Dofs L2_norm H1_norm" << std::endl;

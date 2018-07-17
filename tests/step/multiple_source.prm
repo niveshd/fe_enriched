@@ -25,7 +25,7 @@ subsection expressions
 
     set estimate exact solution = true
     set sigma = 0.1
-    set predicate radius = 0.44
+    set predicate radius = 0
 end
 
 subsection output
