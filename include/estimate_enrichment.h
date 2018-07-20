@@ -236,7 +236,7 @@ namespace Step1
 
   void EstimateEnrichmentFunction::run()
   {
-    if (debug_level >= 1)
+    if (debug_level >= 5)
       std::cout << "Solving problem in 1.: " << 1 << " with center: " << center
                 << ", size: " << domain_size << ", sigma: " << sigma << std::endl;
 
@@ -252,7 +252,7 @@ namespace Step1
             ++refinement;
           }
 
-        if (debug_level >= 1)
+        if (debug_level >= 5)
           std::cout << "Refinement level: " << refinement << std::endl;
 
         setup_system();
@@ -269,11 +269,11 @@ namespace Step1
       }
     while (relative_change > 0.005);
 
-    if (debug_level >= 1)
+    if (debug_level >= 5)
       std::cout << "Radial solution at origin = " << value
                 << " after global refinement " << refinement << std::endl;
 
-    if (debug_level >= 6)
+    if (debug_level >= 9)
       output_results();
   }
 

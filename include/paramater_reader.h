@@ -77,10 +77,6 @@ struct ParameterCollection
   std::vector<double> coefficients;
   double predicate_radius;
   double sigma;
-
-  enum Solver { trilinos_amg = 1, petsc_amg, jacobi };
-
-  Solver solver;
   double threshold_amg;
   bool solve_problem;
 };
@@ -106,7 +102,6 @@ void ParameterCollection::initialize(const std::string &file_name,
   prm.declare_entry("fe enriched degree", "1", Patterns::Integer(1));
   prm.declare_entry("max iterations", "1000", Patterns::Integer(1));
   prm.declare_entry("tolerance", "1e-8", Patterns::Double(0));
-  prm.declare_entry("solver", "1", Patterns::Integer(1));
   prm.declare_entry("quadrature degree", "4", Patterns::Integer(1));
   prm.declare_entry("amg threshold", "0.25", Patterns::Double(0, 1));
   prm.declare_entry("solve problem", "true", Patterns::Bool());
@@ -145,7 +140,6 @@ void ParameterCollection::initialize(const std::string &file_name,
   max_iterations = prm.get_integer("max iterations");
   tolerance = prm.get_double("tolerance");
   q_degree = prm.get_integer("quadrature degree");
-  solver = (Solver)prm.get_integer("solver");
   threshold_amg = prm.get_double("amg threshold");
   solve_problem = prm.get_bool("solve problem");
   prm.leave_subsection();
@@ -344,7 +338,6 @@ void ParameterCollection::print()
             << "FE enriched degree : " << fe_enriched_degree << std::endl
             << "Max Iterations : " << max_iterations << std::endl
             << "Tolerance : " << tolerance << std::endl
-            << "Solver: " << solver << std::endl
             << "solving " << solve_problem << std::endl
             << "rhs - main problem : " << rhs_value_expr << std::endl
             << "boundary value - main problem : " << boundary_value_expr
@@ -358,9 +351,6 @@ void ParameterCollection::print()
             << "Patches used for output: " << patches << std::endl
             << "Debug level: " << debug_level << std::endl
             << "Number of enrichment points: " << n_enrichments << std::endl;
-
-  if (solver == trilinos_amg)
-    std::cout << "Threshold for amg: " << threshold_amg << std::endl;
 
   std::cout << "enrichment points and q (if any): " << std::endl;
   for (unsigned int i = 0, q = 0; i < points_enrichments.size(); i = i + dim, ++q)

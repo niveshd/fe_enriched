@@ -57,7 +57,6 @@
 #include "../tests/tests.h"
 #include "estimate_enrichment.h"
 #include "paramater_reader.h"
-#include "solver.h"
 #include "solver_trilinos.h"
 #include "support.h"
 
@@ -77,30 +76,14 @@ int main(int argc, char **argv)
     if (prm.dim == 2)
       {
         const int d = 2;
-        if (prm.solver == prm.trilinos_amg)
-          {
             Step1::LaplaceProblem_t<d> step1(prm);
             step1.run();
-          }
-        else
-          {
-            Step1::LaplaceProblem<d> step1(prm);
-            step1.run();
-          }
       }
     else if (prm.dim == 3)
       {
         const int d = 3;
-        if (prm.solver == prm.trilinos_amg)
-          {
             Step1::LaplaceProblem_t<d> step1(prm);
             step1.run();
-          }
-        else
-          {
-            Step1::LaplaceProblem<d> step1(prm);
-            step1.run();
-          }
       }
     else
       AssertThrow(false, ExcMessage("Dimension incorect. dim can be 2 or 3"));

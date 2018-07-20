@@ -3,6 +3,7 @@
 
 #include <deal.II/base/conditional_ostream.h>
 #include <deal.II/base/function.h>
+#include <deal.II/base/timer.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/dofs/dof_renumbering.h>
@@ -52,6 +53,123 @@
 #include <set>
 
 #include "../tests/tests.h"
+
+
+
+template <int dim>
+void plot_shape_function(hp::DoFHandler<dim> &dof_handler,
+                         unsigned int patches = 5)
+{
+  std::cout << "...start plotting shape function" << std::endl;
+  std::cout << "Patches for output: " << patches << std::endl;
+
+  ConstraintMatrix constraints;
+  constraints.clear();
+  dealii::DoFTools::make_hanging_node_constraints(dof_handler, constraints);
+  constraints.close();
+
+  // find set of dofs which belong to enriched cells
+  std::set<unsigned int> enriched_cell_dofs;
+  for (auto cell : dof_handler.active_cell_iterators())
+    if (cell->active_fe_index() != 0)
+      {
+        unsigned int dofs_per_cell = cell->get_fe().dofs_per_cell;
+        std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+        cell->get_dof_indices(local_dof_indices);
+        enriched_cell_dofs.insert(local_dof_indices.begin(),
+                                  local_dof_indices.end());
+      }
+
+  // output to check if all is good:
+  std::vector<Vector<double>> shape_functions;
+  std::vector<std::string> names;
+  for (auto dof : enriched_cell_dofs)
+    {
+      Vector<double> shape_function;
+      shape_function.reinit(dof_handler.n_dofs());
+      shape_function[dof] = 1.0;
+
+      // if the dof is constrained, first output unconstrained vector
+      names.push_back(std::string("C_") +
+                      dealii::Utilities::int_to_string(dof, 2));
+      shape_functions.push_back(shape_function);
+
+      //      names.push_back(std::string("UC_") +
+      //                      dealii::Utilities::int_to_string(s,2));
+
+      //      // make continuous/constraint:
+      //      constraints.distribute(shape_function);
+      //      shape_functions.push_back(shape_function);
+    }
+
+  if (dof_handler.n_dofs() < 100)
+    {
+      std::cout << "...start printing support points" << std::endl;
+
+      std::map<types::global_dof_index, Point<dim>> support_points;
+      MappingQ1<dim> mapping;
+      hp::MappingCollection<dim> hp_mapping;
+      for (unsigned int i = 0; i < dof_handler.get_fe_collection().size(); ++i)
+        hp_mapping.push_back(mapping);
+      DoFTools::map_dofs_to_support_points(hp_mapping, dof_handler,
+                                           support_points);
+
+      const std::string base_filename =
+        "DOFs" + dealii::Utilities::int_to_string(dim) + "_p" +
+        dealii::Utilities::int_to_string(0);
+
+      const std::string filename = base_filename + ".gp";
+      std::ofstream f(filename.c_str());
+
+      f << "set terminal png size 400,410 enhanced font \"Helvetica,8\""
+        << std::endl
+        << "set output \"" << base_filename << ".png\"" << std::endl
+        << "set size square" << std::endl
+        << "set view equal xy" << std::endl
+        << "unset xtics                                                          "
+        "                         "
+        << std::endl
+        << "unset ytics" << std::endl
+        << "unset grid" << std::endl
+        << "unset border" << std::endl
+        << "plot '-' using 1:2 with lines notitle, '-' with labels point pt 2 "
+        "offset 1,1 notitle"
+        << std::endl;
+      GridOut grid_out;
+      grid_out.write_gnuplot(dof_handler.get_triangulation(), f);
+      f << "e" << std::endl;
+
+      DoFTools::write_gnuplot_dof_support_point_info(f, support_points);
+
+      f << "e" << std::endl;
+
+      std::cout << "...finished printing support points" << std::endl;
+    }
+
+  DataOut<dim, hp::DoFHandler<dim>> data_out;
+  data_out.attach_dof_handler(dof_handler);
+
+  // get material ids:
+  Vector<float> fe_index(dof_handler.get_triangulation().n_active_cells());
+  for (auto cell : dof_handler.active_cell_iterators())
+    {
+      fe_index[cell->active_cell_index()] = cell->active_fe_index();
+    }
+  data_out.add_data_vector(fe_index, "fe_index");
+
+  for (unsigned int i = 0; i < shape_functions.size(); i++)
+    data_out.add_data_vector(shape_functions[i], names[i]);
+
+  data_out.build_patches(patches);
+
+  std::string filename = "shape_functions.vtu";
+  std::ofstream output(filename.c_str());
+  data_out.write_vtu(output);
+
+  std::cout << "...finished plotting shape functions" << std::endl;
+}
+
+
 
 namespace LA
 {
@@ -501,57 +619,57 @@ namespace Step1
                                                  v_sol_func,
                                                  constraints);
 
-//    if (prm.debug_level >= 1)
-//    {
-//      pcout << "print cells with dof" << std::endl;
-//      //set dof id
-//      unsigned int match_dof = 8617;
+    if (prm.debug_level >= 2)
+    {
+      pcout << "print cells with dof" << std::endl;
+      //set dof id
+      unsigned int match_dof = 8617;
 
-//      Vector<float> cells_match_dof;
-//      cells_match_dof.reinit(triangulation.n_active_cells());
+      Vector<float> cells_match_dof;
+      cells_match_dof.reinit(triangulation.n_active_cells());
 
-//      //replace all strings. used to better represent fe enriched elements
-//      auto replace = [](std::string& str, const std::string& from, const std::string& to) {
-//      if(from.empty())
-//          return;
-//      size_t start_pos = 0;
-//      while((start_pos = str.find(from, start_pos)) != std::string::npos) {
-//          str.replace(start_pos, from.length(), to);
-//          start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
-//      }
-//      };
+      //replace all strings. used to better represent fe enriched elements
+      auto replace = [](std::string& str, const std::string& from, const std::string& to) {
+      if(from.empty())
+          return;
+      size_t start_pos = 0;
+      while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+          str.replace(start_pos, from.length(), to);
+          start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+      }
+      };
 
-//      //loop through cells
-//      int i = 0;
-//      for (auto cell:dof_handler.active_cell_iterators()){
+      //loop through cells
+      int i = 0;
+      for (auto cell:dof_handler.active_cell_iterators()){
 
-//        //if the dof belongs to it
-//        std::vector< types::global_dof_index > 	dof_indices(cell->get_fe().dofs_per_cell);
-//        cell->get_dof_indices(dof_indices);
-//        for (auto dof:dof_indices)
-//          if (dof == match_dof){
-//             std::string fe_name(cell->get_fe().get_name());
-//             replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
-//             replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
+        //if the dof belongs to it
+        std::vector< types::global_dof_index > 	dof_indices(cell->get_fe().dofs_per_cell);
+        cell->get_dof_indices(dof_indices);
+        for (auto dof:dof_indices)
+          if (dof == match_dof){
+             std::string fe_name(cell->get_fe().get_name());
+             replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
+             replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
 
-//             cells_match_dof[cell->active_cell_index()] = ++i;
+             cells_match_dof[cell->active_cell_index()] = ++i;
 
-//            //print FE enriched for the cell
-//            pcout << cell->id() << " "
-//                  << cell->active_fe_index() << " "
-//                  << fe_name << std::endl;
-//          }
-//        }
+            //print FE enriched for the cell
+            pcout << cell->id() << " "
+                  << cell->active_fe_index() << " "
+                  << fe_name << std::endl;
+          }
+        }
 
-//      //geometry of the cell (adaptable for 3d!)
-//      std::ofstream output("dof_debug.vtk");
-//      DataOut<dim, hp::DoFHandler<dim>> data_out;
-//      data_out.attach_dof_handler(dof_handler);
-//      data_out.add_data_vector(cells_match_dof, "match_dof");
-//      data_out.build_patches(prm.patches);
-//      data_out.write_vtk(output);
-//      output.close();
-//    }
+      //geometry of the cell (adaptable for 3d!)
+      std::ofstream output("dof_debug.vtk");
+      DataOut<dim, hp::DoFHandler<dim>> data_out;
+      data_out.attach_dof_handler(dof_handler);
+      data_out.add_data_vector(cells_match_dof, "match_dof");
+      data_out.build_patches(prm.patches);
+      data_out.write_vtk(output);
+      output.close();
+    }
 
     constraints.close();
 
@@ -663,29 +781,14 @@ namespace Step1
     SolverControl solver_control(prm.max_iterations, prm.tolerance, false, false);
     SolverCG<vector_t> cg(solver_control);
 
-    // choose preconditioner
-    if (prm.solver == prm.trilinos_amg)
-      {
-        TrilinosWrappers::PreconditionAMG::AdditionalData Amg_data;
-        Amg_data.elliptic = true;
-        Amg_data.higher_order_elements = true;
-        Amg_data.smoother_sweeps = 2;
-        Amg_data.aggregation_threshold = prm.threshold_amg;
-        TrilinosWrappers::PreconditionAMG preconditioner;
-        preconditioner.initialize(system_matrix, Amg_data);
-        cg.solve(system_matrix, solution, system_rhs, preconditioner);
-      }
-    else if (prm.solver == prm.jacobi)
-      {
-        TrilinosWrappers::PreconditionJacobi preconditioner;
-        preconditioner.initialize(system_matrix);
-        cg.solve(system_matrix, solution, system_rhs, preconditioner);
-      }
-    else
-      {
-        AssertThrow(false, ExcMessage("Improper preconditioner. Value given " +
-                                      prm.solver));
-      }
+    TrilinosWrappers::PreconditionAMG::AdditionalData Amg_data;
+    Amg_data.elliptic = true;
+    Amg_data.higher_order_elements = true;
+    Amg_data.smoother_sweeps = 2;
+    Amg_data.aggregation_threshold = prm.threshold_amg;
+    TrilinosWrappers::PreconditionAMG preconditioner;
+    preconditioner.initialize(system_matrix, Amg_data);
+    cg.solve(system_matrix, solution, system_rhs, preconditioner);
 
     Vector<double> local_soln(solution);
 

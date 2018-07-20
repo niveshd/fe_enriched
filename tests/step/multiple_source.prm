@@ -13,7 +13,6 @@ subsection solver
     set tolerance = 1e-9
     set amg threshold = 0.02
     set quadrature degree = 10
-    set solver = 1
 end
 
 subsection expressions
