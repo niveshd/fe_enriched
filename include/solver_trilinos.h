@@ -501,57 +501,57 @@ namespace Step1
                                                  v_sol_func,
                                                  constraints);
 
-    if (prm.debug_level >= 1)
-    {
-      pcout << "print cells with dof" << std::endl;
-      //set dof id
-      unsigned int match_dof = 8617;
+//    if (prm.debug_level >= 1)
+//    {
+//      pcout << "print cells with dof" << std::endl;
+//      //set dof id
+//      unsigned int match_dof = 8617;
 
-      Vector<float> cells_match_dof;
-      cells_match_dof.reinit(triangulation.n_active_cells());
+//      Vector<float> cells_match_dof;
+//      cells_match_dof.reinit(triangulation.n_active_cells());
 
-      //replace all strings. used to better represent fe enriched elements
-      auto replace = [](std::string& str, const std::string& from, const std::string& to) {
-      if(from.empty())
-          return;
-      size_t start_pos = 0;
-      while((start_pos = str.find(from, start_pos)) != std::string::npos) {
-          str.replace(start_pos, from.length(), to);
-          start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
-      }
-      };
+//      //replace all strings. used to better represent fe enriched elements
+//      auto replace = [](std::string& str, const std::string& from, const std::string& to) {
+//      if(from.empty())
+//          return;
+//      size_t start_pos = 0;
+//      while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+//          str.replace(start_pos, from.length(), to);
+//          start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+//      }
+//      };
 
-      //loop through cells
-      int i = 0;
-      for (auto cell:dof_handler.active_cell_iterators()){
+//      //loop through cells
+//      int i = 0;
+//      for (auto cell:dof_handler.active_cell_iterators()){
 
-        //if the dof belongs to it
-        std::vector< types::global_dof_index > 	dof_indices(cell->get_fe().dofs_per_cell);
-        cell->get_dof_indices(dof_indices);
-        for (auto dof:dof_indices)
-          if (dof == match_dof){
-             std::string fe_name(cell->get_fe().get_name());
-             replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
-             replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
+//        //if the dof belongs to it
+//        std::vector< types::global_dof_index > 	dof_indices(cell->get_fe().dofs_per_cell);
+//        cell->get_dof_indices(dof_indices);
+//        for (auto dof:dof_indices)
+//          if (dof == match_dof){
+//             std::string fe_name(cell->get_fe().get_name());
+//             replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
+//             replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
 
-             cells_match_dof[cell->active_cell_index()] = ++i;
+//             cells_match_dof[cell->active_cell_index()] = ++i;
 
-            //print FE enriched for the cell
-            pcout << cell->id() << " "
-                  << cell->active_fe_index() << " "
-                  << fe_name << std::endl;
-          }
-        }
+//            //print FE enriched for the cell
+//            pcout << cell->id() << " "
+//                  << cell->active_fe_index() << " "
+//                  << fe_name << std::endl;
+//          }
+//        }
 
-      //geometry of the cell (adaptable for 3d!)
-      std::ofstream output("dof_debug.vtk");
-      DataOut<dim, hp::DoFHandler<dim>> data_out;
-      data_out.attach_dof_handler(dof_handler);
-      data_out.add_data_vector(cells_match_dof, "match_dof");
-      data_out.build_patches(prm.patches);
-      data_out.write_vtk(output);
-      output.close();
-    }
+//      //geometry of the cell (adaptable for 3d!)
+//      std::ofstream output("dof_debug.vtk");
+//      DataOut<dim, hp::DoFHandler<dim>> data_out;
+//      data_out.attach_dof_handler(dof_handler);
+//      data_out.add_data_vector(cells_match_dof, "match_dof");
+//      data_out.build_patches(prm.patches);
+//      data_out.write_vtk(output);
+//      output.close();
+//    }
 
     constraints.close();
 

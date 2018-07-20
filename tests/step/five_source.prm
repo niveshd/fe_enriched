@@ -3,7 +3,7 @@ subsection geometry
     set size = 8
     set shape = 1
     set Global refinement = 4
-    set cycles = 4 
+    set cycles = 4
 end
 
 subsection solver

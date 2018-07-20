@@ -15,4 +15,3 @@ set (CMAKE_CXX_FLAGS "-fexceptions")
 
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(tests/step)
-ADD_SUBDIRECTORY(tests/support)
