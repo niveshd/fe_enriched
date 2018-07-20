@@ -208,6 +208,7 @@ namespace Step1
     void refine_grid();
     void output_results(const unsigned int cycle);
     void process_solution();
+    void debug_dof(const unsigned int dof);
 
   protected:
     ParameterCollection prm;
@@ -621,54 +622,9 @@ namespace Step1
 
     if (prm.debug_level >= 2)
     {
-      pcout << "print cells with dof" << std::endl;
-      //set dof id
+      //set dof id. problem with 50 atoms P3M problem with dof=8617
       unsigned int match_dof = 8617;
-
-      Vector<float> cells_match_dof;
-      cells_match_dof.reinit(triangulation.n_active_cells());
-
-      //replace all strings. used to better represent fe enriched elements
-      auto replace = [](std::string& str, const std::string& from, const std::string& to) {
-      if(from.empty())
-          return;
-      size_t start_pos = 0;
-      while((start_pos = str.find(from, start_pos)) != std::string::npos) {
-          str.replace(start_pos, from.length(), to);
-          start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
-      }
-      };
-
-      //loop through cells
-      int i = 0;
-      for (auto cell:dof_handler.active_cell_iterators()){
-
-        //if the dof belongs to it
-        std::vector< types::global_dof_index > 	dof_indices(cell->get_fe().dofs_per_cell);
-        cell->get_dof_indices(dof_indices);
-        for (auto dof:dof_indices)
-          if (dof == match_dof){
-             std::string fe_name(cell->get_fe().get_name());
-             replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
-             replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
-
-             cells_match_dof[cell->active_cell_index()] = ++i;
-
-            //print FE enriched for the cell
-            pcout << cell->id() << " "
-                  << cell->active_fe_index() << " "
-                  << fe_name << std::endl;
-          }
-        }
-
-      //geometry of the cell (adaptable for 3d!)
-      std::ofstream output("dof_debug.vtk");
-      DataOut<dim, hp::DoFHandler<dim>> data_out;
-      data_out.attach_dof_handler(dof_handler);
-      data_out.add_data_vector(cells_match_dof, "match_dof");
-      data_out.build_patches(prm.patches);
-      data_out.write_vtk(output);
-      output.close();
+      debug_dof(match_dof);
     }
 
     constraints.close();
@@ -1095,6 +1051,83 @@ namespace Step1
   template <int dim> LaplaceProblem_t<dim>::~LaplaceProblem_t()
   {
     dof_handler.clear();
+  }
+
+  template <int dim> void LaplaceProblem_t<dim>::debug_dof(const unsigned int match_dof)
+  {
+    pcout << "print cells with dof" << std::endl;
+
+    Vector<float> cells_match_dof;
+    cells_match_dof.reinit(triangulation.n_active_cells());
+
+    //replace all strings. used to better represent fe enriched elements
+    auto replace = [](std::string& str, const std::string& from, const std::string& to) {
+    if(from.empty())
+        return;
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+    }
+    };
+
+    //find cell with a dof = match_dof.
+    //store the iterator to one of these cells
+    int i = 0;
+    typename hp::DoFHandler<dim>::active_cell_iterator match_cell;
+    for (auto cell:dof_handler.active_cell_iterators()){
+
+      //if the dof belongs to it
+      std::vector< types::global_dof_index > 	dof_indices(cell->get_fe().dofs_per_cell);
+      cell->get_dof_indices(dof_indices);
+      for (auto dof:dof_indices)
+        if (dof == match_dof){
+           match_cell = cell;
+
+           std::string fe_name(cell->get_fe().get_name());
+           replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
+           replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
+
+           cells_match_dof[cell->active_cell_index()] = ++i;
+
+          //print FE enriched for the cell
+          pcout << cell->id() << " "
+                << cell->active_fe_index() << " "
+                << fe_name << std::endl;
+        }
+      }
+
+    if (match_cell.state() == IteratorState::valid)
+    {
+    auto patch = GridTools::get_patch_around_cell<hp::DoFHandler<dim>>(match_cell);
+    Triangulation<dim> local_triangulation;
+    hp::DoFHandler<dim> local_dofhandler(local_triangulation);
+    std::map<typename Triangulation<dim>::active_cell_iterator,
+             typename hp::DoFHandler<dim>::active_cell_iterator> 	patch_to_global_tria_map;
+    GridTools::build_triangulation_from_patch<hp::DoFHandler<dim>>(patch,
+                                                                   local_triangulation,
+                                                                   patch_to_global_tria_map);
+
+    for (auto cell:local_dofhandler.active_cell_iterators()){
+        cell->set_material_id(patch_to_global_tria_map.at(cell)->material_id());
+        cell->set_subdomain_id(patch_to_global_tria_map.at(cell)->active_fe_index());
+      }
+
+    std::ofstream output("triangulation_debug.vtk");
+    GridOut().write_vtk(local_triangulation, output);
+    output.close();
+    }
+
+    //geometry of the cell (adaptable for 3d!)
+    //cells with matching dofs are labelled from 1.
+    //filter out 0 from output to see the cells.
+    std::ofstream output("dof_debug.vtk");
+    DataOut<dim, hp::DoFHandler<dim>> data_out;
+    data_out.attach_dof_handler(dof_handler);
+    data_out.add_data_vector(cells_match_dof, "match_dof");
+    data_out.build_patches(prm.patches);
+    data_out.write_vtk(output);
+    output.close();
   }
 } // namespace Step1
 #endif
