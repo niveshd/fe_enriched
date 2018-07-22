@@ -622,8 +622,8 @@ namespace Step1
 
     if (prm.debug_level >= 2)
     {
-      //set dof id. problem with 50 atoms P3M problem with dof=8617
-      unsigned int match_dof = 8617;
+      //set dof id. problem with 50 atoms P3M problem with dof=8611
+      unsigned int match_dof = 8611;
       debug_dof(match_dof);
     }
 
