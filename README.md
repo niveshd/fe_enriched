@@ -7,6 +7,14 @@ cd build
 cmake ..	
 make
 
+     
+#for debugging p3m constraint line error with 50 items use
+build/src/step tests/step/multiple_source_enriched.prm tests/step/atom_n3_50.data
+#generates triangulation_debug.vtk file with a patch of cells around cell with a particular problematic dof (8611)
+#the function relevant is debug_constraint() in the include/solver_trilinos.h
+#the vtk file labels based fe indices, (if cells have dof 8611) and material id
+#run the problem in debug mode to ensure the same dof gives the constraint line error
+#initial tests reveal that both the cells cotaining dof (8611) have same fe index, material id!
 
 
 #Unit tests.

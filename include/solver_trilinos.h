@@ -208,7 +208,7 @@ namespace Step1
     void refine_grid();
     void output_results(const unsigned int cycle);
     void process_solution();
-    void debug_dof(const unsigned int dof);
+    void debug_constraint(const unsigned int debug_dof);
 
   protected:
     ParameterCollection prm;
@@ -623,8 +623,8 @@ namespace Step1
     if (prm.debug_level >= 2)
     {
       //set dof id. problem with 50 atoms P3M problem with dof=8611
-      unsigned int match_dof = 8611;
-      debug_dof(match_dof);
+        unsigned int match_dof = 8611;
+      debug_constraint(match_dof);
     }
 
     constraints.close();
@@ -1053,14 +1053,12 @@ namespace Step1
     dof_handler.clear();
   }
 
-  template <int dim> void LaplaceProblem_t<dim>::debug_dof(const unsigned int match_dof)
+  template <int dim> void LaplaceProblem_t<dim>::debug_constraint(const unsigned int debug_dof)
   {
     pcout << "print cells with dof" << std::endl;
 
-    Vector<float> cells_match_dof;
-    cells_match_dof.reinit(triangulation.n_active_cells());
-
-    //replace all strings. used to better represent fe enriched elements
+    // construct lambda function to modify FE name description.
+    // used to better represent fe enriched elements
     auto replace = [](std::string& str, const std::string& from, const std::string& to) {
     if(from.empty())
         return;
@@ -1071,24 +1069,21 @@ namespace Step1
     }
     };
 
-    //find cell with a dof = match_dof.
+    //find cells with a dof = debug_dof.
     //store the iterator to one of these cells
     int i = 0;
-    typename hp::DoFHandler<dim>::active_cell_iterator match_cell;
+    std::vector<typename hp::DoFHandler<dim>::active_cell_iterator> match_cells;
     for (auto cell:dof_handler.active_cell_iterators()){
-
       //if the dof belongs to it
       std::vector< types::global_dof_index > 	dof_indices(cell->get_fe().dofs_per_cell);
       cell->get_dof_indices(dof_indices);
       for (auto dof:dof_indices)
-        if (dof == match_dof){
-           match_cell = cell;
+        if (dof == debug_dof){
+           match_cells.push_back(cell);
 
            std::string fe_name(cell->get_fe().get_name());
            replace(fe_name, "FE_Q<"+dealii::Utilities::int_to_string(dim)+">(1)", "1");
            replace(fe_name, "FE_Nothing<"+dealii::Utilities::int_to_string(dim)+">(dominating)", "0");
-
-           cells_match_dof[cell->active_cell_index()] = ++i;
 
           //print FE enriched for the cell
           pcout << cell->id() << " "
@@ -1097,37 +1092,65 @@ namespace Step1
         }
       }
 
-    if (match_cell.state() == IteratorState::valid)
-    {
-    auto patch = GridTools::get_patch_around_cell<hp::DoFHandler<dim>>(match_cell);
-    Triangulation<dim> local_triangulation;
-    hp::DoFHandler<dim> local_dofhandler(local_triangulation);
-    std::map<typename Triangulation<dim>::active_cell_iterator,
-             typename hp::DoFHandler<dim>::active_cell_iterator> 	patch_to_global_tria_map;
-    GridTools::build_triangulation_from_patch<hp::DoFHandler<dim>>(patch,
-                                                                   local_triangulation,
-                                                                   patch_to_global_tria_map);
+    // build patch around one of the cells with debug_dof
+    if (!match_cells.empty()){
+      auto patch = GridTools::get_patch_around_cell<hp::DoFHandler<dim>>(match_cells[0]);
 
-    for (auto cell:local_dofhandler.active_cell_iterators()){
-        cell->set_material_id(patch_to_global_tria_map.at(cell)->material_id());
-        cell->set_subdomain_id(patch_to_global_tria_map.at(cell)->active_fe_index());
+      //make sure patch consists of cells from match_cells. otherwise add them.
+      for (auto c: match_cells){
+          auto cell_found = std::find(std:: begin(patch),
+                                      std::end(patch),
+                                      c);
+          if (cell_found != std::end(patch))
+            {
+              patch.push_back(c);
+            }
+        }
+
+
+
+      Triangulation<dim> local_triangulation;
+      hp::DoFHandler<dim> local_dofhandler(local_triangulation);
+      std::map<typename Triangulation<dim>::active_cell_iterator,
+               typename hp::DoFHandler<dim>::active_cell_iterator> 	patch_to_global_tria_map;
+      GridTools::build_triangulation_from_patch<hp::DoFHandler<dim>>(patch,
+                                                                     local_triangulation,
+                                                                     patch_to_global_tria_map);
+
+      Vector<float> local_fe_indices, local_material_id, cells_contain_debug_dof;
+      unsigned int i = 0;
+      local_fe_indices.reinit(local_triangulation.n_active_cells());
+      local_material_id.reinit(local_triangulation.n_active_cells());
+      cells_contain_debug_dof.reinit(local_triangulation.n_active_cells());
+      for (auto cell:local_dofhandler.active_cell_iterators()){
+          local_material_id[i] = patch_to_global_tria_map.at(cell)->material_id();
+          local_fe_indices[i] = patch_to_global_tria_map.at(cell)->active_fe_index();
+
+          //check if the cells contain the debug dof
+          auto cell_found = std::find(std::begin(match_cells),
+                                      std::end(match_cells),
+                                      patch_to_global_tria_map.at(cell));
+          if (cell_found != std::end(match_cells))
+            {
+              cells_contain_debug_dof[i] = 1;
+            }
+          ++i;
       }
 
     std::ofstream output("triangulation_debug.vtk");
-    GridOut().write_vtk(local_triangulation, output);
-    output.close();
-    }
 
     //geometry of the cell (adaptable for 3d!)
     //cells with matching dofs are labelled from 1.
     //filter out 0 from output to see the cells.
-    std::ofstream output("dof_debug.vtk");
     DataOut<dim, hp::DoFHandler<dim>> data_out;
-    data_out.attach_dof_handler(dof_handler);
-    data_out.add_data_vector(cells_match_dof, "match_dof");
+    data_out.attach_dof_handler(local_dofhandler);
+    data_out.add_data_vector(local_fe_indices, "fe_indices");
+    data_out.add_data_vector(local_material_id, "material_id");
+    data_out.add_data_vector(cells_contain_debug_dof, "cells_contain_debug_dof");
     data_out.build_patches(prm.patches);
     data_out.write_vtk(output);
     output.close();
+    }
   }
 } // namespace Step1
 #endif
